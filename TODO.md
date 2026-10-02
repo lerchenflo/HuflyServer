@@ -7,7 +7,7 @@ Client-side product TODOs live in the Hufly app repo (`../hufly/TODO.md`). Requi
 Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by email, extended `GET /users/me`, `POST /users/sync`, `POST /tags/sync`, `AccessService`), 64 green tests. Nothing is committed yet.
 
 1. ~~App-start flow~~ done, security follow-ups fixed (refresh rejects deleted users, dummy BCrypt check for unknown emails, sync body capped at 10 000 entries).
-2. Admin endpoints: create users with generated passwords (USR-1, USR-2), manage tags and permissions (TAG-2), add and remove horses (HOR-3, TAG-6).
+2. ~~Admin endpoints~~ done: users, tags, horses (create/delete admin-only, edit with HORSE_EDIT, sync). Horse `foodPlanId` is not settable yet; the food plan feature assigns it.
 3. Horses, food plans, horse log, paddocks, events with invitations, tasks, user settings, each with a sync endpoint.
    Sync shape (decided 2026-10-02):
    - **Version sync** (like SchneaggchatV3server messages) for growing collections: Event, EventInvitation, HorseLogEntry, StableTask, PaddockAssignment. One counter document per collection in `counters` (atomic `$inc`). Every write, soft delete included, stamps `version`. `GET /x/sync?since=&page_size=` answers rows with `stableId == requester's AND since < version <= safeWatermark`, ascending, plus `newVersion` and `moreEntries`. Index `{stableId: 1, version: 1}`.

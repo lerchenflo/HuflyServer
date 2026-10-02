@@ -25,6 +25,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | `core/security/` | `SecurityConfig`, `JwtAuthFilter`, `JwtService`, `HashEncoder`, `requireAuth()` |
 | `repository/` | All Spring Data Mongo repositories (`@EnableMongoRepositories` base package) |
 | `user/` | `UserController` (`GET/PUT /users/me`, `POST /users/me/password`, `POST /users/sync`, admin: `POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/password-reset`), `UserService`, `model/` |
+| `horse/` | `HorseController` (`POST /horses/sync` for every member; admin: `POST /horses`, `DELETE /horses/{id}`; HORSE_EDIT: `PUT /horses/{id}`), `HorseService`, `model/{Horse,Medication,HorseResponse}` |
 | `stable/` | `StableLookupService`, `model/{Stable,StableResponse}` |
 | `tag/` | `TagController` (`POST /tags/sync`, admin: `POST /tags`, `PUT/DELETE /tags/{id}`), `TagService`, `model/{Tag,TagType,Permission,TagResponse}` |
 

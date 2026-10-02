@@ -18,4 +18,7 @@ class FakeRepositoryConfig {
 
     @Bean @Primary
     fun fakeTagRepository() = FakeTagRepository()
+
+    @Bean @Primary
+    fun fakeHorseRepository() = FakeHorseRepository()
 }

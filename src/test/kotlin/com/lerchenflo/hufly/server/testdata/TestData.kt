@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.testdata
 
+import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.stable.model.Stable
 import com.lerchenflo.hufly.server.stable.model.SubscriptionStatus
 import com.lerchenflo.hufly.server.tag.model.Permission
@@ -64,6 +65,31 @@ fun testTag(
     type = type,
     color = "#888888",
     permissions = permissions,
+    updatedAt = updatedAt,
+    updatedBy = id,
+    deleted = deleted,
+)
+
+fun testHorse(
+    id: ObjectId = ObjectId.get(),
+    stableId: ObjectId = STABLE_ID,
+    name: String = "Blitz",
+    updatedAt: Instant = Instant.EPOCH,
+    deleted: Boolean = false,
+) = Horse(
+    id = id,
+    stableId = stableId,
+    name = name,
+    description = "",
+    pictureUrl = null,
+    birthDate = null,
+    breed = "",
+    color = "",
+    ownerUserId = null,
+    medicalNotes = "",
+    vetContact = "",
+    medications = emptyList(),
+    foodPlanId = null,
     updatedAt = updatedAt,
     updatedBy = id,
     deleted = deleted,
