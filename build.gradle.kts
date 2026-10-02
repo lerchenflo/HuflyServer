@@ -34,6 +34,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-mongodb")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -45,4 +48,9 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // Docker Desktop on macOS without the /var/run/docker.sock symlink; Mongo integration tests skip without Docker.
+    val desktopSocket = File(System.getProperty("user.home"), ".docker/run/docker.sock")
+    if (System.getenv("DOCKER_HOST") == null && desktopSocket.exists()) {
+        environment("DOCKER_HOST", "unix://${desktopSocket.absolutePath}")
+    }
 }

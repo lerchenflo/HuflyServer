@@ -22,8 +22,8 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 - [ ] Payment model and subscription expiry (BIZ-6).
 
 ## Deferred features
-- [ ] Stable onboarding website: an operator page, guarded by credentials from the env file, where the first admin and their stable get created. Until then there is no way to create a stable outside tests.
-- [ ] Mongo-backed integration tests (Testcontainers) once Docker is available. Spring tests currently replace repositories with in-memory fakes.
+- [ ] Stable onboarding website: an operator page, guarded by credentials from the env file, where the first admin and their stable get created. Until then `BOOTSTRAP_*` env vars create one stable at startup (local development).
+- [ ] More Mongo integration tests (Testcontainers, `repository/mongo/`): only the task version query has one so far. Add one for every new version-sync repository.
 - [ ] Rate limiting on `/auth/login` (bucket4j + Redis like SchneaggchatV3server).
 - [ ] Verify the refresh-token TTL index against a real Mongo (`expiresAt` is `java.time.Instant`, so it should be stored as a BSON Date).
 - [ ] Device name/type on sessions, logout on all devices, password change (USR-5).

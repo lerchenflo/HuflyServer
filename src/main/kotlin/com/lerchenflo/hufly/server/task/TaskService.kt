@@ -108,7 +108,7 @@ class TaskService(
     fun sync(requester: User, since: Long, pageSize: Int): VersionSyncResponse<TaskResponse> {
         val seesAll = Permission.TASK_VIEW in accessService.effectivePermissions(requester)
         val watermark = versionCounterService.safeWatermark(SyncCollection.TASKS)
-        val rows = taskRepository.findByStableIdAndVersionGreaterThanAndVersionLessThanEqualOrderByVersionAsc(
+        val rows = taskRepository.findVersionPage(
             requester.stableId, since, watermark, Limit.of(pageSize + 1),
         )
         return versionSync(

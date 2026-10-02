@@ -15,9 +15,7 @@ class FakeTaskRepository : TaskRepository {
 
     override fun findById(id: ObjectId): StableTask? = tasks.firstOrNull { it.id == id }
 
-    override fun findByStableIdAndVersionGreaterThanAndVersionLessThanEqualOrderByVersionAsc(
-        stableId: ObjectId, since: Long, watermark: Long, limit: Limit,
-    ): List<StableTask> =
+    override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<StableTask> =
         tasks.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }
             .take(limit.max())
