@@ -18,7 +18,6 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 4. Run the `schneaggchat-security-check` skill after each new endpoint group.
 
 ## Open decisions
-- [ ] HOR-6 says horses can be assigned to tasks, but `StableTask` in the domain model has no `horseIds`. Ask whether tasks need horses.
 - [ ] Refresh token replay grace (SchneaggchatV3server keeps `previousHashedToken` so a client that lost the refresh response can retry). Currently a lost response forces a re-login.
 - [ ] Payment model and subscription expiry (BIZ-6).
 

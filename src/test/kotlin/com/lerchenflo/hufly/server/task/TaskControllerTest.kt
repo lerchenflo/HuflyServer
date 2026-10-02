@@ -59,7 +59,7 @@ class TaskControllerTest {
         }
 
     private fun taskJson(title: String = "Misten") =
-        """{"title":"$title","comment":"Box 3","dueAt":1790000000000,"assigneeUserIds":["${anna.id.toHexString()}"]}"""
+        """{"title":"$title","comment":"Box 3","dueAt":1790000000000,"assigneeUserIds":["${anna.id.toHexString()}"],"horseIds":[]}"""
 
     private fun createTask(): String {
         val body = call(HttpMethod.POST, "/tasks", taskJson()).andReturn().response.contentAsString
@@ -74,6 +74,7 @@ class TaskControllerTest {
             jsonPath("$.dueAt") { value(1790000000000) }
             jsonPath("$.assigneeUserIds[0]") { value(anna.id.toHexString()) }
             jsonPath("$.doneByUserId") { value(null) }
+            jsonPath("$.horseIds.length()") { value(0) }
             jsonPath("$.version") { isNumber() }
         }
     }

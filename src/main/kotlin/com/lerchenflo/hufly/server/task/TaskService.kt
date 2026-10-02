@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.versionSync
+import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
@@ -25,13 +26,22 @@ import java.time.Instant
 class TaskService(
     private val taskRepository: TaskRepository,
     private val userRepository: UserRepository,
+    private val horseRepository: HorseRepository,
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
 ) {
-    fun createTask(requester: User, title: String, comment: String, dueAt: Instant, assigneeUserIds: List<ObjectId>): StableTask {
+    fun createTask(
+        requester: User,
+        title: String,
+        comment: String,
+        dueAt: Instant,
+        assigneeUserIds: List<ObjectId>,
+        horseIds: List<ObjectId>,
+    ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         requireAssignees(requester, assigneeUserIds)
+        requireHorses(requester, horseIds)
         return save(
             StableTask(
                 stableId = requester.stableId,
@@ -39,6 +49,7 @@ class TaskService(
                 comment = comment,
                 dueAt = dueAt,
                 assigneeUserIds = assigneeUserIds,
+                horseIds = horseIds,
                 createdByUserId = requester.id,
                 doneByUserId = null,
                 doneAt = null,
@@ -55,16 +66,19 @@ class TaskService(
         comment: String,
         dueAt: Instant,
         assigneeUserIds: List<ObjectId>,
+        horseIds: List<ObjectId>,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
         requireAssignees(requester, assigneeUserIds)
+        requireHorses(requester, horseIds)
         return save(
             task.copy(
                 title = title,
                 comment = comment,
                 dueAt = dueAt,
                 assigneeUserIds = assigneeUserIds,
+                horseIds = horseIds,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -115,6 +129,13 @@ class TaskService(
             userRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown or missing assignee")
+    }
+
+    private fun requireHorses(requester: User, horseIds: List<ObjectId>) {
+        val valid = horseIds.all { id ->
+            horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
+        }
+        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
     }
 
     private fun stableTask(requester: User, taskId: ObjectId): StableTask =

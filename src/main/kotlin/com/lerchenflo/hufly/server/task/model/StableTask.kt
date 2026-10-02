@@ -16,6 +16,8 @@ data class StableTask(
     val comment: String,
     val dueAt: Instant,
     val assigneeUserIds: List<ObjectId>,
+    /** Optional horses the chore is about (HOR-6). */
+    val horseIds: List<ObjectId>,
     val createdByUserId: ObjectId,
     val doneByUserId: ObjectId?,
     val doneAt: Instant?,

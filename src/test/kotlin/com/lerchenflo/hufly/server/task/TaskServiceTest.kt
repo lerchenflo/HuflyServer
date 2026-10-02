@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
+import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskRepository
@@ -11,6 +12,7 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -34,9 +36,10 @@ class TaskServiceTest {
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
     private val taskRepository = FakeTaskRepository()
+    private val horseRepository = FakeHorseRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
-    private val taskService = TaskService(taskRepository, userRepository, accessService, versionCounterService, clock)
+    private val taskService = TaskService(taskRepository, userRepository, horseRepository, accessService, versionCounterService, clock)
 
     private val admin = testUser()
     private val plannerTag = testTag(permissions = setOf(Permission.TASK_EDIT))
@@ -54,6 +57,7 @@ class TaskServiceTest {
         tagRepository.save(plannerTag)
         tagRepository.save(viewerTag)
         stableRepository.save(testStable(adminUserId = admin.id))
+        horseRepository.save(blitz)
         clock.advance(Duration.ofDays(1))
     }
 
@@ -61,8 +65,13 @@ class TaskServiceTest {
         assertEquals(status, assertFailsWith<ResponseStatusException> { block() }.statusCode)
     }
 
-    private fun create(by: com.lerchenflo.hufly.server.user.model.User = planner, assignees: List<ObjectId> = listOf(anna.id, ben.id)) =
-        taskService.createTask(by, "Misten", "Box 3", due, assignees)
+    private val blitz = testHorse()
+
+    private fun create(
+        by: com.lerchenflo.hufly.server.user.model.User = planner,
+        assignees: List<ObjectId> = listOf(anna.id, ben.id),
+        horses: List<ObjectId> = emptyList(),
+    ) = taskService.createTask(by, "Misten", "Box 3", due, assignees, horses)
 
     private fun stored(id: ObjectId) = taskRepository.findById(id)!!
 
@@ -98,7 +107,7 @@ class TaskServiceTest {
     fun `every write takes a new version`() {
         val task = create()
 
-        taskService.updateTask(planner, task.id, "Misten", "Box 4", due, listOf(anna.id))
+        taskService.updateTask(planner, task.id, "Misten", "Box 4", due, listOf(anna.id), emptyList())
         assertEquals(2, stored(task.id).version)
         taskService.setDone(anna, task.id, true)
         assertEquals(3, stored(task.id).version)
@@ -112,7 +121,7 @@ class TaskServiceTest {
         val task = create()
         taskService.setDone(anna, task.id, true)
 
-        taskService.updateTask(planner, task.id, "Füttern", "", due.plusSeconds(3600), listOf(ben.id))
+        taskService.updateTask(planner, task.id, "Füttern", "", due.plusSeconds(3600), listOf(ben.id), emptyList())
 
         val stored = stored(task.id)
         assertEquals("Füttern", stored.title)
@@ -159,7 +168,7 @@ class TaskServiceTest {
         val foreign = taskRepository.save(stored(task.id).copy(id = ObjectId.get(), stableId = OTHER_STABLE_ID, deleted = false))
 
         for (id in listOf(task.id, foreign.id)) {
-            assertStatus(HttpStatus.NOT_FOUND) { taskService.updateTask(planner, id, "X", "", due, listOf(anna.id)) }
+            assertStatus(HttpStatus.NOT_FOUND) { taskService.updateTask(planner, id, "X", "", due, listOf(anna.id), emptyList()) }
             assertStatus(HttpStatus.NOT_FOUND) { taskService.deleteTask(planner, id) }
             assertStatus(HttpStatus.NOT_FOUND) { taskService.setDone(planner, id, true) }
         }
@@ -169,7 +178,7 @@ class TaskServiceTest {
     fun `members without TASK_EDIT cannot edit or delete`() {
         val task = create()
 
-        assertStatus(HttpStatus.FORBIDDEN) { taskService.updateTask(anna, task.id, "X", "", due, listOf(anna.id)) }
+        assertStatus(HttpStatus.FORBIDDEN) { taskService.updateTask(anna, task.id, "X", "", due, listOf(anna.id), emptyList()) }
         assertStatus(HttpStatus.FORBIDDEN) { taskService.deleteTask(anna, task.id) }
     }
 
@@ -213,7 +222,7 @@ class TaskServiceTest {
         val task = create(assignees = listOf(anna.id, ben.id))
         val before = taskService.sync(ben, since = 0, pageSize = 400).newVersion
 
-        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id))
+        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList())
 
         assertEquals(listOf(task.id.toHexString()), taskService.sync(ben, since = before, pageSize = 400).deletedEntries)
     }
@@ -226,5 +235,24 @@ class TaskServiceTest {
 
         assertEquals(emptyList(), result.updatedEntries)
         assertEquals(emptyList(), result.deletedEntries)
+    }
+
+    @Test
+    fun `tasks carry optional horses of the own stable (HOR-6)`() {
+        val task = create(horses = listOf(blitz.id))
+
+        assertEquals(listOf(blitz.id), stored(task.id).horseIds)
+
+        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList())
+        assertEquals(emptyList(), stored(task.id).horseIds)
+    }
+
+    @Test
+    fun `task horses must be live horses of the own stable`() {
+        val foreign = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
+        val deleted = horseRepository.save(testHorse(deleted = true))
+
+        assertStatus(HttpStatus.BAD_REQUEST) { create(horses = listOf(foreign.id)) }
+        assertStatus(HttpStatus.BAD_REQUEST) { create(horses = listOf(deleted.id)) }
     }
 }

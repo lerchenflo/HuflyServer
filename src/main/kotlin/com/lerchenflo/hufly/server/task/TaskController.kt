@@ -36,6 +36,7 @@ class TaskController(
         /** Epoch milliseconds, years 1970 to 2999. */
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val dueAt: Long,
         @field:Size(max = 50) val assigneeUserIds: List<String>,
+        @field:Size(max = 50) val horseIds: List<String> = emptyList(),
     )
 
     data class DoneRequest(val done: Boolean)
@@ -45,6 +46,7 @@ class TaskController(
         val requester = accessService.requester(requireAuth())
         return taskService.createTask(
             requester, request.title, request.comment, Instant.ofEpochMilli(request.dueAt), request.assigneeUserIds.map(::parseObjectId),
+            request.horseIds.map(::parseObjectId),
         ).toTaskResponse()
     }
 
@@ -54,6 +56,7 @@ class TaskController(
         return taskService.updateTask(
             requester, parseObjectId(taskId), request.title, request.comment, Instant.ofEpochMilli(request.dueAt),
             request.assigneeUserIds.map(::parseObjectId),
+            request.horseIds.map(::parseObjectId),
         ).toTaskResponse()
     }
 
