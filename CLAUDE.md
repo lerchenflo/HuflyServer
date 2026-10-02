@@ -21,7 +21,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | `authentication/` | `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/logout`), `AuthService`, `model/RefreshToken` |
 | `core/` | `parseObjectId` (400 on malformed ids), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |
-| `core/sync/` | `IdTimeStamp`, `SyncResponse`, generic `deltaSync(...)`, `requireValidSyncRequest` (page_size max 1000, at most 10 000 client entries) |
+| `core/sync/` | Version sync for growing collections: `SyncCollection`, `VersionCounterService.withVersion { }` (wrap every save, soft deletes included) and `safeWatermark`, generic `versionSync(...)`. IdTimeStamp sync for small ones: `IdTimeStamp`, `SyncResponse`, generic `deltaSync(...)`, `requireValidSyncRequest` (page_size max 1000, at most 10 000 client entries) |
 | `core/security/` | `SecurityConfig`, `JwtAuthFilter`, `JwtService`, `HashEncoder`, `requireAuth()` |
 | `repository/` | All Spring Data Mongo repositories (`@EnableMongoRepositories` base package) |
 | `user/` | `UserController` (`GET/PUT /users/me`, `POST /users/me/password`, `POST /users/sync`, admin: `POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/password-reset`), `UserService`, `model/` |
