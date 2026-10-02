@@ -58,6 +58,8 @@ class SecurityConfig(
         .authorizeHttpRequests { auth ->
             auth
                 .requestMatchers("/auth/**").permitAll()
+                // Public sales website from resources/static
+                .requestMatchers("/", "/index.html", "/impressum.html", "/datenschutz.html", "/assets/**", "/favicon.svg").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
         }

@@ -18,6 +18,7 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 4. Run the `schneaggchat-security-check` skill after each new endpoint group. Every version-sync repository gets a Testcontainers test in `repository/mongo/`.
 
 ## Open decisions
+- [ ] Website content before going live: real contact address (`index.html` uses the placeholder `kontakt@hufly.app`), full Impressum (ECG § 5, MedienG § 25) and privacy policy (DSGVO), prices once the payment model is decided.
 - [ ] Payment model and subscription expiry (BIZ-6).
 
 ## Deferred features

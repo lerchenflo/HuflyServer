@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hufly – Stallverwaltung für Pferde, Futter, Koppel und Reitstunden</title>
+<meta name="description" content="Hufly organisiert deinen Stall: Pferdeakten, Futterpläne, Koppelplanung, Reitstunden und Stallarbeiten in einer App. Funktioniert auch ohne Netz.">
+<meta name="theme-color" content="#6750A4">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Hufly Startseite">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#6750A4"/><path d="M19 14v18a13 13 0 0 0 26 0V14" fill="none" stroke="#EADDFF" stroke-width="8" stroke-linecap="round"/><g fill="#6750A4"><circle cx="19" cy="24" r="2.4"/><circle cx="45" cy="24" r="2.4"/><circle cx="22" cy="38" r="2.4"/><circle cx="42" cy="38" r="2.4"/></g></svg>
+      Hufly
+    </a>
+    <nav class="site-nav" aria-label="Hauptnavigation">
+      <a href="#funktionen">Funktionen</a>
+      <a href="#rollen">Für wen</a>
+      <a class="button small" href="#kontakt">Demo anfragen</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <h1>Dein Stall.<br>Ein Plan.<br>Für alle.</h1>
+        <p class="lead">Hufly bringt Futterpläne, Koppeleinteilung, Reitstunden und Stallarbeiten in eine App. Jeder im Stall weiß, was heute zu tun ist, auch ohne Netz in der Stallgasse.</p>
+        <div class="actions">
+          <a class="button" href="#kontakt">Demo anfragen</a>
+          <a class="button quiet" href="#funktionen">So funktioniert's</a>
+        </div>
+      </div>
+
+      <section class="board" aria-label="Beispiel: ein Tag im Stall in der Hufly-App">
+        <div class="board-head">
+          <h2>Heute im Stall</h2>
+          <span>Samstag</span>
+        </div>
+        <div class="slot">
+          <time>07:00</time>
+          <div>
+            <h3>Morgenfütterung</h3>
+            <p>Blitz, Donner, Wolke · Futterplan „Standard“</p>
+            <div class="tags"><span class="tag">Heu 2 Gabeln</span><span class="tag">Hafer 1 Schaufel</span></div>
+          </div>
+        </div>
+        <div class="slot">
+          <time>09:00</time>
+          <div>
+            <h3>Große Koppel</h3>
+            <p>Gruppe Wallache und Wolke, bis 16:00</p>
+            <div class="tags"><span class="tag warn">Blitz und Donner vertragen sich nicht</span></div>
+          </div>
+        </div>
+        <div class="slot">
+          <time>11:30</time>
+          <div>
+            <h3>Box 3 misten</h3>
+            <p>Anna oder Ben</p>
+            <div class="tags"><span class="tag yes">Erledigt von Anna</span></div>
+          </div>
+        </div>
+        <div class="slot">
+          <time>16:00</time>
+          <div>
+            <h3>Reitstunde Halle</h3>
+            <p>Mit Blitz und Wolke</p>
+            <div class="tags"><span class="tag yes">Lena kommt</span><span class="tag yes">Max kommt</span><span class="tag">Sophie offen</span></div>
+          </div>
+        </div>
+        <div class="slot">
+          <time>18:00</time>
+          <div>
+            <h3>Impfung fällig</h3>
+            <p>Donner · Influenza, nächste Woche</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="features" id="funktionen">
+    <div class="wrap">
+      <h2 class="section-title">Alles, was im Stall sonst auf Zetteln steht.</h2>
+      <p class="section-intro">Statt Whiteboard, Gruppenchat und Notizbuch: Hufly hält fest, wer welches Pferd füttert, wer auf welche Koppel darf und wer zur Reitstunde kommt.</p>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Futterpläne, die jeder versteht</h3>
+          <p>Ein Futterplan gilt für mehrere Pferde. Braucht ein Pferd etwas anderes, kopierst du den Plan und passt die Kopie an.</p>
+          <ul>
+            <li>Morgens, mittags, abends und nachts</li>
+            <li>Futtersorten als eigene Schlagworte</li>
+            <li>Menge als freie Notiz, so wie im Stall üblich</li>
+          </ul>
+        </div>
+        <div class="panel" aria-label="Beispiel Futterplan">
+          <div class="panel-title">Futterplan „Standard“ · 3 Pferde</div>
+          <table class="mealplan">
+            <thead><tr><th scope="col">Zeit</th><th scope="col">Futter</th></tr></thead>
+            <tbody>
+              <tr><td>Morgens</td><td>Heu<small>2 Gabeln</small></td></tr>
+              <tr><td>Mittags</td><td>Heu<small>1 Gabel</small></td></tr>
+              <tr><td>Abends</td><td>Hafer<small>1 Schaufel, eingeweicht</small></td></tr>
+              <tr><td>Nachts</td><td>Heu<small>Netz voll</small></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Koppelplanung mit Warnung</h3>
+          <p>Teile Gruppen oder einzelne Pferde Koppeln zu, mit Beginn und optionalem Ende. Vertragen sich zwei Pferde nicht, zeigt Hufly es sofort. Entscheiden tust du.</p>
+          <ul>
+            <li>Feste Gruppen für Pferde, die zusammen rausgehen</li>
+            <li>Unverträglichkeiten mit Grund hinterlegen</li>
+            <li>Warnung statt Verbot</li>
+          </ul>
+        </div>
+        <div class="panel" aria-label="Beispiel Koppelplan">
+          <div class="panel-title">Koppeln heute</div>
+          <div class="paddock">
+            <div class="paddock-row"><strong>Große Koppel</strong><p>Wallache, Wolke · 09:00 bis 16:00</p></div>
+            <div class="paddock-row conflict"><strong>Kleine Koppel</strong><p>Blitz und Donner: beißt beim Füttern</p></div>
+            <div class="paddock-row"><strong>Paddock</strong><p>Stute Luna · ab 10:00, offen</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Pferdeakte und Gesundheit</h3>
+          <p>Steckbrief, Besitzer, Tierarzt und Medikamente an einem Ort. Impfungen, Hufschmied und Training landen im Verlauf, jeweils mit dem nächsten Termin.</p>
+          <ul>
+            <li>Medikamente nur für die, die sie sehen sollen</li>
+            <li>Tätigkeiten mit Datum, Dauer und wer es gemacht hat</li>
+            <li>Nächster Termin direkt am Eintrag</li>
+          </ul>
+        </div>
+        <div class="panel" aria-label="Beispiel Pferdeakte">
+          <div class="panel-title">Donner · Haflinger, 11 Jahre</div>
+          <div class="record">
+            <div class="record-row"><span>Tierarzt</span><span>Dr. Huber, Dornbirn</span></div>
+            <div class="record-row"><span>Hufschmied</span><span>vor 5 Wochen</span></div>
+            <div class="record-row"><span>Longieren</span><span>gestern, 30 Minuten</span></div>
+            <div class="record-row due"><span>Impfung Influenza</span><span>fällig nächste Woche</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Reitstunden mit Zu- und Absagen</h3>
+          <p>Reitlehrer legen Stunden an, wählen die Pferde und laden ein. Wer absagt, wird ersetzt, ohne zehn Nachrichten im Gruppenchat.</p>
+          <ul>
+            <li>Ein oder mehrere Pferde pro Stunde</li>
+            <li>Zusagen und Absagen auf einen Blick</li>
+            <li>Alles im Kalender der Eingeladenen</li>
+          </ul>
+        </div>
+        <div class="panel" aria-label="Beispiel Reitstunde">
+          <div class="panel-title">Reitstunde Halle · Samstag 16:00</div>
+          <div class="invitees">
+            <div class="invitee"><div><span class="avatar">L</span>Lena</div><span class="tag yes">Kommt</span></div>
+            <div class="invitee"><div><span class="avatar">M</span>Max</div><span class="tag yes">Kommt</span></div>
+            <div class="invitee"><div><span class="avatar">S</span>Sophie</div><span class="tag">Offen</span></div>
+            <div class="invitee"><div><span class="avatar">J</span>Jonas</div><span class="tag warn">Abgesagt</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="roles" id="rollen">
+    <div class="wrap">
+      <h2 class="section-title">Jeder sieht, was er braucht.</h2>
+      <p class="section-intro">Du legst Rollen an und entscheidest, wer Pferde bearbeitet, Futterpläne ändert, Koppeln plant oder Reitstunden anlegt.</p>
+      <div class="role-grid">
+        <div class="role">
+          <h3>Stallbetreiber</h3>
+          <p>Legt Einsteller, Pferde und Rollen an. Hat immer alle Rechte und behält den Überblick über den ganzen Stall.</p>
+        </div>
+        <div class="role">
+          <h3>Reitlehrer und Stallteam</h3>
+          <p>Planen Reitstunden, verteilen Stallarbeiten, tragen Futterpläne und Tätigkeiten ein, je nach Rolle.</p>
+        </div>
+        <div class="role">
+          <h3>Einsteller und Reitschüler</h3>
+          <p>Sehen ihre Pferde, ihre Reitstunden und ihre Aufgaben. Sagen mit einem Tipp zu oder ab.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="offline">
+    <div class="wrap">
+      <h2>Kein Netz im Stall? Kein Problem.</h2>
+      <p>Hufly speichert alles auf dem Handy und gleicht ab, sobald wieder Verbindung da ist. Eintragen kannst du immer, auch hinten bei der Koppel.</p>
+    </div>
+  </section>
+
+  <section class="contact" id="kontakt">
+    <div class="wrap">
+      <div>
+        <h2>Probier Hufly in deinem Stall.</h2>
+        <p class="section-intro">Schreib uns kurz, wie groß dein Stall ist. Wir richten deinen Stall ein und du startest mit einer Testphase.</p>
+        <div class="actions contact-actions">
+          <!-- TODO: real contact address -->
+          <a class="button" href="mailto:kontakt@hufly.app?subject=Demo%20f%C3%BCr%20meinen%20Stall">Demo anfragen</a>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><div><strong>Anfrage schicken</strong><span>Name des Stalls und deine E-Mail genügen.</span></div></li>
+        <li><div><strong>Zugang bekommen</strong><span>Wir legen deinen Stall an, du bekommst dein Admin-Passwort.</span></div></li>
+        <li><div><strong>Team einladen</strong><span>Du legst Einsteller und Rollen an, alle loggen sich mit ihrer E-Mail ein.</span></div></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Hufly</span>
+    <nav aria-label="Rechtliches">
+      <a href="/impressum.html">Impressum</a>
+      <a href="/datenschutz.html">Datenschutz</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

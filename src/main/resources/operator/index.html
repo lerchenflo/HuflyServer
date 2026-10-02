@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Hufly Ställe</title>
 <style>
 /* Material 3 baseline colours, the same scheme the Hufly app uses (lightColorScheme / darkColorScheme). */
@@ -23,15 +24,22 @@
     --error: #F2B8B5; --error-container: #8C1D18; --on-error-container: #F9DEDC;
   }
 }
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/bricolage-grotesque-latin.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--surface); color: var(--on-surface);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 main { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
-h1 { font-size: 28px; font-weight: 500; margin: 0 0 4px; }
+h1 { display: flex; align-items: center; gap: 12px; font: 700 30px/1.1 "Bricolage Grotesque", system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 6px; }
+h1 svg { width: 36px; height: 36px; flex: none; }
 .subtitle { color: var(--on-surface-variant); margin: 0 0 32px; }
-h2 { font-size: 18px; font-weight: 500; margin: 0 0 16px; }
+h2 { font: 600 20px/1.2 "Bricolage Grotesque", system-ui, sans-serif; margin: 0 0 16px; }
 .card { background: var(--surface-container); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
 form { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
 label { display: grid; gap: 6px; font-size: 14px; color: var(--on-surface-variant); }
@@ -40,6 +48,7 @@ input {
   font: inherit; color: var(--on-surface); background: transparent;
   border: 1px solid var(--outline); border-radius: 8px; padding: 12px 14px;
 }
+button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
 button {
   grid-column: 1 / -1; justify-self: start; font: inherit; font-weight: 500;
@@ -66,7 +75,7 @@ td { border-top: 1px solid var(--outline-variant); padding: 10px 12px 10px 0; }
 </head>
 <body>
 <main>
-  <h1>Hufly Ställe</h1>
+  <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#6750A4"/><path d="M19 14v18a13 13 0 0 0 26 0V14" fill="none" stroke="#EADDFF" stroke-width="8" stroke-linecap="round"/><g fill="#6750A4"><circle cx="19" cy="24" r="2.4"/><circle cx="45" cy="24" r="2.4"/><circle cx="22" cy="38" r="2.4"/><circle cx="42" cy="38" r="2.4"/></g></svg>Hufly Ställe</h1>
   <p class="subtitle">Neuen Stall mit seinem Admin anlegen.</p>
 
   <section class="card">
