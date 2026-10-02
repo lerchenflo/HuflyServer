@@ -41,6 +41,9 @@ class FakeRepositoryConfig {
     fun fakePaddockAssignmentRepository() = FakePaddockAssignmentRepository()
 
     @Bean @Primary
+    fun fakeUserSettingsRepository() = FakeUserSettingsRepository()
+
+    @Bean @Primary
     fun fakeTaskRepository() = FakeTaskRepository()
 
     @Bean @Primary
