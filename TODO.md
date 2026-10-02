@@ -8,7 +8,12 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 
 1. ~~App-start flow~~ done, security follow-ups fixed (refresh rejects deleted users, dummy BCrypt check for unknown emails, sync body capped at 10 000 entries).
 2. Admin endpoints: create users with generated passwords (USR-1, USR-2), manage tags and permissions (TAG-2), add and remove horses (HOR-3, TAG-6).
-3. Horses, food plans, horse log, paddocks, events with invitations, tasks, user settings, each with a sync endpoint. Model: `docs/domain-model.html` (complete as of 2026-10-02).
+3. Horses, food plans, horse log, paddocks, events with invitations, tasks, user settings, each with a sync endpoint.
+   Sync shape (decided 2026-10-02):
+   - **Version sync** (like SchneaggchatV3server messages) for growing collections: Event, EventInvitation, HorseLogEntry, StableTask, PaddockAssignment. One counter document per collection in `counters` (atomic `$inc`). Every write, soft delete included, stamps `version`. `GET /x/sync?since=&page_size=` answers rows with `stableId == requester's AND since < version <= safeWatermark`, ascending, plus `newVersion` and `moreEntries`. Index `{stableId: 1, version: 1}`.
+   - Build `safeWatermark` without the Schneaggchat gap: read `current()` first, then take `min(current, lowestInFlight - 1)`. In-flight tracking is per process, so the server must stay single-instance until it moves to a shared store.
+   - Loss of access (e.g. EVENT_VIEW removed) produces no tombstones; the client drops local data based on `/users/me` permissions.
+   - **IdTimeStamp sync** (already built in `core/sync`) for small collections: users, tags, horses, food plans, paddocks, horse groups, horse conflicts. Model: `docs/domain-model.html` (complete as of 2026-10-02).
 4. Run the `schneaggchat-security-check` skill after each new endpoint group.
 
 ## Open decisions

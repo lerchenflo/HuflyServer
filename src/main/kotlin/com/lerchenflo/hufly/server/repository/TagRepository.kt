@@ -6,5 +6,6 @@ import org.springframework.data.repository.Repository
 
 interface TagRepository : Repository<Tag, ObjectId> {
     fun save(tag: Tag): Tag
+    fun findById(id: ObjectId): Tag?
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<Tag>
 }

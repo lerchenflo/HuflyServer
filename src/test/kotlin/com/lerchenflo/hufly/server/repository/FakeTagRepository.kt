@@ -14,4 +14,6 @@ class FakeTagRepository : TagRepository {
 
     override fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<Tag> =
         tags.filter { it.stableId == stableId && !it.deleted }
+
+    override fun findById(id: ObjectId): Tag? = tags.firstOrNull { it.id == id }
 }

@@ -8,4 +8,5 @@ interface RefreshTokenRepository : Repository<RefreshToken, ObjectId> {
     fun save(token: RefreshToken): RefreshToken
     fun findByHashedToken(hashedToken: String): RefreshToken?
     fun deleteByHashedToken(hashedToken: String): Long
+    fun deleteByUserId(userId: ObjectId): Long
 }

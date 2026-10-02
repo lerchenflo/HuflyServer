@@ -19,4 +19,10 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         tokens.removeIf { it.hashedToken == hashedToken }
         return (before - tokens.size).toLong()
     }
+
+    override fun deleteByUserId(userId: org.bson.types.ObjectId): Long {
+        val before = tokens.size
+        tokens.removeIf { it.userId == userId }
+        return (before - tokens.size).toLong()
+    }
 }

@@ -398,12 +398,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "createdAt: Instant",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "version: Long"
    ],
    "id": "log",
    "kind": "class",
    "name": "HorseLogEntry",
-   "note": "What was done with a horse, from when to when, and by whom (jumping, lunging, farrier, vaccination...). endAt is empty for one-off things like a vaccination. 'Last done' = newest startAt per horse and ACTIVITY tag, computed in the app. nextDueAt e.g. for vaccinations. Writing needs HORSE_LOG_WRITE; everyone in the stable can read.",
+   "note": "What was done with a horse, from when to when, and by whom (jumping, lunging, farrier, vaccination...). endAt is empty for one-off things like a vaccination. 'Last done' = newest startAt per horse and ACTIVITY tag, computed in the app. nextDueAt e.g. for vaccinations. Writing needs HORSE_LOG_WRITE; everyone in the stable can read. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "horselog",
    "x": 890,
    "y": 720
@@ -486,12 +487,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "comment: String",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "version: Long"
    ],
    "id": "passign",
    "kind": "class",
    "name": "PaddockAssignment",
-   "note": "Which horses are on which paddock from startAt to endAt (empty = until further notice). Planned by picking groups and/or single horses. horseIds is the full list at save time, so later group edits don't rewrite history; groupIds only remembers what was picked. Needs PADDOCK_PLAN.",
+   "note": "Which horses are on which paddock from startAt to endAt (empty = until further notice). Planned by picking groups and/or single horses. horseIds is the full list at save time, so later group edits don't rewrite history; groupIds only remembers what was picked. Needs PADDOCK_PLAN. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "paddock",
    "x": 1500,
    "y": 500
@@ -528,12 +530,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "createdAt: Instant",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "version: Long"
    ],
    "id": "event",
    "kind": "class",
    "name": "Event",
-   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_CREATE_INVITE, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. Recurring events deferred.",
+   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_CREATE_INVITE, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. Recurring events deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "event",
    "x": 395,
    "y": 520
@@ -549,12 +552,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "respondedAt: Instant?",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "version: Long"
    ],
    "id": "inv",
    "kind": "class",
    "name": "EventInvitation",
-   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined.",
+   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "event",
    "x": 395,
    "y": 820
@@ -586,12 +590,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "doneAt: Instant?",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "version: Long"
    ],
    "id": "task",
    "kind": "class",
    "name": "StableTask",
-   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_CREATE_ASSIGN. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. Recurring tasks deferred.",
+   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_CREATE_ASSIGN. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. Recurring tasks deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "task",
    "x": 1180,
    "y": 420

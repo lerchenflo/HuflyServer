@@ -7,7 +7,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 - **Test-driven development.** Use the `test-driven-development` skill for every feature and bugfix. No production code without a failing test first. Run `./gradlew test` before calling work done.
 - **Follow the SchneaggchatV3server conventions** (`../SchneaggchatV3server`). Use its skills: `schneaggchatv3server` (architecture map), `schneaggchat-add-feature`, `schneaggchat-add-sync-endpoint`, `schneaggchat-add-realtime-push`, `schneaggchat-security-check` (run after every new endpoint), `schneaggchat-flow-stability`. Translate package names to `com.lerchenflo.hufly.server`.
 - **Client contract.** DTO field names must match the client's `*Dto` classes in `../hufly`. Change both sides together.
-- **Offline first clients.** Every synced entity has `updatedAt`, `updatedBy`, `deleted` (soft delete) so clients can delta-sync.
+- **Offline first clients.** Every synced entity has `updatedAt`, `updatedBy`, `deleted` (soft delete) so clients can delta-sync. Small collections sync via `IdTimeStamp` lists (`core/sync`); growing ones (events, invitations, horse log, tasks, paddock assignments) via a per-collection `version` counter. See `TODO.md` step 3.
 - **Interface first, fakes over mocks.** Repositories extend Spring Data `Repository` (not `MongoRepository`) and declare only the methods in use, so tests use small in-memory fakes from `src/test/.../repository/`.
 - **Stables are separate user bases.** Every user belongs to exactly one stable (`User.stableId`). Every query filters by the requester's `stableId`; nobody, stable admins included, can read or change another stable's data. The admin (`Stable.adminUserId`) bypasses role tags; everyone else is gated by the permissions of their `USER_ROLE` tags.
 - **Domain model.** The agreed UML lives in `docs/domain-model.html` (model JSON in its `<script id="model">` block). Open it in a browser to view or edit; "Save to file" writes edits back. Implement from it and keep it in sync.
@@ -19,14 +19,14 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | Package | Content |
 |---|---|
 | `authentication/` | `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/logout`), `AuthService`, `model/RefreshToken` |
-| `core/` | `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
+| `core/` | `parseObjectId` (400 on malformed ids), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |
 | `core/sync/` | `IdTimeStamp`, `SyncResponse`, generic `deltaSync(...)`, `requireValidSyncRequest` (page_size max 1000, at most 10 000 client entries) |
 | `core/security/` | `SecurityConfig`, `JwtAuthFilter`, `JwtService`, `HashEncoder`, `requireAuth()` |
 | `repository/` | All Spring Data Mongo repositories (`@EnableMongoRepositories` base package) |
-| `user/` | `UserController` (`GET /users/me`, `POST /users/sync`), `model/{User,UserResponse,MeResponse}` |
+| `user/` | `UserController` (`GET/PUT /users/me`, `POST /users/me/password`, `POST /users/sync`, admin: `POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/password-reset`), `UserService`, `model/` |
 | `stable/` | `StableLookupService`, `model/{Stable,StableResponse}` |
-| `tag/` | `TagController` (`POST /tags/sync`), `model/{Tag,TagType,Permission,TagResponse}` |
+| `tag/` | `TagController` (`POST /tags/sync`, admin: `POST /tags`, `PUT/DELETE /tags/{id}`), `TagService`, `model/{Tag,TagType,Permission,TagResponse}` |
 
 New feature: package `<feature>/` with `Controller`, `Service`, optional `LookupService`, `model/` (entity + `Response` DTO + `toXResponse()`), repository in `repository/`.
 
