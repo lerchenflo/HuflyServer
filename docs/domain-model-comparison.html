@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hufly vs Schneaggchat Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: single reading column of comparison tables, one section per domain area. */
+:root {
+  --bg: #e9ece6;
+  --sheet: #f7f8f4;
+  --grid: #dde2d8;
+  --ink: #1d2a24;
+  --muted: #5b6b62;
+  --line: #9aa89f;
+  --accent: #7a4a23;
+  --box: #ffffff;
+  --ok: #2e7d4f;
+  --warn: #a8631a;
+  --bad: #b23a33;
+  --hufly: #2f6f9f;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a17; --sheet: #1c2320; --grid: #26302b; --ink: #e3ebe5; --muted: #9db0a5; --line: #6f8278;
+    --accent: #d39a62; --box: #222b27; --ok: #6cc28f; --warn: #e0a35c; --bad: #ec7d74; --hufly: #7fb6df;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a17; --sheet: #1c2320; --grid: #26302b; --ink: #e3ebe5; --muted: #9db0a5; --line: #6f8278;
+  --accent: #d39a62; --box: #222b27; --ok: #6cc28f; --warn: #e0a35c; --bad: #ec7d74; --hufly: #7fb6df;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.wrap { padding-inline: 16px; padding-block: 24px 48px; max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; }
+p { margin: 0; max-width: 72ch; }
+.muted { color: var(--muted); }
+code { font-family: var(--font-mono); font-size: 12.5px; }
+section { background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; border: 1px solid currentColor; white-space: nowrap; }
+.same { color: var(--ok); }
+.changed { color: var(--warn); }
+.hufly { color: var(--hufly); }
+.sch { color: var(--bad); }
+.table-wrap { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; min-width: 620px; background: var(--box); }
+th, td { text-align: left; vertical-align: top; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+td.f { font-family: var(--font-mono); font-size: 12.5px; }
+td.s { width: 1%; }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.cols > div { min-width: 0; display: grid; gap: 8px; align-content: start; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Hufly vs Schneaggchat Model</h1>
+    <p class="muted">Field-level comparison of the stored MongoDB documents. Hufly side: <code>docs/domain-model.html</code> in HuflyServer. Schneaggchat side: <code>docs/domain-model.html</code> in SchneaggchatV3server, taken from the <code>@Document</code> classes.</p>
+    <div class="legend">
+      <span class="chip same">same</span>
+      <span class="chip changed">changed</span>
+      <span class="chip hufly">Hufly only</span>
+      <span class="chip sch">Schneaggchat only</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>User</h2>
+    <p>Schneaggchat is one global user base with a username login and a global <code>role</code>. Hufly users belong to exactly one stable, log in with email and get their rights from the stable admin and role tags.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>Hufly</th><th>Schneaggchat</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id</td><td class="f">ObjectId</td><td class="f">ObjectId</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">email</td><td>Login, globally unique</td><td>Indexed, not unique; not the login</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">username</td><td>—</td><td>Unique, the login</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+        <tr><td class="f">stableId</td><td class="f">ObjectId</td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+        <tr><td class="f">displayName</td><td class="f">String</td><td>— (username is shown)</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+        <tr><td class="f">hashedPassword</td><td class="f">String</td><td class="f">String</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">phoneNumber</td><td class="f">String?</td><td class="f">String?</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">profile picture</td><td class="f">profilePictureUrl: String?</td><td class="f">profilePicUpdatedAt: Instant</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">permissions</td><td class="f">roleTagIds: List&lt;ObjectId&gt;</td><td class="f">role: UserRole (USER / ADMIN)</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">settings</td><td>Separate <code>UserSettings</code> document, <code>values: Map&lt;String, String&gt;</code></td><td>Embedded <code>settings: PersonalUserSettings</code></td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">createdAt, updatedAt</td><td class="f">Instant</td><td class="f">Instant</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">updatedBy, deleted</td><td class="f">ObjectId, Boolean</td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+        <tr><td class="f">emailVerifiedAt, userDescription, userStatus, birthDate, lastSeen, allowWakeGlobal</td><td>—</td><td>Profile and chat presence fields</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>RefreshToken</h2>
+    <p>Hufly currently has the minimal session row. Schneaggchat rotates the row in place and keeps the previous hash so a client that lost a refresh response can retry, and it records the device.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>Hufly</th><th>Schneaggchat</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id, userId, hashedToken, expiresAt, createdAt</td><td>Present</td><td>Present</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">previousHashedToken, rawToken</td><td>—</td><td>Replay recovery after a lost refresh response</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+        <tr><td class="f">deviceName, deviceType</td><td>—</td><td>One row per device, login dedup</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Event and participation</h2>
+    <p>Schneaggchat embeds invitations and answers in the event document. Hufly keeps one <code>EventInvitation</code> document per invited user, so an invitee's answer is a small write that syncs on its own.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>Hufly Event</th><th>Schneaggchat Event</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id, title, description</td><td>Present</td><td>Present</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">creator</td><td class="f">creatorUserId</td><td class="f">creatorId</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">start / end</td><td class="f">startAt: Instant, endAt: Instant</td><td class="f">startDate: Instant, closeDate: Instant?</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">invitations</td><td>Separate <code>EventInvitation</code> collection: status PENDING / ACCEPTED / DECLINED, invitedAt, respondedAt</td><td>Embedded <code>invitedUsers: List&lt;ObjectId&gt;</code> + <code>participations: List&lt;EventParticipation&gt;</code>, status SEEN / ACCEPTED / DISMISSED</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td class="f">stableId, horseIds</td><td>Stable scope, horses used in the lesson</td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+        <tr><td class="f">type, groupId, location, visibility, maxUsers, groupDeleteDelay</td><td>— (no limit, no chat group)</td><td>Present</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+        <tr><td class="f">createdAt</td><td class="f">Instant</td><td class="f">Instant</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">updatedAt, updatedBy</td><td>Present</td><td>Present</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td class="f">deleted</td><td class="f">Boolean</td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Roles and admin rights</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Concept</th><th>Hufly</th><th>Schneaggchat</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Global admin</td><td>None</td><td><code>User.role</code> = ADMIN (server admin panel)</td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+        <tr><td>Scope admin</td><td><code>Stable.adminUserId</code>, exactly one per stable, bypasses tags</td><td><code>GroupMember.admin</code>, any number per group</td><td class="s"><span class="chip changed">changed</span></td></tr>
+        <tr><td>Fine-grained rights</td><td><code>Tag</code> (type USER_ROLE) with <code>permissions: Set&lt;Permission&gt;</code></td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+        <tr><td>Data isolation</td><td>Every document carries <code>stableId</code>; no cross-stable access</td><td>Visibility through friendships and group membership</td><td class="s"><span class="chip changed">changed</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Sync fields</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Mechanism</th><th>Hufly</th><th>Schneaggchat</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><code>updatedAt</code>, <code>updatedBy</code>, <code>deleted</code></td><td>On User, Tag, Horse, FoodPlanEntry, Event, EventInvitation, StableTask</td><td>On MapEntry (soft delete), Event has updatedAt/updatedBy, Group has updatedAt/deleted</td><td class="s"><span class="chip same">same</span></td></tr>
+        <tr><td>Version counter</td><td>—</td><td><code>counters</code> collection; <code>Message.version</code> and <code>GroupMember.joinedAtVersion</code> drive <code>/messages/sync</code></td><td class="s"><span class="chip sch">Schneaggchat only</span></td></tr>
+        <tr><td>Gaps</td><td><code>UserSettings</code> only updatedAt (per-user document, never soft-deleted)</td><td>—</td><td class="s"><span class="chip hufly">Hufly only</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Only on one side</h2>
+    <div class="cols">
+      <div>
+        <h3 class="sch">Schneaggchat only, not needed in Hufly</h3>
+        <ul>
+          <li>Friends: <code>Friendship</code>, <code>FriendshipSetting</code></li>
+          <li>Chat: <code>Group</code>, <code>GroupMember</code>, <code>Message</code></li>
+          <li>Map: <code>MapEntry</code>, <code>MapEntryVersion</code>, <code>UserLocation</code></li>
+          <li>Push tokens and presence: <code>ApnsToken</code>, <code>FirebaseToken</code>, <code>ConnectionLogEntry</code> (Hufly needs token collections once push notifications land)</li>
+          <li>Games: <code>GameScore</code></li>
+          <li>Website: <code>Donation</code>, <code>FaqEntry</code></li>
+          <li>Infrastructure: <code>VersionCounter</code>, <code>Log</code></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="hufly">Hufly only</h3>
+        <ul>
+          <li><code>Stable</code> with <code>SubscriptionStatus</code></li>
+          <li><code>Tag</code> with <code>TagType</code> and <code>Permission</code></li>
+          <li><code>Horse</code> with embedded <code>Vaccination</code> and <code>Medication</code></li>
+          <li><code>FoodPlanEntry</code> with <code>MealSlot</code></li>
+          <li><code>EventInvitation</code> as its own collection</li>
+          <li><code>StableTask</code></li>
+          <li><code>UserSettings</code> as its own collection</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Worth reusing from Schneaggchat</h2>
+    <p class="muted">Paths relative to <code>src/main/kotlin/com/lerchenflo/schneaggchatv3server/</code>.</p>
+    <ul>
+      <li>Refresh token replay recovery and device dedup: <code>authentication/AuthService.kt</code>, <code>authentication/model/RefreshToken.kt</code></li>
+      <li>Soft-delete synced feature with controller, service and sync endpoint: <code>schneaggmap/SchneaggmapController.kt</code>, <code>schneaggmap/SchneaggmapService.kt</code></li>
+      <li>Version-based delta sync if timestamps prove unreliable: <code>util/VersionCounterService.kt</code>, <code>util/SyncCollection.kt</code></li>
+      <li>Retry on concurrent writes: <code>util/OptimisticRetry.kt</code></li>
+      <li>Canonical auth helper: <code>core/security/RequireAuth.kt</code></li>
+      <li>Expired data cleanup (TTL indexes do not work on kotlin.time.Instant there): <code>core/DatabaseCleanupTask.kt</code></li>
+      <li>Login rate limiting: <code>core/security/ratelimit/RateLimitFilter.kt</code></li>
+      <li>Profile and horse pictures: <code>util/ImageManager.kt</code></li>
+      <li>Push fan-out (WebSocket, FCM, APNs) for event invitations later: <code>notifications/NotificationService.kt</code></li>
+      <li>Error responses and input checks: <code>core/GlobalExceptionHandler.kt</code>, <code>util/ValidationUtils.kt</code></li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>
