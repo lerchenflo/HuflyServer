@@ -24,6 +24,5 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 - [ ] Security check 2026-10-02 (food plans, horse log, paddocks, settings, events): no HIGH or MEDIUM. LOW fixed: at most 500 live invitations per event. NOTE: rows a user may not see come as ids in `deletedEntries` (ids only, no content).
 - [ ] Stable onboarding website: an operator page, guarded by credentials from the env file, where the first admin and their stable get created. Until then `BOOTSTRAP_*` env vars create one stable at startup (local development).
 - [ ] Rate limiting on `/auth/login` (bucket4j + Redis like SchneaggchatV3server).
-- [ ] Verify the refresh-token TTL index against a real Mongo (`expiresAt` is `java.time.Instant`, so it should be stored as a BSON Date).
 - [ ] Device name/type on sessions, logout on all devices; a password change should end the other sessions (USR-5).
 - [ ] Emailing generated passwords (USR-3), push notifications (EVT-9), recurring events and tasks (EVT-10, TSK-5).

@@ -7,8 +7,10 @@ import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
 /**
- * One row per device session. Only SHA-256 hashes of tokens are stored. [previousHashedToken] and [rotatedAt] let a
- * client that lost the refresh response retry with its old token for a short grace period.
+ * One row per device session, rotated in place like SchneaggchatV3server: `/auth/refresh` swaps [hashedToken] to
+ * the new token's hash and keeps the presented one in [previousHashedToken]. A client that never received the
+ * response retries with the old token and gets the current one back from [encryptedToken], so the old token works
+ * until the client uses the new one. Tokens are stored only hashed or encrypted.
  */
 @Document("refreshTokens")
 data class RefreshToken(
@@ -16,7 +18,9 @@ data class RefreshToken(
     val userId: ObjectId,
     @Indexed(unique = true) val hashedToken: String,
     @Indexed(sparse = true) val previousHashedToken: String? = null,
-    val rotatedAt: Instant? = null,
+    /** The current token, AES-GCM encrypted; null until the first rotation. */
+    val encryptedToken: String? = null,
+    /** Slides forward on every rotation. */
     @Indexed(expireAfter = "0s") val expiresAt: Instant,
     val createdAt: Instant,
 )

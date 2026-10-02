@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.authentication
 
 import com.lerchenflo.hufly.server.core.security.JwtService
+import com.lerchenflo.hufly.server.core.security.TokenCipher
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -24,7 +25,8 @@ class AuthServiceTest {
     private val hashEncoder = CountingHashEncoder()
     private val userRepository = FakeUserRepository()
     private val refreshTokenRepository = FakeRefreshTokenRepository()
-    private val authService = AuthService(userRepository, refreshTokenRepository, jwtService, hashEncoder, clock)
+    private val tokenCipher = TokenCipher("test-secret-that-is-long-enough-for-hs256-signing")
+    private val authService = AuthService(userRepository, refreshTokenRepository, jwtService, hashEncoder, tokenCipher, clock)
 
     private val anna = testUser(
         id = ObjectId("66f000000000000000000001"),
@@ -155,56 +157,47 @@ class AuthServiceTest {
         authService.logout("unknown")
     }
 
-    // Replay grace: a client that lost the refresh response retries with the token it still has.
+    // Replay recovery like SchneaggchatV3server: the old token keeps working until the client uses the new one.
 
     @Test
-    fun `retry with the rotated token within 30 seconds gets working tokens`() {
+    fun `retry with the old token returns the same refresh token as the lost response, even much later`() {
         val login = authService.login("anna@hufly.test", "Secret123")
-        authService.refresh(login.refreshToken)
-        clock.advance(Duration.ofSeconds(29))
+        val lost = authService.refresh(login.refreshToken)
+        clock.advance(Duration.ofDays(3))
 
         val retried = authService.refresh(login.refreshToken)
 
-        authService.refresh(retried.refreshToken)
+        assertEquals(lost.refreshToken, retried.refreshToken)
+        assertEquals(anna.id, jwtService.userIdFromAccessToken(retried.accessToken))
     }
 
     @Test
-    fun `retry replaces the token from the lost response`() {
+    fun `retries do not rotate, the delivered token keeps working`() {
         val login = authService.login("anna@hufly.test", "Secret123")
         val lost = authService.refresh(login.refreshToken)
-
+        authService.refresh(login.refreshToken)
         authService.refresh(login.refreshToken)
 
-        assertUnauthorized { authService.refresh(lost.refreshToken) }
+        authService.refresh(lost.refreshToken)
     }
 
     @Test
-    fun `retry after 30 seconds is unauthorized`() {
+    fun `using the new token retires the old one`() {
         val login = authService.login("anna@hufly.test", "Secret123")
-        authService.refresh(login.refreshToken)
-        clock.advance(Duration.ofSeconds(31))
+        val second = authService.refresh(login.refreshToken)
+        authService.refresh(second.refreshToken)
 
         assertUnauthorized { authService.refresh(login.refreshToken) }
     }
 
     @Test
-    fun `repeated retries do not extend the 30 seconds`() {
+    fun `retry after logout is unauthorized, also when logging out with the old token`() {
         val login = authService.login("anna@hufly.test", "Secret123")
         authService.refresh(login.refreshToken)
-        clock.advance(Duration.ofSeconds(20))
-        authService.refresh(login.refreshToken)
-        clock.advance(Duration.ofSeconds(20))
+        authService.logout(login.refreshToken)
 
         assertUnauthorized { authService.refresh(login.refreshToken) }
-    }
-
-    @Test
-    fun `retry after logout is unauthorized`() {
-        val login = authService.login("anna@hufly.test", "Secret123")
-        val current = authService.refresh(login.refreshToken)
-        authService.logout(current.refreshToken)
-
-        assertUnauthorized { authService.refresh(login.refreshToken) }
+        assertTrue(refreshTokenRepository.tokens.isEmpty())
     }
 
     @Test
@@ -217,11 +210,22 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `the token before the previous one never works`() {
-        val first = authService.login("anna@hufly.test", "Secret123")
-        val second = authService.refresh(first.refreshToken)
-        authService.refresh(second.refreshToken)
+    fun `rotation keeps one row per session and stores no raw token`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        val current = authService.refresh(login.refreshToken)
 
-        assertUnauthorized { authService.refresh(first.refreshToken) }
+        val row = refreshTokenRepository.tokens.single()
+        assertFalse(row.toString().contains(current.refreshToken))
+        assertFalse(row.toString().contains(login.refreshToken))
+    }
+
+    @Test
+    fun `rotation slides the session expiry`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        clock.advance(Duration.ofDays(10))
+
+        authService.refresh(login.refreshToken)
+
+        assertEquals(clock.instant().plus(jwtService.refreshTokenValidity), refreshTokenRepository.tokens.single().expiresAt)
     }
 }
