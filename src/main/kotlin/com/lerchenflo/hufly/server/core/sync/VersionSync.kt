@@ -32,3 +32,11 @@ fun <E, R> versionSync(
         moreEntries = rows.size > pageSize,
     )
 }
+
+fun requireValidVersionSyncRequest(since: Long, pageSize: Int) {
+    if (since < 0 || pageSize !in 1..MAX_SYNC_PAGE_SIZE) {
+        throw org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid since or page_size",
+        )
+    }
+}

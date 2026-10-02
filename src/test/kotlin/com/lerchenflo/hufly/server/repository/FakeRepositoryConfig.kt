@@ -21,4 +21,10 @@ class FakeRepositoryConfig {
 
     @Bean @Primary
     fun fakeHorseRepository() = FakeHorseRepository()
+
+    @Bean @Primary
+    fun fakeTaskRepository() = FakeTaskRepository()
+
+    @Bean @Primary
+    fun fakeVersionCounterStore() = com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()
 }
