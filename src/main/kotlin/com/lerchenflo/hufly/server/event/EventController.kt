@@ -39,10 +39,10 @@ class EventController(
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val endAt: Long,
         @field:Size(max = 50) val horseIds: List<String>,
         /** Only read on create; afterwards use the invitation endpoints. */
-        @field:Size(max = 200) val inviteeUserIds: List<String> = emptyList(),
+        @field:Size(max = 500) val inviteeUserIds: List<String> = emptyList(),
     )
 
-    data class InviteRequest(@field:Size(min = 1, max = 200) val userIds: List<String>)
+    data class InviteRequest(@field:Size(min = 1, max = 500) val userIds: List<String>)
 
     data class AnswerRequest(val accepted: Boolean)
 

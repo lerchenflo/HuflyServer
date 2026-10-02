@@ -55,6 +55,7 @@ class EventService(
         accessService.requirePermission(requester, Permission.EVENT_EDIT)
         validate(requester, startAt, endAt, horseIds)
         requireOwnUsers(requester, inviteeUserIds)
+        requireInvitationCap(inviteeUserIds.distinct().size)
         val now = clock.instant()
         val event = saveEvent(
             Event(
@@ -114,6 +115,7 @@ class EventService(
         val alreadyInvited = invitationRepository.findByEventIdAndDeletedFalse(event.id).map { it.userId }.toSet()
         val newUserIds = userIds.distinct().filter { it !in alreadyInvited }
         if (newUserIds.isEmpty()) return
+        requireInvitationCap(alreadyInvited.size + newUserIds.size)
         newUserIds.forEach { saveInvitation(newInvitation(requester, event, it)) }
         restamp(event)
     }
@@ -228,5 +230,12 @@ class EventService(
         if (!valid) throw badRequest("Unknown user")
     }
 
+    /** EVT-7 sets no participant limit; this technical cap only bounds the work of re-stamping. */
+    private fun requireInvitationCap(liveInvitations: Int) {
+        if (liveInvitations > MAX_INVITATIONS_PER_EVENT) throw badRequest("At most $MAX_INVITATIONS_PER_EVENT invitations per event")
+    }
+
     private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }
+
+const val MAX_INVITATIONS_PER_EVENT = 500

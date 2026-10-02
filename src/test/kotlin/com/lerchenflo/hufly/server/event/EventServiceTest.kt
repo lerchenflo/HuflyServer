@@ -173,6 +173,24 @@ class EventServiceTest {
     }
 
     @Test
+    fun `an event holds at most 500 live invitations`() {
+        val event = lesson()
+        val crowd = (1..498).map { userRepository.save(testUser()).id }
+
+        service.invite(teacher, event.id, crowd)
+
+        assertEquals(500, invitationRepository.findByEventIdAndDeletedFalse(event.id).size)
+        assertStatus(HttpStatus.BAD_REQUEST) { service.invite(teacher, event.id, listOf(clara.id)) }
+    }
+
+    @Test
+    fun `creating with more than 500 invitees is rejected`() {
+        val crowd = (1..501).map { userRepository.save(testUser()).id }
+
+        assertStatus(HttpStatus.BAD_REQUEST) { lesson(invitees = crowd) }
+    }
+
+    @Test
     fun `only creator and admin manage invitations`() {
         val event = lesson()
 
