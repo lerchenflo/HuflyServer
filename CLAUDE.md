@@ -19,6 +19,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | Package | Content |
 |---|---|
 | `authentication/` | `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/logout`), `AuthService`, `model/RefreshToken` |
+| `core/mongo/` | `MongoTimeConfig`: every Instant is stored as epoch millis (Long), every LocalDate as epoch days (negative before 1970). No Mongo TTL indexes; expired refresh tokens go via `RefreshTokenCleanup` (hourly) |
 | `core/` | `parseObjectId` (400 on malformed ids), `MAX_EPOCH_MILLIS` (bound for epoch-ms request fields), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |
 | `core/sync/` | Version sync for growing collections: `SyncCollection`, `VersionCounterService.withVersion { }` (wrap every save, soft deletes included) and `safeWatermark`, generic `versionSync(...)`. IdTimeStamp sync for small ones: `IdTimeStamp`, `SyncResponse`, generic `deltaSync(...)`, `requireValidSyncRequest` (page_size max 1000, at most 10 000 client entries) |

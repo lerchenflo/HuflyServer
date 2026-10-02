@@ -35,4 +35,10 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         save(row.copy(hashedToken = newHash, previousHashedToken = oldHash, encryptedToken = encryptedToken, expiresAt = expiresAt))
         return 1
     }
+
+    override fun deleteByExpiresAtBefore(time: Instant): Long {
+        val before = tokens.size
+        tokens.removeIf { it.expiresAt.isBefore(time) }
+        return (before - tokens.size).toLong()
+    }
 }

@@ -11,10 +11,8 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
 import java.time.Instant
-import java.util.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 @SpringBootTest
@@ -61,10 +59,24 @@ class MongoRefreshTokenRepositoryTest {
     }
 
     @Test
-    fun `expiresAt is a BSON date, so the TTL index works`() {
+    fun `times are stored as epoch millis`() {
         session("t1")
+        repository.rotate("t1", "t2", "enc", later)
 
-        val raw = mongoTemplate.getCollection("refreshTokens").find(org.bson.Document("hashedToken", "t1")).first()!!
-        assertIs<Date>(raw["expiresAt"])
+        val raw = mongoTemplate.getCollection("refreshTokens").find(org.bson.Document("hashedToken", "t2")).first()!!
+        assertEquals(later.toEpochMilli(), raw["expiresAt"])
+        assertEquals(0L, raw["createdAt"])
+        assertEquals(later, repository.findByHashedToken("t2")!!.expiresAt)
+    }
+
+    @Test
+    fun `cleanup query deletes only expired sessions`() {
+        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "old", expiresAt = Instant.parse("2026-01-01T00:00:00Z"), createdAt = Instant.EPOCH))
+        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "new", expiresAt = Instant.parse("2027-01-01T00:00:00Z"), createdAt = Instant.EPOCH))
+
+        repository.deleteByExpiresAtBefore(Instant.parse("2026-06-01T00:00:00Z"))
+
+        assertNull(repository.findByHashedToken("old"))
+        assertEquals("new", repository.findByHashedToken("new")!!.hashedToken)
     }
 }

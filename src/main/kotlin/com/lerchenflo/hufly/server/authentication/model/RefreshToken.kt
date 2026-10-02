@@ -20,7 +20,7 @@ data class RefreshToken(
     @Indexed(sparse = true) val previousHashedToken: String? = null,
     /** The current token, AES-GCM encrypted; null until the first rotation. */
     val encryptedToken: String? = null,
-    /** Slides forward on every rotation. */
-    @Indexed(expireAfter = "0s") val expiresAt: Instant,
+    /** Slides forward on every rotation. Expired rows are removed by `RefreshTokenCleanup`. */
+    @Indexed val expiresAt: Instant,
     val createdAt: Instant,
 )

@@ -13,6 +13,7 @@ interface RefreshTokenRepository : Repository<RefreshToken, ObjectId> {
     fun findByPreviousHashedToken(previousHashedToken: String): RefreshToken?
     fun deleteByHashedTokenOrPreviousHashedToken(hashedToken: String, previousHashedToken: String): Long
     fun deleteByUserId(userId: ObjectId): Long
+    fun deleteByExpiresAtBefore(time: Instant): Long
 
     /** Atomic: only the caller that still finds [oldHash] as the current token rotates; returns 1 for that caller. */
     @Query("{ 'hashedToken': ?0 }")
