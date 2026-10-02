@@ -32,7 +32,8 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | `paddock/` | `PaddockController` (PADDOCK_PLAN for writes, everyone reads): `/paddocks`, `/horsegroups`, `/horseconflicts` (IdTimeStamp `POST .../sync`), `/paddockassignments` (`GET .../sync?since=` version sync); `PaddockService`; conflicts only warn on the client, never block |
 | `event/` | `EventController`: EVENT_EDIT `POST /events`; creator or admin: `PUT/DELETE /events/{id}`, `POST /events/{id}/invitations`, `DELETE /eventinvitations/{id}`; invitee: `POST /eventinvitations/{id}/answer`; `GET /events/sync`, `GET /eventinvitations/sync` (version sync; invitees, creator and EVENT_VIEW see an event with all its invitations). `EventService` re-stamps an event and its invitations when invitees change |
 | `task/` | `TaskController` (TASK_EDIT: `POST /tasks`, `PUT/DELETE /tasks/{id}`; assignee or TASK_EDIT: `POST /tasks/{id}/done`; `GET /tasks/sync?since=` version sync, all tasks with TASK_VIEW, else own), `TaskService`, `model/{StableTask,TaskResponse}` |
-| `stable/` | `StableLookupService`, `model/{Stable,StableResponse}` |
+| `operator/` | Operator website under the secret `OPERATOR_PATH` (HTTP Basic, `OPERATOR_USERNAME`/`OPERATOR_PASSWORD` 12+ chars, role OPERATOR): page `resources/operator/index.html` (not in `static/`), `GET/POST {path}/api/stables` (JSON only, against CSRF) |
+| `stable/` | `StableOnboardingService` (stable + admin, used by operator and bootstrap), `StableBootstrap`, `StableLookupService`, `model/{Stable,StableResponse}` |
 | `tag/` | `TagController` (`POST /tags/sync`, admin: `POST /tags`, `PUT/DELETE /tags/{id}`), `TagService`, `model/{Tag,TagType,Permission,TagResponse}` |
 
 New feature: package `<feature>/` with `Controller`, `Service`, optional `LookupService`, `model/` (entity + `Response` DTO + `toXResponse()`), repository in `repository/`.

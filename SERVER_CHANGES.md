@@ -24,3 +24,13 @@ Shared documents: several horses point at the same plan via `Horse.foodPlanId`. 
 - `PUT /foodplans/{id}` — same body and auth, answers `FoodPlanDto`. 404 for an unknown or foreign id.
 - `DELETE /foodplans/{id}` — auth: FOODPLAN_EDIT or admin. Soft-deletes the plan and clears `foodPlanId` on all horses of the stable that point at it, bumping those horses' `updatedAt` so clients pull the unlink. Answers empty 200.
 - `POST /horses` and `PUT /horses/{id}`: add optional `foodPlanId` (nullable; null unlinks) to the request body. 400 when it is not a food plan of the stable. Auth unchanged (HORSE_EDIT or admin).
+
+## Horse log (LOG-1..3, domain model `horselog` package)
+
+Activity entries per horse (jumping, farrier, vaccination, ...), typed by ACTIVITY tags. Everyone in the stable reads; writing needs HORSE_LOG_WRITE (admin bypasses). The collection grows forever, so it uses version-increment sync, not IdTimeStamp. Every write (soft delete included) stamps the next per-collection version. The client ships its side on 2026-10-02 and tolerates 404s until these exist.
+
+- `GET /horselogs/sync?since=N` — version-increment sync. Response `{ "updatedEntries": [HorseLogEntryDto], "deletedEntries": ["id"], "newVersion": Long, "moreEntries": Boolean }`. `deletedEntries` are tombstone ids with a version greater than `since`. Auth: any member of the stable.
+- `HorseLogEntryDto`: `{ "id", "stableId", "horseId", "activityTagId", "startAt": Long (epoch millis), "endAt": Long? (null = one-off), "doneByUserId": String?, "comment": String, "nextDueAt": String? ("yyyy-MM-dd", e.g. next vaccination), "updatedAt": Long (epoch millis), "updatedBy": String }`.
+- `POST /horselogs` — body `{ "horseId", "activityTagId", "startAt", "endAt", "doneByUserId", "comment", "nextDueAt" }` (same types as the DTO, no id). Auth: HORSE_LOG_WRITE or admin (403 otherwise). Answers `HorseLogEntryDto`. Errors: 400 when `horseId` is not a horse of the stable, when `activityTagId` is not an ACTIVITY tag of the stable, or when `doneByUserId` is set but not a member of the stable.
+- `PUT /horselogs/{id}` — same body and auth, answers `HorseLogEntryDto`. 404 for an unknown or foreign id.
+- `DELETE /horselogs/{id}` — auth: HORSE_LOG_WRITE or admin. Soft delete with a version bump so clients pull the tombstone. Answers empty 200.

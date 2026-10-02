@@ -19,7 +19,7 @@ class StableBootstrapTest {
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
     private val accessService = AccessService(userRepository, stableRepository, FakeTagRepository())
-    private val bootstrap = StableBootstrap(userRepository, stableRepository, hashEncoder, clock)
+    private val bootstrap = StableBootstrap(userRepository, StableOnboardingService(userRepository, stableRepository, hashEncoder, clock))
 
     @Test
     fun `creates the stable with its admin when the email is unknown`() {

@@ -13,4 +13,6 @@ class FakeStableRepository : StableRepository {
     }
 
     override fun findById(id: ObjectId): Stable? = stables.firstOrNull { it.id == id }
+
+    override fun findByDeletedFalse(): List<Stable> = stables.filter { !it.deleted }
 }
