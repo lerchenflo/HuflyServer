@@ -7,6 +7,7 @@ import com.lerchenflo.hufly.server.core.sync.IdTimeStamp
 import com.lerchenflo.hufly.server.core.sync.SyncResponse
 import com.lerchenflo.hufly.server.core.sync.deltaSync
 import com.lerchenflo.hufly.server.core.sync.requireValidSyncRequest
+import com.lerchenflo.hufly.server.foodplan.FoodPlanService
 import com.lerchenflo.hufly.server.horse.model.HorseResponse
 import com.lerchenflo.hufly.server.horse.model.Medication
 import com.lerchenflo.hufly.server.horse.model.toHorseResponse
@@ -30,7 +31,10 @@ class HorseController(
     private val accessService: AccessService,
     private val horseService: HorseService,
     private val horseRepository: HorseRepository,
+    private val foodPlanService: FoodPlanService,
 ) {
+
+    data class AssignFoodPlanRequest(val foodPlanId: String?)
 
     data class MedicationRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
@@ -90,6 +94,14 @@ class HorseController(
         val requester = accessService.requester(requireAuth())
         return horseService.updateMedications(requester, parseObjectId(horseId), request.medications.toMedications())
             .toHorseResponse(showMedications = true)
+    }
+
+    /** Needs FOODPLAN_EDIT, not HORSE_EDIT (FOD-3). Null removes the plan. */
+    @PutMapping("/{horseId}/foodplan")
+    fun assignFoodPlan(@PathVariable horseId: String, @RequestBody request: AssignFoodPlanRequest): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        return foodPlanService.assignPlan(requester, parseObjectId(horseId), request.foodPlanId?.let(::parseObjectId))
+            .toHorseResponse(horseService.canSeeMedications(requester))
     }
 
     @DeleteMapping("/{horseId}")

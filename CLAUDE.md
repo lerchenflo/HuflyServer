@@ -26,6 +26,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | `repository/` | All Spring Data Mongo repositories (`@EnableMongoRepositories` base package) |
 | `user/` | `UserController` (`GET/PUT /users/me`, `POST /users/me/password`, `POST /users/sync`, admin: `POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/password-reset`), `UserService`, `model/` |
 | `horse/` | `HorseController` (`POST /horses/sync` for every member; admin: `POST /horses`, `DELETE /horses/{id}`; HORSE_EDIT: `PUT /horses/{id}`; HORSE_MEDICATION_EDIT: `PUT /horses/{id}/medications`; medications are null in responses without HORSE_MEDICATION_VIEW), `HorseService`, `model/{Horse,Medication,HorseResponse}` |
+| `foodplan/` | `FoodPlanController` (FOODPLAN_EDIT: `POST /foodplans`, `PUT/DELETE /foodplans/{id}`, `POST /foodplans/{id}/copy`; `POST /foodplans/sync` for everyone), `FoodPlanService` (also `PUT /horses/{id}/foodplan`), `model/{FoodPlan,FoodPlanEntry,MealSlot,FoodPlanResponse}` |
 | `task/` | `TaskController` (TASK_EDIT: `POST /tasks`, `PUT/DELETE /tasks/{id}`; assignee or TASK_EDIT: `POST /tasks/{id}/done`; `GET /tasks/sync?since=` version sync, all tasks with TASK_VIEW, else own), `TaskService`, `model/{StableTask,TaskResponse}` |
 | `stable/` | `StableLookupService`, `model/{Stable,StableResponse}` |
 | `tag/` | `TagController` (`POST /tags/sync`, admin: `POST /tags`, `PUT/DELETE /tags/{id}`), `TagService`, `model/{Tag,TagType,Permission,TagResponse}` |

@@ -8,4 +8,5 @@ interface HorseRepository : Repository<Horse, ObjectId> {
     fun save(horse: Horse): Horse
     fun findById(id: ObjectId): Horse?
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<Horse>
+    fun findByFoodPlanIdAndDeletedFalse(foodPlanId: ObjectId): List<Horse>
 }

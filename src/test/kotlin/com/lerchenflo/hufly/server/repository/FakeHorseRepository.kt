@@ -16,4 +16,7 @@ class FakeHorseRepository : HorseRepository {
 
     override fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<Horse> =
         horses.filter { it.stableId == stableId && !it.deleted }
+
+    override fun findByFoodPlanIdAndDeletedFalse(foodPlanId: ObjectId): List<Horse> =
+        horses.filter { it.foodPlanId == foodPlanId && !it.deleted }
 }
