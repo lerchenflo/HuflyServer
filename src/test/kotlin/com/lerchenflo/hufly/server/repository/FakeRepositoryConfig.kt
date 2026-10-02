@@ -44,6 +44,12 @@ class FakeRepositoryConfig {
     fun fakeUserSettingsRepository() = FakeUserSettingsRepository()
 
     @Bean @Primary
+    fun fakeEventRepository() = FakeEventRepository()
+
+    @Bean @Primary
+    fun fakeEventInvitationRepository() = FakeEventInvitationRepository()
+
+    @Bean @Primary
     fun fakeTaskRepository() = FakeTaskRepository()
 
     @Bean @Primary
