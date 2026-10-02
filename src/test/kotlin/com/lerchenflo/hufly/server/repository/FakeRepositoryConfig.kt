@@ -29,6 +29,18 @@ class FakeRepositoryConfig {
     fun fakeHorseLogRepository() = FakeHorseLogRepository()
 
     @Bean @Primary
+    fun fakePaddockRepository() = FakePaddockRepository()
+
+    @Bean @Primary
+    fun fakeHorseGroupRepository() = FakeHorseGroupRepository()
+
+    @Bean @Primary
+    fun fakeHorseConflictRepository() = FakeHorseConflictRepository()
+
+    @Bean @Primary
+    fun fakePaddockAssignmentRepository() = FakePaddockAssignmentRepository()
+
+    @Bean @Primary
     fun fakeTaskRepository() = FakeTaskRepository()
 
     @Bean @Primary

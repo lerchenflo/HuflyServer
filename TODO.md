@@ -8,7 +8,7 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 
 1. ~~App-start flow~~ done, security follow-ups fixed (refresh rejects deleted users, dummy BCrypt check for unknown emails, sync body capped at 10 000 entries).
 2. ~~Admin endpoints~~ done: users, tags, horses (create/delete admin-only, edit with HORSE_EDIT, sync). Horse `foodPlanId` is not settable yet; the food plan feature assigns it.
-3. Done: horses, tasks (first version-sync feature), food plans, horse log. Order of the rest (user decision 2026-10-02): paddocks, user settings, events with invitations last. Still to build: paddocks, events with invitations, tasks, user settings, each with a sync endpoint.
+3. Done: horses, tasks (first version-sync feature), food plans, horse log, paddocks. Order of the rest (user decision 2026-10-02): user settings, then events with invitations last. Still to build: paddocks, events with invitations, tasks, user settings, each with a sync endpoint.
    Sync shape (decided 2026-10-02):
    - **Version sync** (like SchneaggchatV3server messages) for growing collections: Event, EventInvitation, HorseLogEntry, StableTask, PaddockAssignment. One counter document per collection in `counters` (atomic `$inc`). Every write, soft delete included, stamps `version`. `GET /x/sync?since=&page_size=` answers rows with `stableId == requester's AND since < version <= safeWatermark`, ascending, plus `newVersion` and `moreEntries`. Index `{stableId: 1, version: 1}`.
    - Built in `core/sync` (2026-10-02): counting and registering a version share one lock with `safeWatermark`, which closes the Schneaggchat gap (proven by a concurrency test). In-flight tracking is per process, so the server must stay single-instance until it moves to a shared store.
@@ -23,7 +23,7 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 
 ## Deferred features
 - [ ] Stable onboarding website: an operator page, guarded by credentials from the env file, where the first admin and their stable get created. Until then `BOOTSTRAP_*` env vars create one stable at startup (local development).
-- [ ] More Mongo integration tests (Testcontainers, `repository/mongo/`): the task and horse log version queries have one so far. Add one for every new version-sync repository.
+- [ ] More Mongo integration tests (Testcontainers, `repository/mongo/`): task, horse log and paddock assignment version queries have one so far. Add one for every new version-sync repository.
 - [ ] Rate limiting on `/auth/login` (bucket4j + Redis like SchneaggchatV3server).
 - [ ] Verify the refresh-token TTL index against a real Mongo (`expiresAt` is `java.time.Instant`, so it should be stored as a BSON Date).
 - [ ] Device name/type on sessions, logout on all devices, password change (USR-5).
