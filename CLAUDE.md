@@ -19,7 +19,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | Package | Content |
 |---|---|
 | `authentication/` | `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/logout`), `AuthService`, `model/RefreshToken` |
-| `core/` | `parseObjectId` (400 on malformed ids), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
+| `core/` | `parseObjectId` (400 on malformed ids), `MAX_EPOCH_MILLIS` (bound for epoch-ms request fields), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |
 | `core/sync/` | Version sync for growing collections: `SyncCollection`, `VersionCounterService.withVersion { }` (wrap every save, soft deletes included) and `safeWatermark`, generic `versionSync(...)`. IdTimeStamp sync for small ones: `IdTimeStamp`, `SyncResponse`, generic `deltaSync(...)`, `requireValidSyncRequest` (page_size max 1000, at most 10 000 client entries) |
 | `core/security/` | `SecurityConfig`, `JwtAuthFilter`, `JwtService`, `HashEncoder`, `requireAuth()` |
@@ -27,6 +27,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 | `user/` | `UserController` (`GET/PUT /users/me`, `POST /users/me/password`, `POST /users/sync`, admin: `POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/password-reset`), `UserService`, `model/` |
 | `horse/` | `HorseController` (`POST /horses/sync` for every member; admin: `POST /horses`, `DELETE /horses/{id}`; HORSE_EDIT: `PUT /horses/{id}`; HORSE_MEDICATION_EDIT: `PUT /horses/{id}/medications`; medications are null in responses without HORSE_MEDICATION_VIEW), `HorseService`, `model/{Horse,Medication,HorseResponse}` |
 | `foodplan/` | `FoodPlanController` (FOODPLAN_EDIT: `POST /foodplans`, `PUT/DELETE /foodplans/{id}`, `POST /foodplans/{id}/copy`; `POST /foodplans/sync` for everyone), `FoodPlanService` (also `PUT /horses/{id}/foodplan`), `model/{FoodPlan,FoodPlanEntry,MealSlot,FoodPlanResponse}` |
+| `horselog/` | `HorseLogController` (HORSE_LOG_WRITE: `POST /horselog`, `PUT/DELETE /horselog/{id}`; `GET /horselog/sync?since=` version sync for everyone), `HorseLogService`, `model/{HorseLogEntry,HorseLogEntryResponse}` |
 | `task/` | `TaskController` (TASK_EDIT: `POST /tasks`, `PUT/DELETE /tasks/{id}`; assignee or TASK_EDIT: `POST /tasks/{id}/done`; `GET /tasks/sync?since=` version sync, all tasks with TASK_VIEW, else own), `TaskService`, `model/{StableTask,TaskResponse}` |
 | `stable/` | `StableLookupService`, `model/{Stable,StableResponse}` |
 | `tag/` | `TagController` (`POST /tags/sync`, admin: `POST /tags`, `PUT/DELETE /tags/{id}`), `TagService`, `model/{Tag,TagType,Permission,TagResponse}` |

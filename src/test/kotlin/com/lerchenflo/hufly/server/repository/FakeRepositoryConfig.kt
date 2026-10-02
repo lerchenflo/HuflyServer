@@ -26,6 +26,9 @@ class FakeRepositoryConfig {
     fun fakeFoodPlanRepository() = FakeFoodPlanRepository()
 
     @Bean @Primary
+    fun fakeHorseLogRepository() = FakeHorseLogRepository()
+
+    @Bean @Primary
     fun fakeTaskRepository() = FakeTaskRepository()
 
     @Bean @Primary

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -82,6 +83,3 @@ class TaskController(
         return taskService.sync(requester, since, pageSize)
     }
 }
-
-/** 3000-01-01T00:00:00Z */
-private const val MAX_EPOCH_MILLIS = 32503680000000L
