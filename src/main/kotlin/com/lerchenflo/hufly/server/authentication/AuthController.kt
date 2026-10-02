@@ -3,7 +3,11 @@ package com.lerchenflo.hufly.server.authentication
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.UNKNOWN_DEVICE_NAME
 import com.lerchenflo.hufly.server.core.security.requireAuth
+import com.lerchenflo.hufly.server.core.security.LoginGuard
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.PostMapping
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/auth")
 class AuthController(
     private val authService: AuthService,
+    private val loginGuard: LoginGuard,
 ) {
 
     data class LoginRequest(
@@ -34,8 +39,19 @@ class AuthController(
     )
 
     @PostMapping("/login")
-    fun login(@Valid @RequestBody request: LoginRequest): AuthService.TokenPair =
-        authService.login(request.email, request.password, request.device())
+    fun login(@Valid @RequestBody request: LoginRequest, servletRequest: HttpServletRequest): AuthService.TokenPair {
+        val email = normalizeEmail(request.email)
+        val ip = servletRequest.remoteAddr
+        loginGuard.checkLogin(email, ip)
+        val tokens = try {
+            authService.login(email, request.password, request.device())
+        } catch (e: ResponseStatusException) {
+            if (e.statusCode == HttpStatus.UNAUTHORIZED) loginGuard.loginFailed(email, ip)
+            throw e
+        }
+        loginGuard.loginSucceeded(email)
+        return tokens
+    }
 
     @PostMapping("/refresh")
     fun refresh(@Valid @RequestBody request: RefreshRequest): AuthService.TokenPair =

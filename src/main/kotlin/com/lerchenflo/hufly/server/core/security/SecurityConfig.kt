@@ -1,6 +1,10 @@
 package com.lerchenflo.hufly.server.core.security
 
+import jakarta.servlet.FilterChain
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.web.filter.OncePerRequestFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
@@ -12,7 +16,10 @@ import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.provisioning.InMemoryUserDetailsManager
+import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
@@ -42,13 +49,36 @@ class SecurityConfig(
     /** The operator area lives under an unguessable OPERATOR_PATH and needs HTTP Basic; app tokens never carry the role. */
     @Bean
     @Order(1)
-    fun operatorFilterChain(http: HttpSecurity, @Value("\${operator.path}") operatorPath: String): SecurityFilterChain = http
-        .securityMatcher(requireValidOperatorPath(operatorPath), "$operatorPath/**")
-        .csrf { it.disable() }
-        .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-        .authorizeHttpRequests { it.anyRequest().hasRole(OPERATOR_ROLE) }
-        .httpBasic { it.realmName("Hufly") }
-        .build()
+    fun operatorFilterChain(
+        http: HttpSecurity,
+        @Value("\${operator.path}") operatorPath: String,
+        loginGuard: LoginGuard,
+    ): SecurityFilterChain {
+        val basicEntryPoint = BasicAuthenticationEntryPoint().apply { setRealmName("Hufly"); afterPropertiesSet() }
+        // Wrong Basic credentials end here; a request without credentials is only the browser's first try.
+        val countingEntryPoint = AuthenticationEntryPoint { request, response, exception ->
+            if (request.getHeader("Authorization")?.startsWith("Basic ") == true) loginGuard.operatorLoginFailed(request.remoteAddr)
+            basicEntryPoint.commence(request, response, exception)
+        }
+        val blockedIps = OncePerRequestFilterAdapter { request, response, chain ->
+            val retryAfter = loginGuard.operatorRetryAfter(request.remoteAddr)
+            if (retryAfter == null) {
+                chain.doFilter(request, response)
+            } else {
+                response.setHeader("Retry-After", retryAfter.toSeconds().coerceAtLeast(1).toString())
+                response.sendError(HttpStatus.TOO_MANY_REQUESTS.value())
+            }
+        }
+        return http
+            .securityMatcher(requireValidOperatorPath(operatorPath), "$operatorPath/**")
+            .csrf { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .authorizeHttpRequests { it.anyRequest().hasRole(OPERATOR_ROLE) }
+            .httpBasic { it.authenticationEntryPoint(countingEntryPoint) }
+            .exceptionHandling { it.authenticationEntryPoint(countingEntryPoint) }
+            .addFilterBefore(blockedIps, BasicAuthenticationFilter::class.java)
+            .build()
+    }
 
     @Bean
     @Order(2)
@@ -74,4 +104,12 @@ const val OPERATOR_ROLE = "OPERATOR"
 fun requireValidOperatorPath(path: String): String {
     check(Regex("^/[A-Za-z0-9_-]{4,}$").matches(path)) { "OPERATOR_PATH must look like /hb-7f3k2q, got '$path'" }
     return path
+}
+
+/** A plain filter from a lambda; not a bean, so it only runs inside the chain it is added to. */
+private class OncePerRequestFilterAdapter(
+    private val body: (HttpServletRequest, HttpServletResponse, FilterChain) -> Unit,
+) : OncePerRequestFilter() {
+    override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) =
+        body(request, response, filterChain)
 }

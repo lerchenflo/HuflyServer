@@ -47,6 +47,7 @@ New feature: package `<feature>/` with `Controller`, `Service`, optional `Lookup
 - Login by email + password. Emails are globally unique, stored trimmed and lowercase (`normalizeEmail`). Deleted users cannot log in.
 - Every handler starts with `accessService.requester(requireAuth())` and filters by `requester.stableId`. Timestamps in responses are epoch milliseconds.
 - Passwords: BCrypt via `HashEncoder`.
+- Brute-force protection (`LoginGuard`, in memory, single instance): failed logins per 15 min, 10 per email and 30 per IP on `/auth/login`, 5 per IP on the operator login; answers 429 with `Retry-After`. Client IP via `server.forward-headers-strategy=native` (X-Forwarded-For only from internal proxies).
 
 ## Commands
 
