@@ -265,7 +265,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "horse",
    "kind": "class",
    "name": "Horse",
-   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung').",
+   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung'). Medications are only visible with HORSE_MEDICATION_VIEW and edited separately with HORSE_MEDICATION_EDIT.",
    "pkg": "horse",
    "x": 813,
    "y": 22
@@ -322,17 +322,20 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   {
    "fields": [
     "HORSE_EDIT",
+    "HORSE_MEDICATION_VIEW",
+    "HORSE_MEDICATION_EDIT",
     "FOODPLAN_EDIT",
     "HORSE_LOG_WRITE",
     "PADDOCK_PLAN",
     "EVENT_VIEW",
-    "EVENT_CREATE_INVITE",
-    "TASK_CREATE_ASSIGN"
+    "EVENT_EDIT",
+    "TASK_VIEW",
+    "TASK_EDIT"
    ],
    "id": "perm",
    "kind": "enum",
    "name": "Permission",
-   "note": "HORSE_EDIT = change existing horses. FOODPLAN_EDIT = create and change food plans. HORSE_LOG_WRITE = write horse log entries. PADDOCK_PLAN = plan paddocks, groups and conflicts. EVENT_VIEW = see events in the calendar. EVENT_CREATE_INVITE = create events and invite. TASK_CREATE_ASSIGN = create and assign tasks. Viewing horses, food plans, logs and paddocks needs no permission. Adding and removing horses is admin-only and never grantable (TAG-6).",
+   "note": "Grantable through USER_ROLE tags. An EDIT permission includes its VIEW permission. Without a VIEW permission, members still see their own invited events and their own assigned tasks; medications come as null. Medical notes and vet contact are visible to everyone. Adding and removing horses is admin-only and never grantable.",
    "pkg": "tag",
    "x": 322,
    "y": 746
@@ -536,7 +539,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "event",
    "kind": "class",
    "name": "Event",
-   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_CREATE_INVITE, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. Recurring events deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. Recurring events deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "event",
    "x": 395,
    "y": 520
@@ -596,7 +599,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "task",
    "kind": "class",
    "name": "StableTask",
-   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_CREATE_ASSIGN. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. Recurring tasks deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. Recurring tasks deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "task",
    "x": 1180,
    "y": 420

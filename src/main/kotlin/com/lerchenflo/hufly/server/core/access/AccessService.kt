@@ -29,7 +29,8 @@ class AccessService(
         if (isAdmin(user)) return Permission.entries.toSet()
         return tagRepository.findByStableIdAndDeletedFalse(user.stableId)
             .filter { it.type == TagType.USER_ROLE && it.id in user.roleTagIds }
-            .flatMapTo(mutableSetOf()) { it.permissions }
+            .flatMap { it.permissions }
+            .flatMapTo(mutableSetOf()) { listOfNotNull(it, it.impliedView) }
     }
 
     fun requireAdmin(user: User) {

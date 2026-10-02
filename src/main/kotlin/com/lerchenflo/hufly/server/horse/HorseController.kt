@@ -39,6 +39,10 @@ class HorseController(
         val until: LocalDate? = null,
     )
 
+    data class MedicationsRequest(
+        @field:Valid @field:Size(max = 50) val medications: List<MedicationRequest>,
+    )
+
     data class HorseRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 5000) val description: String = "",
@@ -49,6 +53,7 @@ class HorseController(
         val ownerUserId: String? = null,
         @field:Size(max = 5000) val medicalNotes: String = "",
         @field:Size(max = 1000) val vetContact: String = "",
+        /** Only read on create; edits go through PUT /horses/{id}/medications. */
         @field:Valid @field:Size(max = 50) val medications: List<MedicationRequest> = emptyList(),
     ) {
         fun toData() = HorseService.HorseData(
@@ -61,20 +66,30 @@ class HorseController(
             ownerUserId = ownerUserId?.let(::parseObjectId),
             medicalNotes = medicalNotes,
             vetContact = vetContact,
-            medications = medications.map { Medication(it.name, it.dosage, it.from, it.until) },
         )
     }
+
+    private fun List<MedicationRequest>.toMedications() = map { Medication(it.name, it.dosage, it.from, it.until) }
 
     @PostMapping
     fun createHorse(@Valid @RequestBody request: HorseRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
-        return horseService.createHorse(requester, request.toData()).toHorseResponse()
+        return horseService.createHorse(requester, request.toData(), request.medications.toMedications())
+            .toHorseResponse(horseService.canSeeMedications(requester))
     }
 
     @PutMapping("/{horseId}")
     fun updateHorse(@PathVariable horseId: String, @Valid @RequestBody request: HorseRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
-        return horseService.updateHorse(requester, parseObjectId(horseId), request.toData()).toHorseResponse()
+        return horseService.updateHorse(requester, parseObjectId(horseId), request.toData())
+            .toHorseResponse(horseService.canSeeMedications(requester))
+    }
+
+    @PutMapping("/{horseId}/medications")
+    fun updateMedications(@PathVariable horseId: String, @Valid @RequestBody request: MedicationsRequest): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        return horseService.updateMedications(requester, parseObjectId(horseId), request.medications.toMedications())
+            .toHorseResponse(showMedications = true)
     }
 
     @DeleteMapping("/{horseId}")
@@ -83,7 +98,7 @@ class HorseController(
         horseService.deleteHorse(requester, parseObjectId(horseId))
     }
 
-    /** Every member may view horses (HOR-1); only editing is gated. */
+    /** Every member may view horses (HOR-1); medications only with HORSE_MEDICATION_VIEW. */
     @PostMapping("/sync")
     fun sync(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
@@ -92,9 +107,10 @@ class HorseController(
     ): SyncResponse<HorseResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
+        val showMedications = horseService.canSeeMedications(requester)
         return deltaSync(
             horseRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseResponse() },
+            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseResponse(showMedications) },
         )
     }
 }

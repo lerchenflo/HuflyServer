@@ -17,8 +17,7 @@ Status 2026-10-02: auth and step 1 are done (User/Stable/Tag documents, login by
 4. Run the `schneaggchat-security-check` skill after each new endpoint group.
 
 ## Open decisions
-- [ ] **Permission redesign (user request 2026-10-02):** add a permission tag for horse medical data, and give every area a VIEW and an EDIT permission. Clarify before building: does EDIT imply VIEW? Do members without HORSE_VIEW see no horses at all? Is medical edit separate from HORSE_EDIT? Then update `Permission`, the domain model, `AccessService`, the horse sync (hide medical fields without the permission) and `../hufly/TODO.md`.
-- [ ] Next after that: version counter (`core/sync`) with the safeWatermark gap fixed, per step 3.
+- [ ] Next: version counter (`core/sync`) with the safeWatermark gap fixed, per step 3.
 - [ ] Refresh token replay grace (SchneaggchatV3server keeps `previousHashedToken` so a client that lost the refresh response can retry). Currently a lost response forces a re-login.
 - [ ] Payment model and subscription expiry (BIZ-6).
 

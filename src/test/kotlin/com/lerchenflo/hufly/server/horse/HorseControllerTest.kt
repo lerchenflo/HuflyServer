@@ -9,6 +9,10 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
+import com.lerchenflo.hufly.server.testdata.testTag
+import com.lerchenflo.hufly.server.horse.model.Medication
+import com.lerchenflo.hufly.server.tag.model.Permission
+import java.time.LocalDate
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -38,6 +42,9 @@ class HorseControllerTest {
 
     private val admin = testUser()
     private val rider = testUser()
+    private val medicTag = testTag(permissions = setOf(Permission.HORSE_MEDICATION_VIEW))
+    private val medic = testUser(roleTagIds = listOf(medicTag.id))
+    private val aspirin = Medication("Aspirin", "1x", LocalDate.of(2026, 9, 1), null)
 
     private val horseJson = """{"name":"Blitz","description":"Brav","pictureUrl":null,"birthDate":"2015-04-01","breed":"Haflinger",
         |"color":"Fuchs","ownerUserId":null,"medicalNotes":"","vetContact":"Dr. Huf",
@@ -51,6 +58,8 @@ class HorseControllerTest {
         horseRepository.horses.clear()
         userRepository.save(admin)
         userRepository.save(rider)
+        userRepository.save(medic)
+        tagRepository.save(medicTag)
         stableRepository.save(testStable(adminUserId = admin.id))
     }
 
@@ -125,5 +134,36 @@ class HorseControllerTest {
     @Test
     fun `horse sync rejects an oversized page`() {
         call(HttpMethod.POST, "/horses/sync?page_size=5000", "[]").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `sync hides medications without HORSE_MEDICATION_VIEW but shows notes and vet`() {
+        horseRepository.save(testHorse().copy(medications = listOf(aspirin), medicalNotes = "Allergie", vetContact = "Dr. Huf"))
+
+        call(HttpMethod.POST, "/horses/sync", "[]", userId = rider.id).andExpect {
+            jsonPath("$.updatedEntries[0].medications") { value(null) }
+            jsonPath("$.updatedEntries[0].medicalNotes") { value("Allergie") }
+            jsonPath("$.updatedEntries[0].vetContact") { value("Dr. Huf") }
+        }
+    }
+
+    @Test
+    fun `sync shows medications with HORSE_MEDICATION_VIEW`() {
+        horseRepository.save(testHorse().copy(medications = listOf(aspirin)))
+
+        call(HttpMethod.POST, "/horses/sync", "[]", userId = medic.id).andExpect {
+            jsonPath("$.updatedEntries[0].medications[0].name") { value("Aspirin") }
+        }
+    }
+
+    @Test
+    fun `medication update answers with the horse`() {
+        val horse = horseRepository.save(testHorse())
+
+        call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}/medications",
+            """{"medications":[{"name":"Aspirin","dosage":"1x","from":"2026-09-01"}]}""").andExpect {
+            status { isOk() }
+            jsonPath("$.medications[0].name") { value("Aspirin") }
+        }
     }
 }

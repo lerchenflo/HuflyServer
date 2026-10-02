@@ -48,11 +48,11 @@ class TagServiceTest {
 
     @Test
     fun `admin creates a role tag with permissions in the own stable`() {
-        val tag = tagService.createTag(admin, "Reitlehrer", TagType.USER_ROLE, "#AA3300", setOf(Permission.EVENT_CREATE_INVITE))
+        val tag = tagService.createTag(admin, "Reitlehrer", TagType.USER_ROLE, "#AA3300", setOf(Permission.EVENT_EDIT))
 
         val stored = tagRepository.findById(tag.id)!!
         assertEquals(STABLE_ID, stored.stableId)
-        assertEquals(setOf(Permission.EVENT_CREATE_INVITE), stored.permissions)
+        assertEquals(setOf(Permission.EVENT_EDIT), stored.permissions)
         assertEquals(clock.instant(), stored.updatedAt)
         assertEquals(admin.id, stored.updatedBy)
     }
@@ -73,12 +73,12 @@ class TagServiceTest {
     fun `admin edits name, color and permissions but not the type`() {
         val tag = tagRepository.save(testTag(permissions = setOf(Permission.HORSE_EDIT)))
 
-        tagService.updateTag(admin, tag.id, "Helfer", "#123456", setOf(Permission.TASK_CREATE_ASSIGN))
+        tagService.updateTag(admin, tag.id, "Helfer", "#123456", setOf(Permission.TASK_EDIT))
 
         val stored = tagRepository.findById(tag.id)!!
         assertEquals("Helfer", stored.name)
         assertEquals("#123456", stored.color)
-        assertEquals(setOf(Permission.TASK_CREATE_ASSIGN), stored.permissions)
+        assertEquals(setOf(Permission.TASK_EDIT), stored.permissions)
         assertEquals(TagType.USER_ROLE, stored.type)
         assertEquals(clock.instant(), stored.updatedAt)
     }

@@ -70,15 +70,27 @@ class AccessServiceTest {
 
     @Test
     fun `member has the union of the permissions of their role tags`() {
-        val trainer = tagRepository.save(testTag(permissions = setOf(Permission.EVENT_VIEW, Permission.EVENT_CREATE_INVITE)))
-        val helper = tagRepository.save(testTag(permissions = setOf(Permission.TASK_CREATE_ASSIGN)))
+        val trainer = tagRepository.save(testTag(permissions = setOf(Permission.EVENT_VIEW, Permission.EVENT_EDIT)))
+        val helper = tagRepository.save(testTag(permissions = setOf(Permission.TASK_EDIT)))
         tagRepository.save(testTag(permissions = setOf(Permission.HORSE_EDIT)))
         val user = userRepository.save(rider.copy(roleTagIds = listOf(trainer.id, helper.id)))
 
         assertEquals(
-            setOf(Permission.EVENT_VIEW, Permission.EVENT_CREATE_INVITE, Permission.TASK_CREATE_ASSIGN),
+            setOf(Permission.EVENT_VIEW, Permission.EVENT_EDIT, Permission.TASK_EDIT, Permission.TASK_VIEW),
             accessService.effectivePermissions(user),
         )
+    }
+
+    @Test
+    fun `edit permissions include the matching view permission`() {
+        val tag = tagRepository.save(testTag(permissions = setOf(Permission.EVENT_EDIT, Permission.TASK_EDIT, Permission.HORSE_MEDICATION_EDIT)))
+        val user = userRepository.save(rider.copy(roleTagIds = listOf(tag.id)))
+
+        val permissions = accessService.effectivePermissions(user)
+
+        assertTrue(Permission.EVENT_VIEW in permissions)
+        assertTrue(Permission.TASK_VIEW in permissions)
+        assertTrue(Permission.HORSE_MEDICATION_VIEW in permissions)
     }
 
     @Test

@@ -39,6 +39,8 @@ class HorseServiceTest {
     private val editorTag = testTag(permissions = setOf(Permission.HORSE_EDIT))
     private val editor = testUser(roleTagIds = listOf(editorTag.id))
     private val rider = testUser()
+    private val medicTag = testTag(permissions = setOf(Permission.HORSE_MEDICATION_EDIT))
+    private val medic = testUser(roleTagIds = listOf(medicTag.id))
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
 
     private val aspirin = Medication("Aspirin", "1x täglich", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 14))
@@ -46,7 +48,6 @@ class HorseServiceTest {
     private fun data(
         name: String = "Blitz",
         ownerUserId: org.bson.types.ObjectId? = null,
-        medications: List<Medication> = emptyList(),
     ) = HorseService.HorseData(
         name = name,
         description = "Brav",
@@ -57,13 +58,13 @@ class HorseServiceTest {
         ownerUserId = ownerUserId,
         medicalNotes = "",
         vetContact = "Dr. Huf, 0664 123",
-        medications = medications,
     )
 
     @BeforeTest
     fun setUp() {
-        listOf(admin, editor, rider, foreigner).forEach { userRepository.save(it) }
+        listOf(admin, editor, rider, medic, foreigner).forEach { userRepository.save(it) }
         tagRepository.save(editorTag)
+        tagRepository.save(medicTag)
         stableRepository.save(testStable(adminUserId = admin.id))
         clock.advance(Duration.ofDays(1))
     }
@@ -74,7 +75,7 @@ class HorseServiceTest {
 
     @Test
     fun `admin adds a horse with all fields to the own stable`() {
-        val horse = horseService.createHorse(admin, data(ownerUserId = rider.id, medications = listOf(aspirin)))
+        val horse = horseService.createHorse(admin, data(ownerUserId = rider.id), listOf(aspirin))
 
         val stored = horseRepository.findById(horse.id)!!
         assertEquals(STABLE_ID, stored.stableId)
@@ -88,7 +89,7 @@ class HorseServiceTest {
 
     @Test
     fun `adding horses is admin only, even with HORSE_EDIT`() {
-        assertStatus(HttpStatus.FORBIDDEN) { horseService.createHorse(editor, data()) }
+        assertStatus(HttpStatus.FORBIDDEN) { horseService.createHorse(editor, data(), emptyList()) }
     }
 
     @Test
@@ -96,7 +97,7 @@ class HorseServiceTest {
         val removed = userRepository.save(testUser(deleted = true))
 
         for (owner in listOf(foreigner, removed)) {
-            assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(ownerUserId = owner.id)) }
+            assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(ownerUserId = owner.id), emptyList()) }
         }
     }
 
@@ -104,7 +105,7 @@ class HorseServiceTest {
     fun `medication cannot end before it starts`() {
         val backwards = aspirin.copy(until = aspirin.from.minusDays(1))
 
-        assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(medications = listOf(backwards))) }
+        assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(), listOf(backwards)) }
     }
 
     @Test
@@ -164,5 +165,44 @@ class HorseServiceTest {
         val horse = horseRepository.save(testHorse())
 
         assertStatus(HttpStatus.FORBIDDEN) { horseService.deleteHorse(editor, horse.id) }
+    }
+
+    @Test
+    fun `horse edits never touch medications`() {
+        val horse = horseRepository.save(testHorse().copy(medications = listOf(aspirin)))
+
+        horseService.updateHorse(editor, horse.id, data(name = "Donner"))
+
+        assertEquals(listOf(aspirin), horseRepository.findById(horse.id)!!.medications)
+    }
+
+    @Test
+    fun `member with HORSE_MEDICATION_EDIT replaces medications without HORSE_EDIT`() {
+        val horse = horseRepository.save(testHorse())
+
+        horseService.updateMedications(medic, horse.id, listOf(aspirin))
+
+        val stored = horseRepository.findById(horse.id)!!
+        assertEquals(listOf(aspirin), stored.medications)
+        assertEquals(medic.id, stored.updatedBy)
+        assertEquals(clock.instant(), stored.updatedAt)
+    }
+
+    @Test
+    fun `HORSE_EDIT alone cannot change medications`() {
+        val horse = horseRepository.save(testHorse())
+
+        assertStatus(HttpStatus.FORBIDDEN) { horseService.updateMedications(editor, horse.id, listOf(aspirin)) }
+    }
+
+    @Test
+    fun `medication update checks dates and the stable`() {
+        val horse = horseRepository.save(testHorse())
+        val foreign = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
+
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            horseService.updateMedications(medic, horse.id, listOf(aspirin.copy(until = aspirin.from.minusDays(1))))
+        }
+        assertStatus(HttpStatus.NOT_FOUND) { horseService.updateMedications(medic, foreign.id, listOf(aspirin)) }
     }
 }

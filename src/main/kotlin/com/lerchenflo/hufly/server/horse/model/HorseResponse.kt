@@ -15,13 +15,14 @@ data class HorseResponse(
     val ownerUserId: String?,
     val medicalNotes: String,
     val vetContact: String,
-    val medications: List<Medication>,
+    /** Null when the requester lacks HORSE_MEDICATION_VIEW; an empty list means no medications. */
+    val medications: List<Medication>?,
     val foodPlanId: String?,
     val updatedAt: Long,
     val updatedBy: String,
 )
 
-fun Horse.toHorseResponse() = HorseResponse(
+fun Horse.toHorseResponse(showMedications: Boolean) = HorseResponse(
     id = id.toHexString(),
     stableId = stableId.toHexString(),
     name = name,
@@ -33,7 +34,7 @@ fun Horse.toHorseResponse() = HorseResponse(
     ownerUserId = ownerUserId?.toHexString(),
     medicalNotes = medicalNotes,
     vetContact = vetContact,
-    medications = medications,
+    medications = medications.takeIf { showMedications },
     foodPlanId = foodPlanId?.toHexString(),
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
