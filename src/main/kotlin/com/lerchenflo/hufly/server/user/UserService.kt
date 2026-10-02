@@ -113,11 +113,17 @@ class UserService(
     }
 
     /** Answers 400, not 401, on a wrong old password: clients treat 401 as an expired session. */
-    fun changePassword(requester: User, oldPassword: String, newPassword: String) {
+    /** Ends every other session (USR-5); the device that changed the password stays logged in. */
+    fun changePassword(requester: User, oldPassword: String, newPassword: String, currentSessionId: ObjectId?) {
         if (!hashEncoder.matches(oldPassword, requester.hashedPassword)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Old password is wrong")
         }
         userRepository.save(requester.copy(hashedPassword = hashEncoder.encode(newPassword)))
+        if (currentSessionId != null) {
+            refreshTokenRepository.deleteByUserIdAndIdNot(requester.id, currentSessionId)
+        } else {
+            refreshTokenRepository.deleteByUserId(requester.id)
+        }
     }
 
     /** Emails are unique across all stables, deleted users included (USR-4). */

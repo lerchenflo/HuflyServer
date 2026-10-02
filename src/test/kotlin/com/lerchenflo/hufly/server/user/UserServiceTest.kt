@@ -224,13 +224,24 @@ class UserServiceTest {
 
     @Test
     fun `user changes the own password with the old one`() {
-        userService.changePassword(rider, "OldSecret1", "NewSecret1")
+        userService.changePassword(rider, "OldSecret1", "NewSecret1", currentSessionId = null)
 
         assertTrue(hashEncoder.matches("NewSecret1", stored(rider.id).hashedPassword))
     }
 
     @Test
+    fun `password change keeps the current session and ends all others`() {
+        val current = session(rider.id)
+        session(rider.id)
+        val adminSession = session(admin.id)
+
+        userService.changePassword(rider, "OldSecret1", "NewSecret1", currentSessionId = current.id)
+
+        assertEquals(setOf(current, adminSession), refreshTokenRepository.tokens.toSet())
+    }
+
+    @Test
     fun `password change with a wrong old password is rejected without 401`() {
-        assertStatus(HttpStatus.BAD_REQUEST) { userService.changePassword(rider, "wrong", "NewSecret1") }
+        assertStatus(HttpStatus.BAD_REQUEST) { userService.changePassword(rider, "wrong", "NewSecret1", currentSessionId = null) }
     }
 }

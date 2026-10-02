@@ -19,6 +19,7 @@ class JwtAuthFilter(
         if (userId != null) {
             SecurityContextHolder.getContext().authentication =
                 UsernamePasswordAuthenticationToken(userId.toHexString(), null, emptyList())
+                    .apply { details = jwtService.sessionIdFromAccessToken(token) }
         }
         filterChain.doFilter(request, response)
     }

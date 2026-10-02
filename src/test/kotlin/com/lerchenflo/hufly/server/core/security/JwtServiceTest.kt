@@ -81,4 +81,19 @@ class JwtServiceTest {
     fun `two refresh tokens issued in the same instant differ`() {
         assertNotEquals(jwtService.generateRefreshToken(userId), jwtService.generateRefreshToken(userId))
     }
+
+    @Test
+    fun `access token carries the session id`() {
+        val sessionId = ObjectId("66f0000000000000000000f1")
+
+        val token = jwtService.generateAccessToken(userId, sessionId)
+
+        assertEquals(sessionId, jwtService.sessionIdFromAccessToken(token))
+        assertEquals(userId, jwtService.userIdFromAccessToken(token))
+    }
+
+    @Test
+    fun `access token without session id has none`() {
+        assertNull(jwtService.sessionIdFromAccessToken(jwtService.generateAccessToken(userId)))
+    }
 }

@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.authentication
 
+import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.authentication.model.UNKNOWN_DEVICE_NAME
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.core.security.TokenCipher
@@ -25,16 +27,34 @@ class AuthService(
 ) {
     data class TokenPair(val accessToken: String, val refreshToken: String)
 
+    data class Device(val name: String, val type: DeviceType) {
+        companion object {
+            val UNKNOWN = Device(UNKNOWN_DEVICE_NAME, DeviceType.OTHER)
+        }
+    }
+
+    data class SessionResponse(
+        val id: String,
+        val deviceName: String,
+        val deviceType: DeviceType,
+        /** Epoch milliseconds. */
+        val createdAt: Long,
+        val lastUsedAt: Long?,
+        val current: Boolean,
+    )
+
     /** Checked against for unknown emails so the response time does not reveal which emails exist. */
     private val dummyHash by lazy { hashEncoder.encode("unknown-user") }
 
-    fun login(email: String, password: String): TokenPair {
+    /** Logging in again on the same device replaces that device's session. */
+    fun login(email: String, password: String, device: Device = Device.UNKNOWN): TokenPair {
         val user = userRepository.findByEmail(normalizeEmail(email))
         val passwordMatches = hashEncoder.matches(password, user?.hashedPassword ?: dummyHash)
         if (user == null || !passwordMatches || user.deleted) {
             throw unauthorized("Invalid email or password")
         }
-        return issueTokens(user.id)
+        refreshTokenRepository.deleteByUserIdAndDeviceNameAndDeviceType(user.id, device.name, device.type)
+        return issueTokens(user.id, device)
     }
 
     /**
@@ -48,15 +68,20 @@ class AuthService(
         val hash = hashEncoder.sha256(refreshToken)
 
         val newRefreshToken = jwtService.generateRefreshToken(userId)
-        val expiresAt = clock.instant().plus(jwtService.refreshTokenValidity)
-        if (refreshTokenRepository.rotate(hash, hashEncoder.sha256(newRefreshToken), tokenCipher.encrypt(newRefreshToken), expiresAt) == 1L) {
-            return TokenPair(jwtService.generateAccessToken(userId), newRefreshToken)
+        val newHash = hashEncoder.sha256(newRefreshToken)
+        val now = clock.instant()
+        val rotated = refreshTokenRepository.rotate(
+            hash, newHash, tokenCipher.encrypt(newRefreshToken), now.plus(jwtService.refreshTokenValidity), now,
+        )
+        if (rotated == 1L) {
+            val session = refreshTokenRepository.findByHashedToken(newHash) ?: throw unauthorized("Invalid refresh token")
+            return TokenPair(jwtService.generateAccessToken(userId, session.id), newRefreshToken)
         }
 
         val session = refreshTokenRepository.findByPreviousHashedToken(hash)
             ?.takeIf { it.userId == userId && it.encryptedToken != null }
             ?: throw unauthorized("Invalid refresh token")
-        return TokenPair(jwtService.generateAccessToken(userId), tokenCipher.decrypt(session.encryptedToken!!))
+        return TokenPair(jwtService.generateAccessToken(userId, session.id), tokenCipher.decrypt(session.encryptedToken!!))
     }
 
     /** Also works with the previous token of a client that lost its last refresh response. */
@@ -65,18 +90,43 @@ class AuthService(
         refreshTokenRepository.deleteByHashedTokenOrPreviousHashedToken(hash, hash)
     }
 
-    private fun issueTokens(userId: ObjectId): TokenPair {
+    fun sessions(userId: ObjectId, currentSessionId: ObjectId?): List<SessionResponse> =
+        refreshTokenRepository.findByUserId(userId).sortedByDescending { it.lastUsedAt ?: it.createdAt }.map {
+            SessionResponse(
+                id = it.id.toHexString(),
+                deviceName = it.deviceName,
+                deviceType = it.deviceType,
+                createdAt = it.createdAt.toEpochMilli(),
+                lastUsedAt = it.lastUsedAt?.toEpochMilli(),
+                current = it.id == currentSessionId,
+            )
+        }
+
+    /** Its access tokens stay valid until they expire (at most 15 minutes). */
+    fun endSession(userId: ObjectId, sessionId: ObjectId) {
+        val session = refreshTokenRepository.findById(sessionId)?.takeIf { it.userId == userId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found")
+        refreshTokenRepository.deleteById(session.id)
+    }
+
+    fun logoutEverywhere(userId: ObjectId) {
+        refreshTokenRepository.deleteByUserId(userId)
+    }
+
+    private fun issueTokens(userId: ObjectId, device: Device): TokenPair {
         val refreshToken = jwtService.generateRefreshToken(userId)
         val now = clock.instant()
-        refreshTokenRepository.save(
+        val session = refreshTokenRepository.save(
             RefreshToken(
                 userId = userId,
                 hashedToken = hashEncoder.sha256(refreshToken),
                 expiresAt = now.plus(jwtService.refreshTokenValidity),
                 createdAt = now,
+                deviceName = device.name,
+                deviceType = device.type,
             )
         )
-        return TokenPair(jwtService.generateAccessToken(userId), refreshToken)
+        return TokenPair(jwtService.generateAccessToken(userId, session.id), refreshToken)
     }
 
     private fun unauthorized(reason: String) = ResponseStatusException(HttpStatus.UNAUTHORIZED, reason)

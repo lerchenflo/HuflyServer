@@ -6,6 +6,7 @@ import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
+import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import org.springframework.http.HttpStatus
 import com.lerchenflo.hufly.server.core.security.CountingHashEncoder
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
@@ -227,5 +228,93 @@ class AuthServiceTest {
         authService.refresh(login.refreshToken)
 
         assertEquals(clock.instant().plus(jwtService.refreshTokenValidity), refreshTokenRepository.tokens.single().expiresAt)
+    }
+
+    // Sessions per device (USR-5)
+
+    private val pixel = AuthService.Device("Pixel 7", DeviceType.ANDROID)
+    private val ipad = AuthService.Device("iPad", DeviceType.IOS)
+
+    @Test
+    fun `login stores the device on the session and puts the session id into the access token`() {
+        val tokens = authService.login("anna@hufly.test", "Secret123", pixel)
+
+        val session = refreshTokenRepository.tokens.single()
+        assertEquals("Pixel 7", session.deviceName)
+        assertEquals(DeviceType.ANDROID, session.deviceType)
+        assertEquals(session.id, jwtService.sessionIdFromAccessToken(tokens.accessToken))
+    }
+
+    @Test
+    fun `logging in again on the same device replaces its session`() {
+        val first = authService.login("anna@hufly.test", "Secret123", pixel)
+        authService.login("anna@hufly.test", "Secret123", ipad)
+
+        authService.login("anna@hufly.test", "Secret123", pixel)
+
+        assertEquals(2, refreshTokenRepository.tokens.size)
+        assertUnauthorized { authService.refresh(first.refreshToken) }
+    }
+
+    @Test
+    fun `refresh keeps the session id and records the last use`() {
+        val login = authService.login("anna@hufly.test", "Secret123", pixel)
+        clock.advance(Duration.ofHours(2))
+
+        val refreshed = authService.refresh(login.refreshToken)
+
+        val session = refreshTokenRepository.tokens.single()
+        assertEquals(session.id, jwtService.sessionIdFromAccessToken(refreshed.accessToken))
+        assertEquals(clock.instant(), session.lastUsedAt)
+    }
+
+    @Test
+    fun `sessions list the own devices and mark the current one`() {
+        val phone = authService.login("anna@hufly.test", "Secret123", pixel)
+        authService.login("anna@hufly.test", "Secret123", ipad)
+        val current = jwtService.sessionIdFromAccessToken(phone.accessToken)
+
+        val sessions = authService.sessions(anna.id, current)
+
+        assertEquals(setOf("Pixel 7", "iPad"), sessions.map { it.deviceName }.toSet())
+        assertEquals("Pixel 7", sessions.single { it.current }.deviceName)
+    }
+
+    @Test
+    fun `ending one session logs out only that device`() {
+        authService.login("anna@hufly.test", "Secret123", pixel)
+        val tablet = authService.login("anna@hufly.test", "Secret123", ipad)
+        val tabletSession = jwtService.sessionIdFromAccessToken(tablet.accessToken)!!
+
+        authService.endSession(anna.id, tabletSession)
+
+        assertUnauthorized { authService.refresh(tablet.refreshToken) }
+        assertEquals(listOf("Pixel 7"), refreshTokenRepository.tokens.map { it.deviceName })
+    }
+
+    @Test
+    fun `sessions of other users cannot be ended`() {
+        val bob = userRepository.save(testUser(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        val bobTokens = authService.login("bob@hufly.test", "Secret123", pixel)
+
+        val error = assertFailsWith<ResponseStatusException> {
+            authService.endSession(anna.id, jwtService.sessionIdFromAccessToken(bobTokens.accessToken)!!)
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+        authService.refresh(bobTokens.refreshToken)
+        assertEquals(bob.id, refreshTokenRepository.tokens.single().userId)
+    }
+
+    @Test
+    fun `logout everywhere ends all own sessions only`() {
+        val phone = authService.login("anna@hufly.test", "Secret123", pixel)
+        userRepository.save(testUser(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        val bob = authService.login("bob@hufly.test", "Secret123", pixel)
+
+        authService.logoutEverywhere(anna.id)
+
+        assertUnauthorized { authService.refresh(phone.refreshToken) }
+        authService.refresh(bob.refreshToken)
     }
 }

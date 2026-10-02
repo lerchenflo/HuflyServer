@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
+import com.lerchenflo.hufly.server.core.security.currentSessionId
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.stable.StableLookupService
 import com.lerchenflo.hufly.server.stable.model.toStableResponse
@@ -100,7 +101,7 @@ class UserController(
     @PostMapping("/me/password")
     fun changePassword(@Valid @RequestBody request: ChangePasswordRequest) {
         val requester = accessService.requester(requireAuth())
-        userService.changePassword(requester, request.oldPassword, request.newPassword)
+        userService.changePassword(requester, request.oldPassword, request.newPassword, currentSessionId())
     }
 
     @PostMapping

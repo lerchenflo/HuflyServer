@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.repository
 
+import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import org.bson.types.ObjectId
 import java.time.Instant
@@ -11,6 +12,26 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         tokens.removeIf { it.id == token.id }
         tokens += token
         return token
+    }
+
+    override fun findById(id: ObjectId): RefreshToken? = tokens.firstOrNull { it.id == id }
+
+    override fun findByUserId(userId: ObjectId): List<RefreshToken> = tokens.filter { it.userId == userId }
+
+    override fun deleteById(id: ObjectId) {
+        tokens.removeIf { it.id == id }
+    }
+
+    override fun deleteByUserIdAndIdNot(userId: ObjectId, id: ObjectId): Long {
+        val before = tokens.size
+        tokens.removeIf { it.userId == userId && it.id != id }
+        return (before - tokens.size).toLong()
+    }
+
+    override fun deleteByUserIdAndDeviceNameAndDeviceType(userId: ObjectId, deviceName: String, deviceType: DeviceType): Long {
+        val before = tokens.size
+        tokens.removeIf { it.userId == userId && it.deviceName == deviceName && it.deviceType == deviceType }
+        return (before - tokens.size).toLong()
     }
 
     override fun findByHashedToken(hashedToken: String): RefreshToken? = tokens.firstOrNull { it.hashedToken == hashedToken }
@@ -30,9 +51,9 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         return (before - tokens.size).toLong()
     }
 
-    override fun rotate(oldHash: String, newHash: String, encryptedToken: String, expiresAt: Instant): Long {
+    override fun rotate(oldHash: String, newHash: String, encryptedToken: String, expiresAt: Instant, lastUsedAt: Instant): Long {
         val row = tokens.firstOrNull { it.hashedToken == oldHash } ?: return 0
-        save(row.copy(hashedToken = newHash, previousHashedToken = oldHash, encryptedToken = encryptedToken, expiresAt = expiresAt))
+        save(row.copy(hashedToken = newHash, previousHashedToken = oldHash, encryptedToken = encryptedToken, expiresAt = expiresAt, lastUsedAt = lastUsedAt))
         return 1
     }
 

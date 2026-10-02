@@ -18,7 +18,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 
 | Package | Content |
 |---|---|
-| `authentication/` | `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/logout`), `AuthService`, `model/RefreshToken` |
+| `authentication/` | `AuthController` (`/auth/login` with optional device, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`), `SessionController` (`GET /users/me/sessions`, `DELETE /users/me/sessions/{id}`), `AuthService`, `RefreshTokenCleanup`, `model/RefreshToken` (one row per device) |
 | `core/mongo/` | `MongoTimeConfig`: every Instant is stored as epoch millis (Long), every LocalDate as epoch days (negative before 1970). No Mongo TTL indexes; expired refresh tokens go via `RefreshTokenCleanup` (hourly) |
 | `core/` | `parseObjectId` (400 on malformed ids), `MAX_EPOCH_MILLIS` (bound for epoch-ms request fields), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |
@@ -42,6 +42,7 @@ New feature: package `<feature>/` with `Controller`, `Service`, optional `Lookup
 ## Auth
 
 - Access token: JWT HS256, 15 min. Refresh token: JWT, 30 days. Like SchneaggchatV3server, `/auth/refresh` rotates the session row in place (atomic `rotate`): the presented hash moves to `previousHashedToken`, the new token is kept AES-GCM encrypted (`TokenCipher`). A client that lost the response retries with its old token and gets the same new token back, until it uses the new one. Never store raw tokens.
+- Access tokens carry the session id as claim `sid` (`currentSessionId()`); ending a session leaves its access tokens valid for up to 15 min.
 - All routes except `/auth/**` need `Authorization: Bearer <access token>`; missing/invalid answers 401.
 - Login by email + password. Emails are globally unique, stored trimmed and lowercase (`normalizeEmail`). Deleted users cannot log in.
 - Every handler starts with `accessService.requester(requireAuth())` and filters by `requester.stableId`. Timestamps in responses are epoch milliseconds.

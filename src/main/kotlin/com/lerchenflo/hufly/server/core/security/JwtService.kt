@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.core.security
 
+import io.jsonwebtoken.Claims
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
@@ -30,7 +31,8 @@ class JwtService(
 
     val refreshTokenValidity: Duration = TokenType.REFRESH.validity
 
-    fun generateAccessToken(userId: ObjectId): String = generate(userId, TokenType.ACCESS)
+    /** [sessionId] identifies the device session, so the server knows which one a request comes from. */
+    fun generateAccessToken(userId: ObjectId, sessionId: ObjectId? = null): String = generate(userId, TokenType.ACCESS, sessionId)
 
     fun generateRefreshToken(userId: ObjectId): String = generate(userId, TokenType.REFRESH)
 
@@ -38,19 +40,26 @@ class JwtService(
 
     fun userIdFromRefreshToken(token: String): ObjectId? = userIdFrom(token, TokenType.REFRESH)
 
-    private fun generate(userId: ObjectId, type: TokenType): String {
+    fun sessionIdFromAccessToken(token: String): ObjectId? =
+        claimsOf(token, TokenType.ACCESS)?.get("sid", String::class.java)?.takeIf(ObjectId::isValid)?.let(::ObjectId)
+
+    private fun generate(userId: ObjectId, type: TokenType, sessionId: ObjectId? = null): String {
         val now = clock.instant()
         return Jwts.builder()
             .subject(userId.toHexString())
             .id(UUID.randomUUID().toString())
             .claim("type", type.claim)
+            .apply { if (sessionId != null) claim("sid", sessionId.toHexString()) }
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plus(type.validity)))
             .signWith(secretKey, Jwts.SIG.HS256)
             .compact()
     }
 
-    private fun userIdFrom(token: String, type: TokenType): ObjectId? {
+    private fun userIdFrom(token: String, type: TokenType): ObjectId? =
+        claimsOf(token, type)?.subject?.takeIf(ObjectId::isValid)?.let(::ObjectId)
+
+    private fun claimsOf(token: String, type: TokenType): Claims? {
         val claims = try {
             parser.parseSignedClaims(token).payload
         } catch (_: JwtException) {
@@ -58,7 +67,6 @@ class JwtService(
         } catch (_: IllegalArgumentException) {
             return null
         }
-        if (claims["type"] != type.claim) return null
-        return claims.subject?.takeIf(ObjectId::isValid)?.let(::ObjectId)
+        return claims.takeIf { it["type"] == type.claim }
     }
 }

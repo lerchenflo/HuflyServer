@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.repository.mongo
 
+import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
 import org.bson.types.ObjectId
@@ -38,8 +39,8 @@ class MongoRefreshTokenRepositoryTest {
     fun `rotate swaps the current hash in place, once`() {
         val row = session("h1")
 
-        assertEquals(1, repository.rotate("h1", "h2", "enc2", later))
-        assertEquals(0, repository.rotate("h1", "h3", "enc3", later))
+        assertEquals(1, repository.rotate("h1", "h2", "enc2", later, later))
+        assertEquals(0, repository.rotate("h1", "h3", "enc3", later, later))
 
         val rotated = repository.findByHashedToken("h2")!!
         assertEquals(row.id, rotated.id)
@@ -52,7 +53,7 @@ class MongoRefreshTokenRepositoryTest {
     @Test
     fun `logout lookup deletes by current or previous hash`() {
         session("a1")
-        repository.rotate("a1", "a2", "enc", later)
+        repository.rotate("a1", "a2", "enc", later, later)
 
         assertEquals(1, repository.deleteByHashedTokenOrPreviousHashedToken("a1", "a1"))
         assertNull(repository.findByHashedToken("a2"))
@@ -61,7 +62,7 @@ class MongoRefreshTokenRepositoryTest {
     @Test
     fun `times are stored as epoch millis`() {
         session("t1")
-        repository.rotate("t1", "t2", "enc", later)
+        repository.rotate("t1", "t2", "enc", later, later)
 
         val raw = mongoTemplate.getCollection("refreshTokens").find(org.bson.Document("hashedToken", "t2")).first()!!
         assertEquals(later.toEpochMilli(), raw["expiresAt"])
@@ -78,5 +79,20 @@ class MongoRefreshTokenRepositoryTest {
 
         assertNull(repository.findByHashedToken("old"))
         assertEquals("new", repository.findByHashedToken("new")!!.hashedToken)
+    }
+
+    @Test
+    fun `device and keep-current deletes match only the intended rows`() {
+        val anna = ObjectId.get()
+        fun device(hash: String, name: String, type: DeviceType) = repository.save(
+            RefreshToken(userId = anna, hashedToken = hash, expiresAt = later, createdAt = Instant.EPOCH, deviceName = name, deviceType = type)
+        )
+        val phone = device("d1", "Pixel 7", DeviceType.ANDROID)
+        device("d2", "iPad", DeviceType.IOS)
+        device("d3", "iPad", DeviceType.ANDROID)
+
+        assertEquals(1, repository.deleteByUserIdAndDeviceNameAndDeviceType(anna, "iPad", DeviceType.IOS))
+        assertEquals(1, repository.deleteByUserIdAndIdNot(anna, phone.id))
+        assertEquals(listOf(phone.id), repository.findByUserId(anna).map { it.id })
     }
 }

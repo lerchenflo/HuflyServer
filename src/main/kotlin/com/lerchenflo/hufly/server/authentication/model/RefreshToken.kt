@@ -12,6 +12,8 @@ import java.time.Instant
  * response retries with the old token and gets the current one back from [encryptedToken], so the old token works
  * until the client uses the new one. Tokens are stored only hashed or encrypted.
  */
+enum class DeviceType { ANDROID, IOS, WEB, OTHER }
+
 @Document("refreshTokens")
 data class RefreshToken(
     @Id val id: ObjectId = ObjectId.get(),
@@ -23,4 +25,11 @@ data class RefreshToken(
     /** Slides forward on every rotation. Expired rows are removed by `RefreshTokenCleanup`. */
     @Indexed val expiresAt: Instant,
     val createdAt: Instant,
+    /** Logging in again on the same user, name and type replaces this session (USR-5). */
+    val deviceName: String = UNKNOWN_DEVICE_NAME,
+    val deviceType: DeviceType = DeviceType.OTHER,
+    /** Last refresh; null until the first one. */
+    val lastUsedAt: Instant? = null,
 )
+
+const val UNKNOWN_DEVICE_NAME = "Unbekanntes Gerät"
