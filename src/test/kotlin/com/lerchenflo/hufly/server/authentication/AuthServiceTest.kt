@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus
 import com.lerchenflo.hufly.server.core.security.CountingHashEncoder
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
 import org.springframework.web.server.ResponseStatusException
+import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,14 +109,6 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `refresh rotates so the old refresh token stops working`() {
-        val login = authService.login("anna@hufly.test", "Secret123")
-        authService.refresh(login.refreshToken)
-
-        assertUnauthorized { authService.refresh(login.refreshToken) }
-    }
-
-    @Test
     fun `rotated refresh token keeps working`() {
         val login = authService.login("anna@hufly.test", "Secret123")
         val refreshed = authService.refresh(login.refreshToken)
@@ -160,5 +153,75 @@ class AuthServiceTest {
     @Test
     fun `logout with an unknown token succeeds`() {
         authService.logout("unknown")
+    }
+
+    // Replay grace: a client that lost the refresh response retries with the token it still has.
+
+    @Test
+    fun `retry with the rotated token within 30 seconds gets working tokens`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        authService.refresh(login.refreshToken)
+        clock.advance(Duration.ofSeconds(29))
+
+        val retried = authService.refresh(login.refreshToken)
+
+        authService.refresh(retried.refreshToken)
+    }
+
+    @Test
+    fun `retry replaces the token from the lost response`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        val lost = authService.refresh(login.refreshToken)
+
+        authService.refresh(login.refreshToken)
+
+        assertUnauthorized { authService.refresh(lost.refreshToken) }
+    }
+
+    @Test
+    fun `retry after 30 seconds is unauthorized`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        authService.refresh(login.refreshToken)
+        clock.advance(Duration.ofSeconds(31))
+
+        assertUnauthorized { authService.refresh(login.refreshToken) }
+    }
+
+    @Test
+    fun `repeated retries do not extend the 30 seconds`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        authService.refresh(login.refreshToken)
+        clock.advance(Duration.ofSeconds(20))
+        authService.refresh(login.refreshToken)
+        clock.advance(Duration.ofSeconds(20))
+
+        assertUnauthorized { authService.refresh(login.refreshToken) }
+    }
+
+    @Test
+    fun `retry after logout is unauthorized`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        val current = authService.refresh(login.refreshToken)
+        authService.logout(current.refreshToken)
+
+        assertUnauthorized { authService.refresh(login.refreshToken) }
+    }
+
+    @Test
+    fun `retry of a deleted user is unauthorized`() {
+        val login = authService.login("anna@hufly.test", "Secret123")
+        authService.refresh(login.refreshToken)
+        userRepository.save(anna.copy(deleted = true))
+
+        assertUnauthorized { authService.refresh(login.refreshToken) }
+    }
+
+    @Test
+    fun `the token before the previous one never works`() {
+        val first = authService.login("anna@hufly.test", "Secret123")
+        val second = authService.refresh(first.refreshToken)
+        authService.refresh(second.refreshToken)
+
+        assertUnauthorized { authService.refresh(first.refreshToken) }
     }
 }

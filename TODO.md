@@ -18,7 +18,6 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 4. Run the `schneaggchat-security-check` skill after each new endpoint group. Every version-sync repository gets a Testcontainers test in `repository/mongo/`.
 
 ## Open decisions
-- [ ] Refresh token replay grace (SchneaggchatV3server keeps `previousHashedToken` so a client that lost the refresh response can retry). Currently a lost response forces a re-login.
 - [ ] Payment model and subscription expiry (BIZ-6).
 
 ## Deferred features

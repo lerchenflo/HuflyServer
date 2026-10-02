@@ -10,8 +10,12 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 
 fun normalizeEmail(email: String): String = email.trim().lowercase()
+
+private val REPLAY_GRACE: Duration = Duration.ofSeconds(30)
 
 @Service
 class AuthService(
@@ -35,26 +39,47 @@ class AuthService(
         return issueTokens(user.id)
     }
 
+    /**
+     * Rotates the session: the presented token stops working and a new pair is issued. A client that lost the
+     * response may retry with the same token for [REPLAY_GRACE]; the retry replaces the token it never received.
+     */
     fun refresh(refreshToken: String): TokenPair {
         val userId = jwtService.userIdFromRefreshToken(refreshToken)
             ?: throw unauthorized("Invalid refresh token")
-        val deleted = refreshTokenRepository.deleteByHashedToken(hashEncoder.sha256(refreshToken))
-        if (deleted == 0L) throw unauthorized("Invalid refresh token")
+        val hash = hashEncoder.sha256(refreshToken)
+        val rotatedFrom = if (refreshTokenRepository.deleteByHashedToken(hash) > 0) {
+            RotatedFrom(hash, clock.instant())
+        } else {
+            replayedSession(hash) ?: throw unauthorized("Invalid refresh token")
+        }
         if (userRepository.findById(userId)?.deleted != false) throw unauthorized("User no longer exists")
-        return issueTokens(userId)
+        return issueTokens(userId, rotatedFrom)
+    }
+
+    private data class RotatedFrom(val previousHashedToken: String, val rotatedAt: Instant)
+
+    /** The session that was rotated away from [hash] within the grace period, now rotated once more. */
+    private fun replayedSession(hash: String): RotatedFrom? {
+        val session = refreshTokenRepository.findByPreviousHashedToken(hash) ?: return null
+        val rotatedAt = session.rotatedAt ?: return null
+        if (clock.instant().isAfter(rotatedAt.plus(REPLAY_GRACE))) return null
+        if (refreshTokenRepository.deleteByHashedToken(session.hashedToken) == 0L) return null
+        return RotatedFrom(hash, rotatedAt)
     }
 
     fun logout(refreshToken: String) {
         refreshTokenRepository.deleteByHashedToken(hashEncoder.sha256(refreshToken))
     }
 
-    private fun issueTokens(userId: ObjectId): TokenPair {
+    private fun issueTokens(userId: ObjectId, rotatedFrom: RotatedFrom? = null): TokenPair {
         val refreshToken = jwtService.generateRefreshToken(userId)
         val now = clock.instant()
         refreshTokenRepository.save(
             RefreshToken(
                 userId = userId,
                 hashedToken = hashEncoder.sha256(refreshToken),
+                previousHashedToken = rotatedFrom?.previousHashedToken,
+                rotatedAt = rotatedFrom?.rotatedAt,
                 expiresAt = now.plus(jwtService.refreshTokenValidity),
                 createdAt = now,
             )

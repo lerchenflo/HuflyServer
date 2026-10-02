@@ -38,7 +38,7 @@ New feature: package `<feature>/` with `Controller`, `Service`, optional `Lookup
 
 ## Auth
 
-- Access token: JWT HS256, 15 min. Refresh token: JWT, 30 days, rotated on every `/auth/refresh`; only its SHA-256 hash is stored (`refreshTokens`).
+- Access token: JWT HS256, 15 min. Refresh token: JWT, 30 days, rotated on every `/auth/refresh`; only SHA-256 hashes are stored (`refreshTokens`). A client that lost a refresh response may retry with its previous token for 30 s (`previousHashedToken` + `rotatedAt`); the retry replaces the token it never received. Unlike SchneaggchatV3server, no raw token is stored.
 - All routes except `/auth/**` need `Authorization: Bearer <access token>`; missing/invalid answers 401.
 - Login by email + password. Emails are globally unique, stored trimmed and lowercase (`normalizeEmail`). Deleted users cannot log in.
 - Every handler starts with `accessService.requester(requireAuth())` and filters by `requester.stableId`. Timestamps in responses are epoch milliseconds.

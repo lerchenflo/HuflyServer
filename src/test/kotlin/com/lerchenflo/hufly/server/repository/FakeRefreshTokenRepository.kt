@@ -14,6 +14,9 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
     override fun findByHashedToken(hashedToken: String): RefreshToken? =
         tokens.firstOrNull { it.hashedToken == hashedToken }
 
+    override fun findByPreviousHashedToken(previousHashedToken: String): RefreshToken? =
+        tokens.firstOrNull { it.previousHashedToken == previousHashedToken }
+
     override fun deleteByHashedToken(hashedToken: String): Long {
         val before = tokens.size
         tokens.removeIf { it.hashedToken == hashedToken }
