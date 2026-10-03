@@ -2,8 +2,8 @@
 
 Client-side product TODOs live in the Hufly app repo (`../hufly/TODO.md`). Requirements: `../hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
-- [ ] TODO: Get the App icon from the client and use it for the website. also use the app icons colors.
-- [ ] TODO: Implement smooth scrolling for the website
+- [x] TODO: Get the App icon from the client and use it for the website. also use the app icons colors. (2026-10-03: logo, favicon and apple-touch-icon from the client's `app_icon.xml`; colours from `HuflyColors.kt`, which is generated from the icon)
+- [x] TODO: Implement smooth scrolling for the website (2026-10-03: CSS `scroll-behavior: smooth`, off with reduced motion; anchors clear the sticky header)
 
 ## Next (in order)
 
@@ -25,7 +25,6 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 - [ ] Payment model and subscription expiry (BIZ-6).
 
 ## Deferred features
-- [ ] Website: use the client's app icon (`../hufly`) as logo and favicon, and take the site colours from the app icon's theme colours (light and dark).
 - [ ] LOW: STOMP sessions stay open after the access token expires, the session is logged out or the user is deleted. They only receive collection names (no data). Close them on logout/deletion, or require reconnecting with a fresh token.
 - [ ] Security check 2026-10-02 (food plans, horse log, paddocks, settings, events): no HIGH or MEDIUM. LOW fixed: at most 500 live invitations per event. NOTE: rows a user may not see come as ids in `deletedEntries` (ids only, no content).
 - [ ] General API rate limiting per user (only password logins are limited so far). Picture uploads decode up to 40 MP (~160 MB heap each) and need a tight per-user limit. Move limiter and version-counter state to a shared store (Redis) before running more than one server instance.

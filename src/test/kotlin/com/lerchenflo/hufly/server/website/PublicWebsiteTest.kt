@@ -38,6 +38,31 @@ class PublicWebsiteTest {
     }
 
     @Test
+    fun `the site uses the app icon and its colours`() {
+        // Gold of the horseshoe in the client's app_icon.xml
+        mockMvc.get("/favicon.svg").andExpect {
+            status { isOk() }
+            content { string(org.hamcrest.Matchers.containsString("#E8B04B")) }
+        }
+        mockMvc.get("/assets/apple-touch-icon.png").andExpect {
+            status { isOk() }
+            content { contentTypeCompatibleWith(MediaType.IMAGE_PNG) }
+        }
+        // Primary of the client's HuflyLightColors, generated from the icon
+        mockMvc.get("/assets/site.css").andExpect {
+            content { string(org.hamcrest.Matchers.containsString("--primary: #1F6392")) }
+        }
+    }
+
+    @Test
+    fun `in-page links scroll smoothly unless the visitor asks for reduced motion`() {
+        mockMvc.get("/assets/site.css").andExpect {
+            content { string(org.hamcrest.Matchers.containsString("scroll-behavior: smooth")) }
+            content { string(org.hamcrest.Matchers.containsString("prefers-reduced-motion: no-preference")) }
+        }
+    }
+
+    @Test
     fun `the API stays protected`() {
         mockMvc.get("/users/me").andExpect { status { isUnauthorized() } }
     }
