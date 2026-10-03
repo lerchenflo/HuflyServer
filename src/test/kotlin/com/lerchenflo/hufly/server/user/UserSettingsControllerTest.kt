@@ -119,4 +119,12 @@ class UserSettingsControllerTest {
             jsonPath("$.updatedAt") { value(null) }
         }
     }
+
+    @Test
+    fun `keys Mongo cannot store answer 400 instead of 500`() {
+        for (key in listOf("calendar.viewMode", "\$where", "")) {
+            call(HttpMethod.PUT, """{"values":{"$key":"x"}}""").andExpect { status { isBadRequest() } }
+        }
+        call(HttpMethod.PUT, """{"values":{"calendarViewMode":"LIST","a${'$'}b":"x"}}""").andExpect { status { isOk() } }
+    }
 }

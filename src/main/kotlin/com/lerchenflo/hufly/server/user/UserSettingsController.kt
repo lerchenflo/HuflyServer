@@ -55,6 +55,10 @@ class UserSettingsController(
         if (request.values.any { (key, value) -> key.length > 100 || value.length > 5000 }) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Setting key or value too long")
         }
+        // Mongo cannot store map keys with dots or a leading $ (it would answer 500, and clients retry 500s forever).
+        if (request.values.keys.any { it.isEmpty() || '.' in it || it.startsWith('$') }) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Setting key not allowed")
+        }
         return when (val result = settingsService.put(requester.id, request.values, request.condition())) {
             is UserSettingsService.PutResult.Saved -> ResponseEntity.ok(result.settings.toResponse())
             is UserSettingsService.PutResult.Conflict -> ResponseEntity.status(HttpStatus.CONFLICT).body(result.current.toResponse())
