@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
+import com.lerchenflo.hufly.server.core.picture.pictureResponse
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.core.sync.IdTimeStamp
 import com.lerchenflo.hufly.server.core.sync.SyncResponse
@@ -15,7 +16,9 @@ import com.lerchenflo.hufly.server.repository.HorseRepository
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 import java.time.LocalDate
 
 @RestController
@@ -50,7 +54,6 @@ class HorseController(
     data class HorseRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 5000) val description: String = "",
-        @field:Size(max = 2000) val pictureUrl: String? = null,
         val birthDate: LocalDate? = null,
         @field:Size(max = 100) val breed: String = "",
         @field:Size(max = 100) val color: String = "",
@@ -64,7 +67,6 @@ class HorseController(
         fun toData() = HorseService.HorseData(
             name = name,
             description = description,
-            pictureUrl = pictureUrl,
             birthDate = birthDate,
             breed = breed,
             color = color,
@@ -104,6 +106,26 @@ class HorseController(
         val requester = accessService.requester(requireAuth())
         return foodPlanService.assignPlan(requester, parseObjectId(horseId), request.foodPlanId?.let(::parseObjectId))
             .toHorseResponse(horseService.canSeeMedications(requester))
+    }
+
+    @PutMapping("/{horseId}/picture")
+    fun setPicture(@PathVariable horseId: String, @RequestParam("picture") picture: MultipartFile): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        return horseService.setPicture(requester, parseObjectId(horseId), picture.bytes)
+            .toHorseResponse(horseService.canSeeMedications(requester))
+    }
+
+    @DeleteMapping("/{horseId}/picture")
+    fun deletePicture(@PathVariable horseId: String): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        return horseService.deletePicture(requester, parseObjectId(horseId))
+            .toHorseResponse(horseService.canSeeMedications(requester))
+    }
+
+    @GetMapping("/{horseId}/picture")
+    fun picture(@PathVariable horseId: String): ResponseEntity<ByteArray> {
+        val requester = accessService.requester(requireAuth())
+        return pictureResponse(horseService.picture(requester, parseObjectId(horseId)))
     }
 
     @DeleteMapping("/{horseId}")

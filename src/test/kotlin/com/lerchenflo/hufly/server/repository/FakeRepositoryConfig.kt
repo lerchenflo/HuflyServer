@@ -54,4 +54,7 @@ class FakeRepositoryConfig {
 
     @Bean @Primary
     fun fakeVersionCounterStore() = com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()
+
+    @Bean @Primary
+    fun fakePictureStore() = com.lerchenflo.hufly.server.core.picture.FakePictureStore()
 }

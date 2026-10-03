@@ -15,6 +15,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.http.HttpMethod
+import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.multipart
+import com.lerchenflo.hufly.server.core.picture.testPng
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -95,5 +100,28 @@ class UserControllerTest {
         userRepository.save(rider.copy(deleted = true))
 
         getMe(rider.id).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `own profile picture upload, download by a stable member and removal`() {
+        val auth = "Bearer ${jwtService.generateAccessToken(rider.id)}"
+        val path = "/users/${rider.id.toHexString()}/picture"
+
+        mockMvc.multipart(HttpMethod.PUT, "/users/me/picture") {
+            file(MockMultipartFile("picture", "me.png", "image/png", testPng()))
+            header("Authorization", auth)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.profilePictureUrl") { value(org.hamcrest.Matchers.startsWith("$path?v=")) }
+        }
+        mockMvc.get(path) { header("Authorization", "Bearer ${jwtService.generateAccessToken(admin.id)}") }.andExpect {
+            status { isOk() }
+            content { contentType("image/jpeg") }
+        }
+        mockMvc.delete("/users/me/picture") { header("Authorization", auth) }.andExpect {
+            status { isOk() }
+            jsonPath("$.profilePictureUrl") { value(null) }
+        }
+        mockMvc.get(path) { header("Authorization", auth) }.andExpect { status { isNotFound() } }
     }
 }

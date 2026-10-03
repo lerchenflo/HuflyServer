@@ -1,6 +1,10 @@
 package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.picture.PictureKind
+import com.lerchenflo.hufly.server.core.picture.PictureStore
+import com.lerchenflo.hufly.server.core.picture.pictureUrl
+import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.horse.model.Medication
 import com.lerchenflo.hufly.server.repository.FoodPlanRepository
@@ -24,13 +28,13 @@ class HorseService(
     private val horseRepository: HorseRepository,
     private val userRepository: UserRepository,
     private val foodPlanRepository: FoodPlanRepository,
+    private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val clock: Clock,
 ) {
     data class HorseData(
         val name: String,
         val description: String,
-        val pictureUrl: String?,
         val birthDate: LocalDate?,
         val breed: String,
         val color: String,
@@ -49,7 +53,7 @@ class HorseService(
                 stableId = requester.stableId,
                 name = data.name,
                 description = data.description,
-                pictureUrl = data.pictureUrl,
+                pictureUrl = null,
                 birthDate = data.birthDate,
                 breed = data.breed,
                 color = data.color,
@@ -77,7 +81,6 @@ class HorseService(
             horse.copy(
                 name = data.name,
                 description = data.description,
-                pictureUrl = data.pictureUrl,
                 birthDate = data.birthDate,
                 breed = data.breed,
                 color = data.color,
@@ -99,13 +102,38 @@ class HorseService(
         return horseRepository.save(horse.copy(medications = medications, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
+    /** HOR-3: whoever may edit the horse sets its picture. */
+    fun setPicture(requester: User, horseId: ObjectId, upload: ByteArray): Horse {
+        accessService.requirePermission(requester, Permission.HORSE_EDIT)
+        val horse = stableHorse(requester, horseId)
+        pictureStore.save(PictureKind.HORSE, horse.id, toStoredPicture(upload))
+        val now = clock.instant()
+        return horseRepository.save(
+            horse.copy(pictureUrl = pictureUrl(PictureKind.HORSE, horse.id, now), updatedAt = now, updatedBy = requester.id)
+        )
+    }
+
+    fun deletePicture(requester: User, horseId: ObjectId): Horse {
+        accessService.requirePermission(requester, Permission.HORSE_EDIT)
+        val horse = stableHorse(requester, horseId)
+        pictureStore.delete(PictureKind.HORSE, horse.id)
+        return horseRepository.save(horse.copy(pictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+    }
+
+    fun picture(requester: User, horseId: ObjectId): ByteArray {
+        val horse = stableHorse(requester, horseId)
+        return pictureStore.load(PictureKind.HORSE, horse.id)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No picture")
+    }
+
     fun canSeeMedications(requester: User): Boolean =
         Permission.HORSE_MEDICATION_VIEW in accessService.effectivePermissions(requester)
 
     fun deleteHorse(requester: User, horseId: ObjectId) {
         accessService.requireAdmin(requester)
         val horse = stableHorse(requester, horseId)
-        horseRepository.save(horse.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        horseRepository.save(horse.copy(deleted = true, pictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+        pictureStore.delete(PictureKind.HORSE, horse.id)
     }
 
     private fun validate(requester: User, data: HorseData) {

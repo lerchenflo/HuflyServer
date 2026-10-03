@@ -2,6 +2,10 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.picture.PictureKind
+import com.lerchenflo.hufly.server.core.picture.PictureStore
+import com.lerchenflo.hufly.server.core.picture.pictureUrl
+import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.generatePassword
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
@@ -20,6 +24,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val tagRepository: TagRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
+    private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val hashEncoder: HashEncoder,
     private val clock: Clock,
@@ -61,7 +66,6 @@ class UserService(
         email: String,
         displayName: String,
         phoneNumber: String?,
-        profilePictureUrl: String?,
         roleTagIds: List<ObjectId>,
     ): User {
         accessService.requireAdmin(requester)
@@ -73,7 +77,6 @@ class UserService(
                 email = normalizedEmail,
                 displayName = displayName,
                 phoneNumber = phoneNumber,
-                profilePictureUrl = profilePictureUrl,
                 roleTagIds = roleTagIds,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
@@ -85,8 +88,28 @@ class UserService(
         accessService.requireAdmin(requester)
         if (userId == requester.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The admin cannot be deleted")
         val target = stableMember(requester, userId)
-        userRepository.save(target.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        userRepository.save(target.copy(deleted = true, profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
         refreshTokenRepository.deleteByUserId(target.id)
+        pictureStore.delete(PictureKind.USER, target.id)
+    }
+
+    /** USR-6: everyone sets only the own profile picture. */
+    fun setMyPicture(requester: User, upload: ByteArray): User {
+        pictureStore.save(PictureKind.USER, requester.id, toStoredPicture(upload))
+        val now = clock.instant()
+        return userRepository.save(
+            requester.copy(profilePictureUrl = pictureUrl(PictureKind.USER, requester.id, now), updatedAt = now, updatedBy = requester.id)
+        )
+    }
+
+    fun deleteMyPicture(requester: User): User {
+        pictureStore.delete(PictureKind.USER, requester.id)
+        return userRepository.save(requester.copy(profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+    }
+
+    fun picture(requester: User, userId: ObjectId): ByteArray {
+        val user = stableMember(requester, userId)
+        return pictureStore.load(PictureKind.USER, user.id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No picture")
     }
 
     fun resetPassword(requester: User, userId: ObjectId): String {
@@ -98,14 +121,13 @@ class UserService(
         return password
     }
 
-    fun updateMe(requester: User, email: String, displayName: String, phoneNumber: String?, profilePictureUrl: String?): User {
+    fun updateMe(requester: User, email: String, displayName: String, phoneNumber: String?): User {
         val normalizedEmail = requireFreeEmail(email, ownerId = requester.id)
         return userRepository.save(
             requester.copy(
                 email = normalizedEmail,
                 displayName = displayName,
                 phoneNumber = phoneNumber,
-                profilePictureUrl = profilePictureUrl,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )

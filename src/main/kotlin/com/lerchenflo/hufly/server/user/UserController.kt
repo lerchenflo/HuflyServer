@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
+import com.lerchenflo.hufly.server.core.picture.pictureResponse
 import com.lerchenflo.hufly.server.core.security.currentSessionId
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.stable.StableLookupService
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
+import org.springframework.http.ResponseEntity
 
 @RestController
 @RequestMapping("/users")
@@ -50,7 +53,6 @@ class UserController(
         @field:NotBlank @field:Email @field:Size(max = 254) val email: String,
         @field:NotBlank @field:Size(max = 100) val displayName: String,
         @field:Size(max = 50) val phoneNumber: String? = null,
-        @field:Size(max = 2000) val profilePictureUrl: String? = null,
         @field:Size(max = 50) val roleTagIds: List<String> = emptyList(),
     )
 
@@ -58,7 +60,6 @@ class UserController(
         @field:NotBlank @field:Email @field:Size(max = 254) val email: String,
         @field:NotBlank @field:Size(max = 100) val displayName: String,
         @field:Size(max = 50) val phoneNumber: String? = null,
-        @field:Size(max = 2000) val profilePictureUrl: String? = null,
     )
 
     data class ChangePasswordRequest(
@@ -94,8 +95,26 @@ class UserController(
     @PutMapping("/me")
     fun updateMe(@Valid @RequestBody request: UpdateMeRequest): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.updateMe(requester, request.email, request.displayName, request.phoneNumber, request.profilePictureUrl)
+        return userService.updateMe(requester, request.email, request.displayName, request.phoneNumber)
             .toUserResponse()
+    }
+
+    @PutMapping("/me/picture")
+    fun setMyPicture(@RequestParam("picture") picture: MultipartFile): UserResponse {
+        val requester = accessService.requester(requireAuth())
+        return userService.setMyPicture(requester, picture.bytes).toUserResponse()
+    }
+
+    @DeleteMapping("/me/picture")
+    fun deleteMyPicture(): UserResponse {
+        val requester = accessService.requester(requireAuth())
+        return userService.deleteMyPicture(requester).toUserResponse()
+    }
+
+    @GetMapping("/{userId}/picture")
+    fun picture(@PathVariable userId: String): ResponseEntity<ByteArray> {
+        val requester = accessService.requester(requireAuth())
+        return pictureResponse(userService.picture(requester, parseObjectId(userId)))
     }
 
     @PostMapping("/me/password")
@@ -118,7 +137,7 @@ class UserController(
         val requester = accessService.requester(requireAuth())
         return userService.updateUser(
             requester, parseObjectId(userId), request.email, request.displayName, request.phoneNumber,
-            request.profilePictureUrl, request.roleTagIds.map(::parseObjectId),
+            request.roleTagIds.map(::parseObjectId),
         ).toUserResponse()
     }
 

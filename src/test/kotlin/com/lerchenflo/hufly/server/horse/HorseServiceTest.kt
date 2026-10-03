@@ -1,6 +1,9 @@
 package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.picture.FakePictureStore
+import com.lerchenflo.hufly.server.core.picture.PictureKind
+import com.lerchenflo.hufly.server.core.picture.testPng
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.horse.model.Medication
@@ -37,8 +40,9 @@ class HorseServiceTest {
     private val tagRepository = FakeTagRepository()
     private val horseRepository = FakeHorseRepository()
     private val foodPlanRepository = FakeFoodPlanRepository()
+    private val pictureStore = FakePictureStore()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
-    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, accessService, clock)
+    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, pictureStore, accessService, clock)
 
     private val admin = testUser()
     private val editorTag = testTag(permissions = setOf(Permission.HORSE_EDIT))
@@ -63,7 +67,6 @@ class HorseServiceTest {
     ) = HorseService.HorseData(
         name = name,
         description = "Brav",
-        pictureUrl = null,
         birthDate = LocalDate.of(2015, 4, 1),
         breed = "Haflinger",
         color = "Fuchs",
@@ -249,5 +252,67 @@ class HorseServiceTest {
             horseService.updateMedications(medic, horse.id, listOf(aspirin.copy(until = aspirin.from.minusDays(1))))
         }
         assertStatus(HttpStatus.NOT_FOUND) { horseService.updateMedications(medic, foreign.id, listOf(aspirin)) }
+    }
+
+    // Pictures (HOR-2, HOR-3)
+
+    @Test
+    fun `member with HORSE_EDIT uploads a picture and the url changes with every upload`() {
+        val horse = horseRepository.save(testHorse())
+
+        val first = horseService.setPicture(editor, horse.id, testPng())
+        clock.advance(Duration.ofSeconds(1))
+        val second = horseService.setPicture(editor, horse.id, testPng())
+
+        assertEquals("/horses/${horse.id.toHexString()}/picture?v=${first.updatedAt.toEpochMilli()}", first.pictureUrl)
+        assertTrue(first.pictureUrl != second.pictureUrl)
+        assertEquals(second, horseRepository.findById(horse.id))
+        assertTrue(pictureStore.load(PictureKind.HORSE, horse.id)!!.isNotEmpty())
+    }
+
+    @Test
+    fun `uploading a picture needs HORSE_EDIT and a live horse of the own stable`() {
+        val horse = horseRepository.save(testHorse())
+        val foreign = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
+        val removed = horseRepository.save(testHorse(deleted = true))
+
+        assertStatus(HttpStatus.FORBIDDEN) { horseService.setPicture(rider, horse.id, testPng()) }
+        assertStatus(HttpStatus.NOT_FOUND) { horseService.setPicture(admin, foreign.id, testPng()) }
+        assertStatus(HttpStatus.NOT_FOUND) { horseService.setPicture(admin, removed.id, testPng()) }
+        assertTrue(pictureStore.pictures.isEmpty())
+    }
+
+    @Test
+    fun `removing the picture clears url and file`() {
+        val horse = horseRepository.save(testHorse())
+        horseService.setPicture(editor, horse.id, testPng())
+
+        val updated = horseService.deletePicture(editor, horse.id)
+
+        assertNull(updated.pictureUrl)
+        assertNull(pictureStore.load(PictureKind.HORSE, horse.id))
+        assertStatus(HttpStatus.FORBIDDEN) { horseService.deletePicture(rider, horse.id) }
+    }
+
+    @Test
+    fun `every member of the stable loads the picture, nobody else`() {
+        val horse = horseRepository.save(testHorse())
+        horseService.setPicture(admin, horse.id, testPng())
+
+        assertTrue(horseService.picture(rider, horse.id).isNotEmpty())
+        assertStatus(HttpStatus.NOT_FOUND) { horseService.picture(foreigner, horse.id) }
+        assertStatus(HttpStatus.NOT_FOUND) { horseService.picture(rider, horseRepository.save(testHorse()).id) }
+    }
+
+    @Test
+    fun `horse edits keep the picture and deleting the horse removes it`() {
+        val horse = horseRepository.save(testHorse())
+        val url = horseService.setPicture(admin, horse.id, testPng()).pictureUrl
+
+        horseService.updateHorse(editor, horse.id, data(name = "Donner"))
+        assertEquals(url, horseRepository.findById(horse.id)!!.pictureUrl)
+
+        horseService.deleteHorse(admin, horse.id)
+        assertNull(pictureStore.load(PictureKind.HORSE, horse.id))
     }
 }

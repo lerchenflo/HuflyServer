@@ -36,7 +36,8 @@ class UserServiceTest {
     private val tagRepository = FakeTagRepository()
     private val refreshTokenRepository = FakeRefreshTokenRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
-    private val userService = UserService(userRepository, tagRepository, refreshTokenRepository, accessService, hashEncoder, clock)
+    private val pictureStore = com.lerchenflo.hufly.server.core.picture.FakePictureStore()
+    private val userService = UserService(userRepository, tagRepository, refreshTokenRepository, pictureStore, accessService, hashEncoder, clock)
 
     private val admin = testUser(email = "admin@hufly.test")
     private val rider = testUser(email = "rider@hufly.test", hashedPassword = hashEncoder.encode("OldSecret1"))
@@ -110,13 +111,12 @@ class UserServiceTest {
 
     @Test
     fun `admin edits every field of a member`() {
-        userService.updateUser(admin, rider.id, "Renamed@hufly.test", "Renamed", "+43 2", "https://pic", listOf(roleTag.id))
+        userService.updateUser(admin, rider.id, "Renamed@hufly.test", "Renamed", "+43 2", listOf(roleTag.id))
 
         val user = stored(rider.id)
         assertEquals("renamed@hufly.test", user.email)
         assertEquals("Renamed", user.displayName)
         assertEquals("+43 2", user.phoneNumber)
-        assertEquals("https://pic", user.profilePictureUrl)
         assertEquals(listOf(roleTag.id), user.roleTagIds)
         assertEquals(clock.instant(), user.updatedAt)
         assertEquals(admin.id, user.updatedBy)
@@ -124,7 +124,7 @@ class UserServiceTest {
 
     @Test
     fun `admin keeps the own email when editing without conflict`() {
-        userService.updateUser(admin, rider.id, "rider@hufly.test", "Same", null, null, emptyList())
+        userService.updateUser(admin, rider.id, "rider@hufly.test", "Same", null, emptyList())
 
         assertEquals("Same", stored(rider.id).displayName)
     }
@@ -132,7 +132,7 @@ class UserServiceTest {
     @Test
     fun `editing to an email of another user conflicts`() {
         assertStatus(HttpStatus.CONFLICT) {
-            userService.updateUser(admin, rider.id, "admin@hufly.test", "X", null, null, emptyList())
+            userService.updateUser(admin, rider.id, "admin@hufly.test", "X", null, emptyList())
         }
     }
 
@@ -141,13 +141,13 @@ class UserServiceTest {
         val removed = userRepository.save(testUser(deleted = true))
 
         for (target in listOf(foreigner, removed)) {
-            assertStatus(HttpStatus.NOT_FOUND) { userService.updateUser(admin, target.id, "x@hufly.test", "X", null, null, emptyList()) }
+            assertStatus(HttpStatus.NOT_FOUND) { userService.updateUser(admin, target.id, "x@hufly.test", "X", null, emptyList()) }
         }
     }
 
     @Test
     fun `member cannot edit other users`() {
-        assertStatus(HttpStatus.FORBIDDEN) { userService.updateUser(rider, admin.id, "x@hufly.test", "X", null, null, emptyList()) }
+        assertStatus(HttpStatus.FORBIDDEN) { userService.updateUser(rider, admin.id, "x@hufly.test", "X", null, emptyList()) }
     }
 
     // Delete
@@ -206,20 +206,19 @@ class UserServiceTest {
 
     @Test
     fun `user edits the own profile except role tags`() {
-        userService.updateMe(rider, "Me@hufly.test", "Me", "+43 3", "https://me")
+        userService.updateMe(rider, "Me@hufly.test", "Me", "+43 3")
 
         val user = stored(rider.id)
         assertEquals("me@hufly.test", user.email)
         assertEquals("Me", user.displayName)
         assertEquals("+43 3", user.phoneNumber)
-        assertEquals("https://me", user.profilePictureUrl)
         assertEquals(rider.roleTagIds, user.roleTagIds)
         assertEquals(rider.id, user.updatedBy)
     }
 
     @Test
     fun `own email change to a taken email conflicts`() {
-        assertStatus(HttpStatus.CONFLICT) { userService.updateMe(rider, "foreign@hufly.test", "Me", null, null) }
+        assertStatus(HttpStatus.CONFLICT) { userService.updateMe(rider, "foreign@hufly.test", "Me", null) }
     }
 
     @Test
@@ -243,5 +242,32 @@ class UserServiceTest {
     @Test
     fun `password change with a wrong old password is rejected without 401`() {
         assertStatus(HttpStatus.BAD_REQUEST) { userService.changePassword(rider, "wrong", "NewSecret1", currentSessionId = null) }
+    }
+
+    // Profile picture (USR-6)
+
+    @Test
+    fun `user uploads and removes the own profile picture`() {
+        val updated = userService.setMyPicture(rider, com.lerchenflo.hufly.server.core.picture.testPng())
+
+        assertEquals("/users/${rider.id.toHexString()}/picture?v=${updated.updatedAt.toEpochMilli()}", updated.profilePictureUrl)
+        assertEquals(updated, stored(rider.id))
+        assertTrue(userService.picture(admin, rider.id).isNotEmpty())
+
+        val cleared = userService.deleteMyPicture(rider)
+        assertEquals(null, cleared.profilePictureUrl)
+        assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
+    }
+
+    @Test
+    fun `profile pictures stay inside the stable and go with the user`() {
+        userService.setMyPicture(rider, com.lerchenflo.hufly.server.core.picture.testPng())
+        val foreigner = userRepository.save(testUser(stableId = com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID))
+
+        assertStatus(HttpStatus.NOT_FOUND) { userService.picture(foreigner, rider.id) }
+
+        userService.deleteUser(admin, rider.id)
+        assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
+        assertTrue(pictureStore.pictures.isEmpty())
     }
 }

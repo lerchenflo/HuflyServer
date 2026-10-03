@@ -23,3 +23,5 @@ out/
 .claude
 .env
 mongodb_data
+pictures_data
+data/

@@ -1,5 +1,7 @@
 package com.lerchenflo.hufly.server.horse
 
+import com.lerchenflo.hufly.server.core.picture.FakePictureStore
+import com.lerchenflo.hufly.server.core.picture.testPng
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository
@@ -25,6 +27,8 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.request
 import java.time.Instant
 import kotlin.test.BeforeTest
@@ -43,6 +47,7 @@ class HorseControllerTest {
     @Autowired lateinit var tagRepository: FakeTagRepository
     @Autowired lateinit var horseRepository: FakeHorseRepository
     @Autowired lateinit var foodPlanRepository: FakeFoodPlanRepository
+    @Autowired lateinit var pictureStore: FakePictureStore
 
     private val admin = testUser()
     private val rider = testUser()
@@ -61,6 +66,7 @@ class HorseControllerTest {
         tagRepository.tags.clear()
         horseRepository.horses.clear()
         foodPlanRepository.plans.clear()
+        pictureStore.pictures.clear()
         userRepository.save(admin)
         userRepository.save(rider)
         userRepository.save(medic)
@@ -125,6 +131,59 @@ class HorseControllerTest {
             status { isOk() }
             jsonPath("$.foodPlanId") { value(plan.id.toHexString()) }
         }
+    }
+
+    @Test
+    fun `edit horse ignores a client-sent picture url`() {
+        val horse = horseRepository.save(testHorse())
+
+        call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}", horseJson.replace("\"pictureUrl\":null", "\"pictureUrl\":\"https://evil.test/x.png\"")).andExpect {
+            status { isOk() }
+            jsonPath("$.pictureUrl") { value(null) }
+        }
+    }
+
+    private fun upload(horseId: ObjectId, bytes: ByteArray, userId: ObjectId = admin.id) =
+        mockMvc.multipart(HttpMethod.PUT, "/horses/${horseId.toHexString()}/picture") {
+            file(MockMultipartFile("picture", "blitz.png", "image/png", bytes))
+            header("Authorization", "Bearer ${jwtService.generateAccessToken(userId)}")
+        }
+
+    @Test
+    fun `picture upload, download and removal`() {
+        val horse = horseRepository.save(testHorse())
+        val path = "/horses/${horse.id.toHexString()}/picture"
+
+        upload(horse.id, testPng()).andExpect {
+            status { isOk() }
+            jsonPath("$.pictureUrl") { value(org.hamcrest.Matchers.startsWith("$path?v=")) }
+        }
+        call(HttpMethod.GET, path, userId = rider.id).andExpect {
+            status { isOk() }
+            content { contentType("image/jpeg") }
+            header { string("Cache-Control", org.hamcrest.Matchers.containsString("private")) }
+        }
+        call(HttpMethod.DELETE, path).andExpect {
+            status { isOk() }
+            jsonPath("$.pictureUrl") { value(null) }
+        }
+        call(HttpMethod.GET, path).andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `picture upload rejects non-images and members without HORSE_EDIT`() {
+        val horse = horseRepository.save(testHorse())
+
+        upload(horse.id, "nope".toByteArray()).andExpect { status { isBadRequest() } }
+        upload(horse.id, testPng(), userId = rider.id).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `picture of a foreign horse answers 404`() {
+        val foreign = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
+        pictureStore.pictures[com.lerchenflo.hufly.server.core.picture.PictureKind.HORSE to foreign.id] = testPng()
+
+        call(HttpMethod.GET, "/horses/${foreign.id.toHexString()}/picture").andExpect { status { isNotFound() } }
     }
 
     @Test

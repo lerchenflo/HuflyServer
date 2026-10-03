@@ -55,6 +55,9 @@ services:
       OPERATOR_PATH: ${OPERATOR_PATH:-/operator-not-configured}
       OPERATOR_USERNAME: ${OPERATOR_USERNAME:-}
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
+      PICTURES_DIR: /app/pictures
+    volumes:
+      - ./pictures_data:/app/pictures
     networks:
       - spring-mongo-network
 
