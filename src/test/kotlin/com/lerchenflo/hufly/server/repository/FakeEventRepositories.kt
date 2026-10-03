@@ -9,12 +9,16 @@ class FakeEventRepository : EventRepository {
     val events = mutableListOf<Event>()
 
     override fun save(event: Event): Event {
+        events.requireUniqueClientId(event, { it.id }, { it.stableId }, { it.clientId })
         events.removeIf { it.id == event.id }
         events += event
         return event
     }
 
     override fun findById(id: ObjectId): Event? = events.firstOrNull { it.id == id }
+
+    override fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Event? =
+        events.firstOrNull { it.stableId == stableId && it.clientId == clientId }
 
     override fun findByCreatorUserIdAndDeletedFalse(creatorUserId: ObjectId): List<Event> =
         events.filter { it.creatorUserId == creatorUserId && !it.deleted }

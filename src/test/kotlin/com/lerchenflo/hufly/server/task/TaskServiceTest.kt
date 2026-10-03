@@ -255,4 +255,12 @@ class TaskServiceTest {
         assertStatus(HttpStatus.BAD_REQUEST) { create(horses = listOf(foreign.id)) }
         assertStatus(HttpStatus.BAD_REQUEST) { create(horses = listOf(deleted.id)) }
     }
+
+    @Test
+    fun `a retried task create answers the first task`() {
+        val first = taskService.createTask(planner, "Misten", "", due, listOf(anna.id), emptyList(), clientId = "c1")
+
+        assertEquals(first, taskService.createTask(planner, "Misten", "", due, listOf(anna.id), emptyList(), clientId = "c1"))
+        assertEquals(1, taskRepository.tasks.size)
+    }
 }

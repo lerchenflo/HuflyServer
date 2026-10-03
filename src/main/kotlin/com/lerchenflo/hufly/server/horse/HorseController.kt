@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horse
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.picture.pictureResponse
@@ -63,6 +64,8 @@ class HorseController(
         val foodPlanId: String? = null,
         /** Only read on create; edits go through PUT /horses/{id}/medications. */
         @field:Valid @field:Size(max = 50) val medications: List<MedicationRequest> = emptyList(),
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     ) {
         fun toData() = HorseService.HorseData(
             name = name,
@@ -82,7 +85,7 @@ class HorseController(
     @PostMapping
     fun createHorse(@Valid @RequestBody request: HorseRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
-        return horseService.createHorse(requester, request.toData(), request.medications.toMedications())
+        return horseService.createHorse(requester, request.toData(), request.medications.toMedications(), request.clientId)
             .toHorseResponse(horseService.canSeeMedications(requester))
     }
 

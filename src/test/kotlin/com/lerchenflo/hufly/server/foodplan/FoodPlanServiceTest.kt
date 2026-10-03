@@ -189,4 +189,12 @@ class FoodPlanServiceTest {
         foodPlanService.deletePlan(feeder, plan.id)
         assertStatus(HttpStatus.NOT_FOUND) { foodPlanService.assignPlan(feeder, blitz.id, plan.id) }
     }
+
+    @Test
+    fun `a retried food plan create answers the first plan`() {
+        val first = foodPlanService.createPlan(feeder, "Standard", listOf(morningHay), clientId = "c1")
+
+        assertEquals(first, foodPlanService.createPlan(feeder, "Standard", listOf(morningHay), clientId = "c1"))
+        assertEquals(1, foodPlanRepository.plans.size)
+    }
 }

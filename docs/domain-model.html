@@ -143,7 +143,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   <header class="top">
     <div class="titleblock">
       <h1>Hufly Domain Model</h1>
-      <span class="sub">Server entities (MongoDB documents) and how they relate. Sync fields (updatedAt, updatedBy, deleted) are on every synced class; the list below hides them. Scroll or pinch to zoom, drag empty space to move around. Drag boxes, click one to edit. Edits are kept as a draft in this browser until you use “Save to file”.</span>
+      <span class="sub">Server entities (MongoDB documents) and how they relate. Sync fields (updatedAt, updatedBy, deleted) are on every synced class, plus an optional clientId (unique per stable, makes create retries idempotent) on every class clients create; the list below hides them. Scroll or pinch to zoom, drag empty space to move around. Drag boxes, click one to edit. Edits are kept as a draft in this browser until you use “Save to file”.</span>
     </div>
     <div class="toolbar">
       <button id="addClass" class="primary" type="button">Add class</button>

@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.task
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
@@ -38,25 +39,29 @@ class TaskService(
         dueAt: Instant,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
+        clientId: String? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
-        requireAssignees(requester, assigneeUserIds)
-        requireHorses(requester, horseIds)
-        return save(
-            StableTask(
-                stableId = requester.stableId,
-                title = title,
-                comment = comment,
-                dueAt = dueAt,
-                assigneeUserIds = assigneeUserIds,
-                horseIds = horseIds,
-                createdByUserId = requester.id,
-                doneByUserId = null,
-                doneAt = null,
-                updatedAt = clock.instant(),
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            requireAssignees(requester, assigneeUserIds)
+            requireHorses(requester, horseIds)
+            save(
+                StableTask(
+                    stableId = requester.stableId,
+                    title = title,
+                    comment = comment,
+                    dueAt = dueAt,
+                    assigneeUserIds = assigneeUserIds,
+                    horseIds = horseIds,
+                    createdByUserId = requester.id,
+                    doneByUserId = null,
+                    doneAt = null,
+                    updatedAt = clock.instant(),
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
+        }
     }
 
     fun updateTask(

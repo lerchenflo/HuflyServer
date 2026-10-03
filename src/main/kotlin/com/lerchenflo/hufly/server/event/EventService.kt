@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
@@ -51,28 +52,33 @@ class EventService(
         endAt: Instant,
         horseIds: List<ObjectId>,
         inviteeUserIds: List<ObjectId>,
+        clientId: String? = null,
     ): Event {
         accessService.requirePermission(requester, Permission.EVENT_EDIT)
-        validate(requester, startAt, endAt, horseIds)
-        requireOwnUsers(requester, inviteeUserIds)
-        requireInvitationCap(inviteeUserIds.distinct().size)
-        val now = clock.instant()
-        val event = saveEvent(
-            Event(
-                stableId = requester.stableId,
-                creatorUserId = requester.id,
-                title = title,
-                description = description,
-                startAt = startAt,
-                endAt = endAt,
-                horseIds = horseIds.distinct(),
-                createdAt = now,
-                updatedAt = now,
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { eventRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            val invitees = inviteeUserIds.distinct() - requester.id
+            validate(requester, startAt, endAt, horseIds)
+            requireOwnUsers(requester, invitees)
+            requireInvitationCap(invitees.size)
+            val now = clock.instant()
+            val event = saveEvent(
+                Event(
+                    stableId = requester.stableId,
+                    creatorUserId = requester.id,
+                    title = title,
+                    description = description,
+                    startAt = startAt,
+                    endAt = endAt,
+                    horseIds = horseIds.distinct(),
+                    createdAt = now,
+                    updatedAt = now,
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
-        inviteeUserIds.distinct().forEach { saveInvitation(newInvitation(requester, event, it)) }
-        return event
+            invitees.forEach { saveInvitation(newInvitation(requester, event, it)) }
+            event
+        }
     }
 
     fun updateEvent(
@@ -108,16 +114,18 @@ class EventService(
         saveEvent(event.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
     }
 
-    /** Already invited users are skipped. */
-    fun invite(requester: User, eventId: ObjectId, userIds: List<ObjectId>) {
+    /** Already invited users and the creator are skipped. Answers the live invitations afterwards. */
+    fun invite(requester: User, eventId: ObjectId, userIds: List<ObjectId>): List<EventInvitation> {
         val event = managedEvent(requester, eventId)
         requireOwnUsers(requester, userIds)
         val alreadyInvited = invitationRepository.findByEventIdAndDeletedFalse(event.id).map { it.userId }.toSet()
-        val newUserIds = userIds.distinct().filter { it !in alreadyInvited }
-        if (newUserIds.isEmpty()) return
-        requireInvitationCap(alreadyInvited.size + newUserIds.size)
-        newUserIds.forEach { saveInvitation(newInvitation(requester, event, it)) }
-        restamp(event)
+        val newUserIds = userIds.distinct().filter { it !in alreadyInvited && it != event.creatorUserId }
+        if (newUserIds.isNotEmpty()) {
+            requireInvitationCap(alreadyInvited.size + newUserIds.size)
+            newUserIds.forEach { saveInvitation(newInvitation(requester, event, it)) }
+            restamp(event)
+        }
+        return invitationRepository.findByEventIdAndDeletedFalse(event.id)
     }
 
     fun removeInvitation(requester: User, invitationId: ObjectId) {

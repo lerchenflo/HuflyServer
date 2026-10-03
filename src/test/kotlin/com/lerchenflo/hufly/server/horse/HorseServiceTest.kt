@@ -315,4 +315,12 @@ class HorseServiceTest {
         horseService.deleteHorse(admin, horse.id)
         assertNull(pictureStore.load(PictureKind.HORSE, horse.id))
     }
+
+    @Test
+    fun `a retried horse create answers the first horse`() {
+        val first = horseService.createHorse(admin, data(), emptyList(), clientId = "c1")
+
+        assertEquals(first, horseService.createHorse(admin, data(), emptyList(), clientId = "c1"))
+        assertEquals(1, horseRepository.horses.size)
+    }
 }

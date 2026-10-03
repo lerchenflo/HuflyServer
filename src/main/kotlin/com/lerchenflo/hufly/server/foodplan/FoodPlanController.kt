@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.foodplan
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -41,6 +42,8 @@ class FoodPlanController(
     data class FoodPlanRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Valid @field:Size(max = 100) val entries: List<EntryRequest>,
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     ) {
         fun toEntries() = entries.map { FoodPlanEntry(it.slot, parseObjectId(it.foodTagId), it.amountComment) }
     }
@@ -50,7 +53,7 @@ class FoodPlanController(
     @PostMapping
     fun createPlan(@Valid @RequestBody request: FoodPlanRequest): FoodPlanResponse {
         val requester = accessService.requester(requireAuth())
-        return foodPlanService.createPlan(requester, request.name, request.toEntries()).toFoodPlanResponse()
+        return foodPlanService.createPlan(requester, request.name, request.toEntries(), request.clientId).toFoodPlanResponse()
     }
 
     @PutMapping("/{planId}")

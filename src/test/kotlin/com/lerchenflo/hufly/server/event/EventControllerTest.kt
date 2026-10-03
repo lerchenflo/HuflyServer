@@ -130,4 +130,33 @@ class EventControllerTest {
         call(HttpMethod.DELETE, "/events/nope").andExpect { status { isBadRequest() } }
         call(HttpMethod.GET, "/eventinvitations/sync?since=-1").andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `retried create with the same clientId answers 200 with the same event`() {
+        val body = eventJson().replace("{\"title\"", "{\"clientId\":\"local-1\",\"title\"")
+        val first = objectMapper.readTree(call(HttpMethod.POST, "/events", body).andReturn().response.contentAsString)["id"].asString()
+
+        call(HttpMethod.POST, "/events", body).andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(first) }
+        }
+    }
+
+    @Test
+    fun `clientId longer than 64 characters answers 400`() {
+        val body = eventJson().replace("{\"title\"", "{\"clientId\":\"${"x".repeat(65)}\",\"title\"")
+
+        call(HttpMethod.POST, "/events", body).andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `invite answers the live invitations of the event`() {
+        val eventId = createEvent()
+
+        call(HttpMethod.POST, "/events/$eventId/invitations", """{"userIds":["${ben.id.toHexString()}"]}""").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[0].eventId") { value(eventId) }
+        }
+    }
 }

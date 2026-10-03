@@ -260,4 +260,37 @@ class EventServiceTest {
         assertEquals(listOf(event.id.toHexString()), service.syncEvents(ben, benEvents, 400).deletedEntries)
         assertEquals(2, service.syncInvitations(ben, benInvitations, 400).deletedEntries.size)
     }
+
+    // Idempotent creates, creator never invited
+
+    @Test
+    fun `a retried event create answers the first event without new invitations`() {
+        val first = service.createEvent(teacher, "Reitstunde", "", start, end, listOf(blitz.id), listOf(anna.id), clientId = "c1")
+
+        val retry = service.createEvent(teacher, "Reitstunde", "", start, end, listOf(blitz.id), listOf(anna.id, ben.id), clientId = "c1")
+
+        assertEquals(first, retry)
+        assertEquals(1, eventRepository.events.size)
+        assertEquals(1, invitationRepository.invitations.size)
+    }
+
+    @Test
+    fun `the creator is never invited to the own event`() {
+        val event = lesson(invitees = listOf(teacher.id, anna.id))
+        assertEquals(setOf(anna.id), invitationRepository.findByEventIdAndDeletedFalse(event.id).map { it.userId }.toSet())
+
+        val live = service.invite(teacher, event.id, listOf(teacher.id, ben.id))
+
+        assertEquals(setOf(anna.id, ben.id), live.map { it.userId }.toSet())
+    }
+
+    @Test
+    fun `invite answers all live invitations, also when nothing changed`() {
+        val event = lesson(invitees = listOf(anna.id, ben.id))
+        service.removeInvitation(teacher, invitationOf(event, ben).id)
+
+        val live = service.invite(teacher, event.id, listOf(anna.id))
+
+        assertEquals(listOf(anna.id), live.map { it.userId })
+    }
 }

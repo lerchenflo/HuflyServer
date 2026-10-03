@@ -9,6 +9,7 @@ import java.time.Instant
 /** A stable chore. Done as soon as any assignee ticks it (TSK-4). Synced by [version]. */
 @Document("tasks")
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
+@CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class StableTask(
     @Id val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
@@ -25,4 +26,6 @@ data class StableTask(
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
+    /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
+    val clientId: String? = null,
 )

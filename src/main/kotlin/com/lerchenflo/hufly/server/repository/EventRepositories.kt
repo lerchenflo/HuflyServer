@@ -10,6 +10,7 @@ import org.springframework.data.repository.Repository
 interface EventRepository : Repository<Event, ObjectId> {
     fun save(event: Event): Event
     fun findById(id: ObjectId): Event?
+    fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Event?
     fun findByCreatorUserIdAndDeletedFalse(creatorUserId: ObjectId): List<Event>
 
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")

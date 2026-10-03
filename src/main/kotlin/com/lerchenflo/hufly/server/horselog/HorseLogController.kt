@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horselog
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
@@ -41,6 +42,7 @@ class HorseLogController(
         val doneByUserId: String? = null,
         @field:Size(max = 5000) val comment: String = "",
         val nextDueAt: LocalDate? = null,
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     ) {
         fun toData() = HorseLogService.LogData(
             horseId = parseObjectId(horseId),
@@ -56,7 +58,7 @@ class HorseLogController(
     @PostMapping
     fun createEntry(@Valid @RequestBody request: LogEntryRequest): HorseLogEntryResponse {
         val requester = accessService.requester(requireAuth())
-        return horseLogService.createEntry(requester, request.toData()).toHorseLogEntryResponse()
+        return horseLogService.createEntry(requester, request.toData(), request.clientId).toHorseLogEntryResponse()
     }
 
     @PutMapping("/{entryId}")

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.paddock
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
@@ -49,17 +50,22 @@ class PaddockController(
     data class PaddockRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 2000) val description: String = "",
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class GroupRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 200) val horseIds: List<String> = emptyList(),
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class ConflictRequest(
         @field:NotBlank val firstHorseId: String,
         @field:NotBlank val secondHorseId: String,
         @field:Size(max = 1000) val reason: String = "",
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class ConflictReasonRequest(@field:Size(max = 1000) val reason: String)
@@ -72,6 +78,8 @@ class PaddockController(
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val startAt: Long,
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val endAt: Long? = null,
         @field:Size(max = 2000) val comment: String = "",
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     // Paddocks
@@ -79,7 +87,7 @@ class PaddockController(
     @PostMapping("/paddocks")
     fun createPaddock(@Valid @RequestBody request: PaddockRequest): PaddockResponse {
         val requester = accessService.requester(requireAuth())
-        return paddockService.createPaddock(requester, request.name, request.description).toPaddockResponse()
+        return paddockService.createPaddock(requester, request.name, request.description, request.clientId).toPaddockResponse()
     }
 
     @PutMapping("/paddocks/{paddockId}")
@@ -113,7 +121,7 @@ class PaddockController(
     @PostMapping("/horsegroups")
     fun createGroup(@Valid @RequestBody request: GroupRequest): HorseGroupResponse {
         val requester = accessService.requester(requireAuth())
-        return paddockService.createGroup(requester, request.name, request.horseIds.map(::parseObjectId)).toHorseGroupResponse()
+        return paddockService.createGroup(requester, request.name, request.horseIds.map(::parseObjectId), request.clientId).toHorseGroupResponse()
     }
 
     @PutMapping("/horsegroups/{groupId}")
@@ -149,7 +157,7 @@ class PaddockController(
     fun createConflict(@Valid @RequestBody request: ConflictRequest): HorseConflictResponse {
         val requester = accessService.requester(requireAuth())
         return paddockService.createConflict(
-            requester, parseObjectId(request.firstHorseId), parseObjectId(request.secondHorseId), request.reason,
+            requester, parseObjectId(request.firstHorseId), parseObjectId(request.secondHorseId), request.reason, request.clientId,
         ).toHorseConflictResponse()
     }
 
@@ -186,7 +194,7 @@ class PaddockController(
         val requester = accessService.requester(requireAuth())
         return paddockService.createAssignment(
             requester, parseObjectId(request.paddockId), request.groupIds.map(::parseObjectId), request.horseIds.map(::parseObjectId),
-            Instant.ofEpochMilli(request.startAt), request.endAt?.let(Instant::ofEpochMilli), request.comment,
+            Instant.ofEpochMilli(request.startAt), request.endAt?.let(Instant::ofEpochMilli), request.comment, request.clientId,
         ).toPaddockAssignmentResponse()
     }
 

@@ -7,5 +7,6 @@ import org.springframework.data.repository.Repository
 interface FoodPlanRepository : Repository<FoodPlan, ObjectId> {
     fun save(plan: FoodPlan): FoodPlan
     fun findById(id: ObjectId): FoodPlan?
+    fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): FoodPlan?
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<FoodPlan>
 }

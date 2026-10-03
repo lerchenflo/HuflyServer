@@ -7,6 +7,7 @@ import org.springframework.data.repository.Repository
 interface HorseRepository : Repository<Horse, ObjectId> {
     fun save(horse: Horse): Horse
     fun findById(id: ObjectId): Horse?
+    fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Horse?
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<Horse>
     fun findByFoodPlanIdAndDeletedFalse(foodPlanId: ObjectId): List<Horse>
 }

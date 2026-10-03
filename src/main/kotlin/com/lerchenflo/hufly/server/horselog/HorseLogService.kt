@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.horselog
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
@@ -45,25 +46,28 @@ class HorseLogService(
         val nextDueAt: LocalDate?,
     )
 
-    fun createEntry(requester: User, data: LogData): HorseLogEntry {
+    fun createEntry(requester: User, data: LogData, clientId: String? = null): HorseLogEntry {
         accessService.requirePermission(requester, Permission.HORSE_LOG_WRITE)
-        validate(requester, data)
-        val now = clock.instant()
-        return save(
-            HorseLogEntry(
-                stableId = requester.stableId,
-                horseId = data.horseId,
-                activityTagId = data.activityTagId,
-                startAt = data.startAt,
-                endAt = data.endAt,
-                doneByUserId = data.doneByUserId,
-                comment = data.comment,
-                nextDueAt = data.nextDueAt,
-                createdAt = now,
-                updatedAt = now,
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { logRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            validate(requester, data)
+            val now = clock.instant()
+            save(
+                HorseLogEntry(
+                    stableId = requester.stableId,
+                    horseId = data.horseId,
+                    activityTagId = data.activityTagId,
+                    startAt = data.startAt,
+                    endAt = data.endAt,
+                    doneByUserId = data.doneByUserId,
+                    comment = data.comment,
+                    nextDueAt = data.nextDueAt,
+                    createdAt = now,
+                    updatedAt = now,
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
+        }
     }
 
     fun updateEntry(requester: User, entryId: ObjectId, data: LogData): HorseLogEntry {

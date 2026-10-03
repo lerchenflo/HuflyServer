@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
 import com.lerchenflo.hufly.server.core.picture.pictureUrl
@@ -44,28 +45,31 @@ class HorseService(
         val foodPlanId: ObjectId? = null,
     )
 
-    fun createHorse(requester: User, data: HorseData, medications: List<Medication>): Horse {
+    fun createHorse(requester: User, data: HorseData, medications: List<Medication>, clientId: String? = null): Horse {
         accessService.requireAdmin(requester)
-        validate(requester, data)
-        validateMedications(medications)
-        return horseRepository.save(
-            Horse(
-                stableId = requester.stableId,
-                name = data.name,
-                description = data.description,
-                pictureUrl = null,
-                birthDate = data.birthDate,
-                breed = data.breed,
-                color = data.color,
-                ownerUserId = data.ownerUserId,
-                medicalNotes = data.medicalNotes,
-                vetContact = data.vetContact,
-                medications = medications,
-                foodPlanId = requireStablePlan(requester, data.foodPlanId),
-                updatedAt = clock.instant(),
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { horseRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            validate(requester, data)
+            validateMedications(medications)
+            horseRepository.save(
+                Horse(
+                    stableId = requester.stableId,
+                    name = data.name,
+                    description = data.description,
+                    pictureUrl = null,
+                    birthDate = data.birthDate,
+                    breed = data.breed,
+                    color = data.color,
+                    ownerUserId = data.ownerUserId,
+                    medicalNotes = data.medicalNotes,
+                    vetContact = data.vetContact,
+                    medications = medications,
+                    foodPlanId = requireStablePlan(requester, data.foodPlanId),
+                    updatedAt = clock.instant(),
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
+        }
     }
 
     fun updateHorse(requester: User, horseId: ObjectId, data: HorseData): Horse {

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
@@ -40,6 +41,8 @@ class EventController(
         @field:Size(max = 50) val horseIds: List<String>,
         /** Only read on create; afterwards use the invitation endpoints. */
         @field:Size(max = 500) val inviteeUserIds: List<String> = emptyList(),
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class InviteRequest(@field:Size(min = 1, max = 500) val userIds: List<String>)
@@ -51,7 +54,7 @@ class EventController(
         val requester = accessService.requester(requireAuth())
         return eventService.createEvent(
             requester, request.title, request.description, Instant.ofEpochMilli(request.startAt), Instant.ofEpochMilli(request.endAt),
-            request.horseIds.map(::parseObjectId), request.inviteeUserIds.map(::parseObjectId),
+            request.horseIds.map(::parseObjectId), request.inviteeUserIds.map(::parseObjectId), request.clientId,
         ).toEventResponse()
     }
 
@@ -71,9 +74,10 @@ class EventController(
     }
 
     @PostMapping("/events/{eventId}/invitations")
-    fun invite(@PathVariable eventId: String, @Valid @RequestBody request: InviteRequest) {
+    fun invite(@PathVariable eventId: String, @Valid @RequestBody request: InviteRequest): List<EventInvitationResponse> {
         val requester = accessService.requester(requireAuth())
-        eventService.invite(requester, parseObjectId(eventId), request.userIds.map(::parseObjectId))
+        return eventService.invite(requester, parseObjectId(eventId), request.userIds.map(::parseObjectId))
+            .map { it.toEventInvitationResponse() }
     }
 
     @DeleteMapping("/eventinvitations/{invitationId}")

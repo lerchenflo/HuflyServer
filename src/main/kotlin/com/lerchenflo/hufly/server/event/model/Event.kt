@@ -10,6 +10,7 @@ import java.time.Instant
 /** Mainly riding lessons (EVT-2). Horses are attached to the event, not to riders (EVT-6). */
 @Document("events")
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
+@CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class Event(
     @Id val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
@@ -24,6 +25,8 @@ data class Event(
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
+    /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
+    val clientId: String? = null,
 )
 
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED }

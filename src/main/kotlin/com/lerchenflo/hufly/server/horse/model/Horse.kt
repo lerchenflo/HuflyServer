@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.horse.model
 
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
@@ -15,6 +16,7 @@ data class Medication(
 )
 
 @Document("horses")
+@CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class Horse(
     @Id val id: ObjectId = ObjectId.get(),
     @Indexed val stableId: ObjectId,
@@ -28,9 +30,11 @@ data class Horse(
     val medicalNotes: String,
     val vetContact: String,
     val medications: List<Medication>,
-    /** Set through the food plan feature, not through horse edits. */
+    /** Only changed by members with FOODPLAN_EDIT. */
     val foodPlanId: ObjectId?,
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
+    /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
+    val clientId: String? = null,
 )

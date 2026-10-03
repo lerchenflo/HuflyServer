@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.foodplan
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlanEntry
 import com.lerchenflo.hufly.server.horse.model.Horse
@@ -25,12 +26,17 @@ class FoodPlanService(
     private val accessService: AccessService,
     private val clock: Clock,
 ) {
-    fun createPlan(requester: User, name: String, entries: List<FoodPlanEntry>): FoodPlan {
+    fun createPlan(requester: User, name: String, entries: List<FoodPlanEntry>, clientId: String? = null): FoodPlan {
         accessService.requirePermission(requester, Permission.FOODPLAN_EDIT)
-        requireFoodTags(requester, entries)
-        return foodPlanRepository.save(
-            FoodPlan(stableId = requester.stableId, name = name, entries = entries, updatedAt = clock.instant(), updatedBy = requester.id)
-        )
+        return idempotentCreate(clientId, { foodPlanRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            requireFoodTags(requester, entries)
+            foodPlanRepository.save(
+                FoodPlan(
+                    stableId = requester.stableId, name = name, entries = entries, updatedAt = clock.instant(), updatedBy = requester.id,
+                    clientId = clientId,
+                )
+            )
+        }
     }
 
     fun updatePlan(requester: User, planId: ObjectId, name: String, entries: List<FoodPlanEntry>): FoodPlan {

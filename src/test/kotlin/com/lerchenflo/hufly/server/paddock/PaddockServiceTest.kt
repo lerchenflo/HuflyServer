@@ -223,4 +223,26 @@ class PaddockServiceTest {
         assertStatus(HttpStatus.NOT_FOUND) { service.deleteConflict(planner, ObjectId.get()) }
         assertStatus(HttpStatus.NOT_FOUND) { service.deleteAssignment(planner, ObjectId.get()) }
     }
+
+    // Idempotent creates
+
+    @Test
+    fun `retried paddock, group, conflict and assignment creates answer the first ones`() {
+        val paddock = service.createPaddock(planner, "Koppel", "", clientId = "p1")
+        assertEquals(paddock, service.createPaddock(planner, "Koppel", "", clientId = "p1"))
+
+        val group = service.createGroup(planner, "Wallache", listOf(blitz.id), clientId = "g1")
+        assertEquals(group, service.createGroup(planner, "Wallache", listOf(blitz.id), clientId = "g1"))
+
+        val conflict = service.createConflict(planner, blitz.id, donner.id, "beißt", clientId = "k1")
+        assertEquals(conflict, service.createConflict(planner, blitz.id, donner.id, "beißt", clientId = "k1"))
+
+        val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), start, null, "", clientId = "a1")
+        assertEquals(assignment, service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), start, null, "", clientId = "a1"))
+
+        assertEquals(1, paddockRepository.paddocks.size)
+        assertEquals(1, groupRepository.groups.size)
+        assertEquals(1, conflictRepository.conflicts.size)
+        assertEquals(1, assignmentRepository.assignments.size)
+    }
 }

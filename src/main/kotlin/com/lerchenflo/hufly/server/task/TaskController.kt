@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
@@ -38,6 +39,8 @@ class TaskController(
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val dueAt: Long,
         @field:Size(max = 50) val assigneeUserIds: List<String>,
         @field:Size(max = 50) val horseIds: List<String> = emptyList(),
+        /** Only read on create. */
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class DoneRequest(val done: Boolean)
@@ -47,7 +50,7 @@ class TaskController(
         val requester = accessService.requester(requireAuth())
         return taskService.createTask(
             requester, request.title, request.comment, Instant.ofEpochMilli(request.dueAt), request.assigneeUserIds.map(::parseObjectId),
-            request.horseIds.map(::parseObjectId),
+            request.horseIds.map(::parseObjectId), request.clientId,
         ).toTaskResponse()
     }
 

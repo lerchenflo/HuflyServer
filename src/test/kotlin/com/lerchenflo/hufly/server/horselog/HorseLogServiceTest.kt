@@ -165,4 +165,46 @@ class HorseLogServiceTest {
         assertEquals(listOf(removed.id.toHexString()), result.deletedEntries)
         assertEquals(3, result.newVersion)
     }
+
+    // Idempotent creates (OFF-2)
+
+    @Test
+    fun `a retried create with the same clientId answers the first entry and saves nothing`() {
+        val first = logService.createEntry(writer, data(), clientId = "c1")
+
+        val retry = logService.createEntry(writer, data(), clientId = "c1")
+
+        assertEquals(first, retry)
+        assertEquals(1, logRepository.entries.size)
+    }
+
+    @Test
+    fun `a retry answers the entry even after it was deleted or its horse is gone`() {
+        val first = logService.createEntry(writer, data(), clientId = "c1")
+        logService.deleteEntry(writer, first.id)
+        horseRepository.save(blitz.copy(deleted = true))
+
+        val retry = logService.createEntry(writer, data(), clientId = "c1")
+
+        assertEquals(first.id, retry.id)
+        assertTrue(retry.deleted)
+    }
+
+    @Test
+    fun `the permission check comes before the clientId lookup`() {
+        logService.createEntry(writer, data(), clientId = "c1")
+
+        assertStatus(HttpStatus.FORBIDDEN) { logService.createEntry(rider, data(), clientId = "c1") }
+    }
+
+    @Test
+    fun `clientIds are scoped per stable`() {
+        val foreign = logService.createEntry(writer, data(), clientId = "c1").copy(id = ObjectId.get(), stableId = OTHER_STABLE_ID, clientId = "x")
+        logRepository.save(foreign.copy(clientId = "c2"))
+
+        val own = logService.createEntry(writer, data(), clientId = "c2")
+
+        assertEquals(STABLE_ID, own.stableId)
+        assertEquals(3, logRepository.entries.size)
+    }
 }

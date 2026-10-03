@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.paddock
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
@@ -40,11 +41,16 @@ class PaddockService(
 ) {
     // Paddocks
 
-    fun createPaddock(requester: User, name: String, description: String): Paddock {
+    fun createPaddock(requester: User, name: String, description: String, clientId: String? = null): Paddock {
         requirePlanner(requester)
-        return paddockRepository.save(
-            Paddock(stableId = requester.stableId, name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id)
-        )
+        return idempotentCreate(clientId, { paddockRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            paddockRepository.save(
+                    Paddock(
+                        stableId = requester.stableId, name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id,
+                        clientId = clientId,
+                    )
+                )
+        }
     }
 
     fun updatePaddock(requester: User, paddockId: ObjectId, name: String, description: String): Paddock {
@@ -61,12 +67,17 @@ class PaddockService(
 
     // Groups
 
-    fun createGroup(requester: User, name: String, horseIds: List<ObjectId>): HorseGroup {
+    fun createGroup(requester: User, name: String, horseIds: List<ObjectId>, clientId: String? = null): HorseGroup {
         requirePlanner(requester)
-        requireOwnHorses(requester, horseIds)
-        return groupRepository.save(
-            HorseGroup(stableId = requester.stableId, name = name, horseIds = horseIds.distinct(), updatedAt = clock.instant(), updatedBy = requester.id)
-        )
+        return idempotentCreate(clientId, { groupRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            requireOwnHorses(requester, horseIds)
+            groupRepository.save(
+                    HorseGroup(
+                        stableId = requester.stableId, name = name, horseIds = horseIds.distinct(), updatedAt = clock.instant(),
+                        updatedBy = requester.id, clientId = clientId,
+                    )
+                )
+        }
     }
 
     fun updateGroup(requester: User, groupId: ObjectId, name: String, horseIds: List<ObjectId>): HorseGroup {
@@ -84,8 +95,20 @@ class PaddockService(
 
     // Conflicts
 
-    fun createConflict(requester: User, firstHorseId: ObjectId, secondHorseId: ObjectId, reason: String): HorseConflict {
+    fun createConflict(
+        requester: User,
+        firstHorseId: ObjectId,
+        secondHorseId: ObjectId,
+        reason: String,
+        clientId: String? = null,
+    ): HorseConflict {
         requirePlanner(requester)
+        return idempotentCreate(clientId, { conflictRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            newConflict(requester, firstHorseId, secondHorseId, reason, clientId)
+        }
+    }
+
+    private fun newConflict(requester: User, firstHorseId: ObjectId, secondHorseId: ObjectId, reason: String, clientId: String?): HorseConflict {
         if (firstHorseId == secondHorseId) throw badRequest("A horse cannot conflict with itself")
         requireOwnHorses(requester, listOf(firstHorseId, secondHorseId))
         val pair = setOf(firstHorseId, secondHorseId)
@@ -100,6 +123,7 @@ class PaddockService(
                 reason = reason,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
+                clientId = clientId,
             )
         )
     }
@@ -126,22 +150,26 @@ class PaddockService(
         startAt: Instant,
         endAt: Instant?,
         comment: String,
+        clientId: String? = null,
     ): PaddockAssignment {
         requirePlanner(requester)
-        val resolved = resolveAssignment(requester, paddockId, groupIds, horseIds, startAt, endAt)
-        return saveAssignment(
-            PaddockAssignment(
-                stableId = requester.stableId,
-                paddockId = paddockId,
-                groupIds = groupIds.distinct(),
-                horseIds = resolved,
-                startAt = startAt,
-                endAt = endAt,
-                comment = comment,
-                updatedAt = clock.instant(),
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { assignmentRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            val resolved = resolveAssignment(requester, paddockId, groupIds, horseIds, startAt, endAt)
+            saveAssignment(
+                PaddockAssignment(
+                    stableId = requester.stableId,
+                    paddockId = paddockId,
+                    groupIds = groupIds.distinct(),
+                    horseIds = resolved,
+                    startAt = startAt,
+                    endAt = endAt,
+                    comment = comment,
+                    updatedAt = clock.instant(),
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
+        }
     }
 
     fun updateAssignment(
