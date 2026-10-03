@@ -79,21 +79,21 @@ class PaddockService(
     fun createGroup(requester: User, name: String, horseIds: List<ObjectId>, clientId: String? = null): HorseGroup {
         requirePlanner(requester)
         return idempotentCreate(clientId, { groupRepository.findByStableIdAndClientId(requester.stableId, it) }) {
-            requireOwnHorses(requester, horseIds)
+            val liveHorseIds = liveOwnHorses(requester, horseIds)
             groupRepository.save(
-                    HorseGroup(
-                        stableId = requester.stableId, name = name, horseIds = horseIds.distinct(), updatedAt = clock.instant(),
-                        updatedBy = requester.id, clientId = clientId,
-                    )
+                HorseGroup(
+                    stableId = requester.stableId, name = name, horseIds = liveHorseIds, updatedAt = clock.instant(),
+                    updatedBy = requester.id, clientId = clientId,
                 )
+            )
         }
     }
 
     fun updateGroup(requester: User, groupId: ObjectId, name: String, horseIds: List<ObjectId>): HorseGroup {
         requirePlanner(requester)
         val group = ownGroup(requester, groupId) ?: throw notFound()
-        requireOwnHorses(requester, horseIds)
-        return groupRepository.save(group.copy(name = name, horseIds = horseIds.distinct(), updatedAt = clock.instant(), updatedBy = requester.id))
+        val liveHorseIds = liveOwnHorses(requester, horseIds)
+        return groupRepository.save(group.copy(name = name, horseIds = liveHorseIds, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
     fun deleteGroup(requester: User, groupId: ObjectId) {
@@ -170,7 +170,7 @@ class PaddockService(
                     paddockId = paddockId,
                     groupIds = resolved.groupIds,
                     horseIds = resolved.horseIds,
-                    singleHorseIds = horseIds.distinct(),
+                    singleHorseIds = resolved.singleHorseIds,
                     startAt = startAt,
                     endAt = endAt,
                     comment = comment,
@@ -200,7 +200,7 @@ class PaddockService(
                 paddockId = paddockId,
                 groupIds = resolved.groupIds,
                 horseIds = resolved.horseIds,
-                singleHorseIds = horseIds.distinct(),
+                singleHorseIds = resolved.singleHorseIds,
                 startAt = startAt,
                 endAt = endAt,
                 comment = comment,
@@ -229,9 +229,9 @@ class PaddockService(
         )
     }
 
-    private data class ResolvedAssignment(val groupIds: List<ObjectId>, val horseIds: List<ObjectId>)
+    private data class ResolvedAssignment(val groupIds: List<ObjectId>, val horseIds: List<ObjectId>, val singleHorseIds: List<ObjectId>)
 
-    /** Live group horses plus single horses, in that order, without duplicates. Deleted groups are skipped. */
+    /** Live group horses plus single horses, in that order, without duplicates. Deleted groups and horses are skipped. */
     private fun resolveAssignment(
         requester: User,
         paddockId: ObjectId,
@@ -246,11 +246,11 @@ class PaddockService(
                 ?: throw badRequest("UNKNOWN_GROUP", "Unknown group")
             group.takeIf { !it.deleted }
         }
-        requireOwnHorses(requester, horseIds)
+        val singles = liveOwnHorses(requester, horseIds)
         if (endAt != null && endAt < startAt) throw badRequest("END_BEFORE_START", "End before start")
-        val resolved = (groups.flatMap { it.horseIds } + horseIds).distinct()
+        val resolved = (groups.flatMap { it.horseIds } + singles).distinct()
         if (resolved.isEmpty()) throw badRequest("NO_HORSES", "No horses")
-        return ResolvedAssignment(groups.map { it.id }, resolved)
+        return ResolvedAssignment(groups.map { it.id }, resolved, singles)
     }
 
     private fun saveAssignment(assignment: PaddockAssignment): PaddockAssignment =
@@ -264,6 +264,17 @@ class PaddockService(
         val valid = horseIds.all { id -> horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }
         if (!valid) throw badRequest("UNKNOWN_HORSE", "Unknown horse")
     }
+
+    /**
+     * The live ones of [horseIds], distinct. Horses deleted meanwhile are dropped: offline clients may still hold them.
+     * Ids that never were horses of the stable answer 400.
+     */
+    private fun liveOwnHorses(requester: User, horseIds: List<ObjectId>): List<ObjectId> =
+        horseIds.distinct().mapNotNull { id ->
+            val horse = horseRepository.findById(id)?.takeIf { it.stableId == requester.stableId }
+                ?: throw badRequest("UNKNOWN_HORSE", "Unknown horse")
+            horse.id.takeIf { !horse.deleted }
+        }
 
     private fun ownPaddock(requester: User, id: ObjectId) =
         paddockRepository.findById(id)?.takeIf { it.stableId == requester.stableId && !it.deleted }

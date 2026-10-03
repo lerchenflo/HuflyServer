@@ -325,4 +325,34 @@ class PaddockServiceTest {
 
         assertEquals(first, service.createConflict(planner, blitz.id, donner.id, "", clientId = "k1"))
     }
+
+    // Deleted horses
+
+    @Test
+    fun `assignments skip deleted horses, unknown ones still answer 400`() {
+        val paddock = service.createPaddock(planner, "Koppel", "")
+        val gone = horseRepository.save(testHorse(deleted = true))
+
+        val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id, gone.id), start, null, "")
+        assertEquals(listOf(blitz.id), assignment.horseIds)
+        assertEquals(listOf(blitz.id), assignment.singleHorseIds)
+
+        val edited = service.updateAssignment(planner, assignment.id, paddock.id, emptyList(), listOf(gone.id, donner.id), start, null, "")
+        assertEquals(listOf(donner.id), edited.singleHorseIds)
+
+        assertCode("UNKNOWN_HORSE") { service.createAssignment(planner, paddock.id, emptyList(), listOf(foreignHorse.id), start, null, "") }
+        assertCode("NO_HORSES") { service.createAssignment(planner, paddock.id, emptyList(), listOf(gone.id), start, null, "") }
+    }
+
+    @Test
+    fun `groups skip deleted horses on create and edit`() {
+        val gone = horseRepository.save(testHorse(deleted = true))
+
+        val group = service.createGroup(planner, "Wallache", listOf(blitz.id, gone.id))
+        assertEquals(listOf(blitz.id), group.horseIds)
+
+        val edited = service.updateGroup(planner, group.id, "Wallache", listOf(gone.id, donner.id))
+        assertEquals(listOf(donner.id), edited.horseIds)
+        assertCode("UNKNOWN_HORSE") { service.updateGroup(planner, group.id, "Wallache", listOf(foreignHorse.id)) }
+    }
 }

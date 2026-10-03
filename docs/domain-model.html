@@ -497,7 +497,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "passign",
    "kind": "class",
    "name": "PaddockAssignment",
-   "note": "Which horses are on which paddock from startAt to endAt (empty = until further notice). Planned by picking groups and/or single horses. horseIds is the full list at save time, so later group edits don't rewrite history; groupIds and singleHorseIds only remember what was picked (deleted groups are dropped). Deleting the paddock deletes future assignments and ends running ones now. Needs PADDOCK_PLAN. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Which horses are on which paddock from startAt to endAt (empty = until further notice). Planned by picking groups and/or single horses. horseIds is the full list at save time, so later group edits don't rewrite history; groupIds and singleHorseIds only remember what was picked (deleted groups and horses are dropped). Deleting the paddock deletes future assignments and ends running ones now. Needs PADDOCK_PLAN. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "paddock",
    "x": 1500,
    "y": 500
