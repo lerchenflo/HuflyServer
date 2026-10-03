@@ -26,7 +26,7 @@ import java.time.Instant
 import java.time.LocalDate
 
 @RestController
-@RequestMapping("/horselog")
+@RequestMapping("/horselogs")
 class HorseLogController(
     private val accessService: AccessService,
     private val horseLogService: HorseLogService,

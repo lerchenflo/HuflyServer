@@ -57,6 +57,7 @@ class HorseController(
         val ownerUserId: String? = null,
         @field:Size(max = 5000) val medicalNotes: String = "",
         @field:Size(max = 1000) val vetContact: String = "",
+        val foodPlanId: String? = null,
         /** Only read on create; edits go through PUT /horses/{id}/medications. */
         @field:Valid @field:Size(max = 50) val medications: List<MedicationRequest> = emptyList(),
     ) {
@@ -70,6 +71,7 @@ class HorseController(
             ownerUserId = ownerUserId?.let(::parseObjectId),
             medicalNotes = medicalNotes,
             vetContact = vetContact,
+            foodPlanId = foodPlanId?.let(::parseObjectId),
         )
     }
 

@@ -74,7 +74,7 @@ class HorseLogControllerTest {
 
     @Test
     fun `create entry answers with the entry`() {
-        call(HttpMethod.POST, "/horselog", entryJson()).andExpect {
+        call(HttpMethod.POST, "/horselogs", entryJson()).andExpect {
             status { isOk() }
             jsonPath("$.horseId") { value(blitz.id.toHexString()) }
             jsonPath("$.startAt") { value(1790000000000) }
@@ -85,24 +85,24 @@ class HorseLogControllerTest {
 
     @Test
     fun `create entry without HORSE_LOG_WRITE answers 403`() {
-        call(HttpMethod.POST, "/horselog", entryJson(), userId = rider.id).andExpect { status { isForbidden() } }
+        call(HttpMethod.POST, "/horselogs", entryJson(), userId = rider.id).andExpect { status { isForbidden() } }
     }
 
     @Test
     fun `create entry with an out of range start answers 400`() {
-        call(HttpMethod.POST, "/horselog", entryJson(startAt = "9000000000000000000")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/horselogs", entryJson(startAt = "9000000000000000000")).andExpect { status { isBadRequest() } }
     }
 
     @Test
     fun `edit and delete answer 200, every member syncs`() {
-        val id = objectMapper.readTree(call(HttpMethod.POST, "/horselog", entryJson()).andReturn().response.contentAsString)["id"].asString()
+        val id = objectMapper.readTree(call(HttpMethod.POST, "/horselogs", entryJson()).andReturn().response.contentAsString)["id"].asString()
 
-        call(HttpMethod.PUT, "/horselog/$id", entryJson().replace("Influenza", "Tetanus")).andExpect {
+        call(HttpMethod.PUT, "/horselogs/$id", entryJson().replace("Influenza", "Tetanus")).andExpect {
             status { isOk() }
             jsonPath("$.comment") { value("Tetanus") }
         }
-        call(HttpMethod.DELETE, "/horselog/$id").andExpect { status { isOk() } }
-        call(HttpMethod.GET, "/horselog/sync?since=0", userId = rider.id).andExpect {
+        call(HttpMethod.DELETE, "/horselogs/$id").andExpect { status { isOk() } }
+        call(HttpMethod.GET, "/horselogs/sync?since=0", userId = rider.id).andExpect {
             status { isOk() }
             jsonPath("$.deletedEntries[0]") { value(id) }
             jsonPath("$.moreEntries") { value(false) }
@@ -111,7 +111,7 @@ class HorseLogControllerTest {
 
     @Test
     fun `sync rejects a negative since and malformed ids answer 400`() {
-        call(HttpMethod.GET, "/horselog/sync?since=-1").andExpect { status { isBadRequest() } }
-        call(HttpMethod.DELETE, "/horselog/nope").andExpect { status { isBadRequest() } }
+        call(HttpMethod.GET, "/horselogs/sync?since=-1").andExpect { status { isBadRequest() } }
+        call(HttpMethod.DELETE, "/horselogs/nope").andExpect { status { isBadRequest() } }
     }
 }

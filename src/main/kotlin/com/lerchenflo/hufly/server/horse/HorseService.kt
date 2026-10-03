@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.horse
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.horse.model.Medication
+import com.lerchenflo.hufly.server.repository.FoodPlanRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
@@ -14,11 +15,15 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.LocalDate
 
-/** Adding and removing horses is admin-only (TAG-6); editing needs HORSE_EDIT, medications HORSE_MEDICATION_EDIT. */
+/**
+ * Adding and removing horses is admin-only (TAG-6); editing needs HORSE_EDIT, medications HORSE_MEDICATION_EDIT.
+ * An edit only changes the food plan with FOODPLAN_EDIT; otherwise the sent id is ignored, so offline edits never fail on it.
+ */
 @Service
 class HorseService(
     private val horseRepository: HorseRepository,
     private val userRepository: UserRepository,
+    private val foodPlanRepository: FoodPlanRepository,
     private val accessService: AccessService,
     private val clock: Clock,
 ) {
@@ -32,6 +37,7 @@ class HorseService(
         val ownerUserId: ObjectId?,
         val medicalNotes: String,
         val vetContact: String,
+        val foodPlanId: ObjectId? = null,
     )
 
     fun createHorse(requester: User, data: HorseData, medications: List<Medication>): Horse {
@@ -51,7 +57,7 @@ class HorseService(
                 medicalNotes = data.medicalNotes,
                 vetContact = data.vetContact,
                 medications = medications,
-                foodPlanId = null,
+                foodPlanId = requireStablePlan(requester, data.foodPlanId),
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -62,6 +68,11 @@ class HorseService(
         accessService.requirePermission(requester, Permission.HORSE_EDIT)
         val horse = stableHorse(requester, horseId)
         validate(requester, data)
+        val foodPlanId = if (Permission.FOODPLAN_EDIT in accessService.effectivePermissions(requester)) {
+            requireStablePlan(requester, data.foodPlanId)
+        } else {
+            horse.foodPlanId
+        }
         return horseRepository.save(
             horse.copy(
                 name = data.name,
@@ -73,6 +84,7 @@ class HorseService(
                 ownerUserId = data.ownerUserId,
                 medicalNotes = data.medicalNotes,
                 vetContact = data.vetContact,
+                foodPlanId = foodPlanId,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -101,6 +113,11 @@ class HorseService(
             val owner = userRepository.findById(ownerId)
             if (owner == null || owner.deleted || owner.stableId != requester.stableId) throw badRequest("Unknown owner")
         }
+    }
+
+    private fun requireStablePlan(requester: User, planId: ObjectId?): ObjectId? = planId?.also {
+        val plan = foodPlanRepository.findById(it)
+        if (plan == null || plan.deleted || plan.stableId != requester.stableId) throw badRequest("Unknown food plan")
     }
 
     private fun validateMedications(medications: List<Medication>) {

@@ -1,12 +1,15 @@
 package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.security.JwtService
+import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
+import com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
+import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -39,6 +42,7 @@ class HorseControllerTest {
     @Autowired lateinit var stableRepository: FakeStableRepository
     @Autowired lateinit var tagRepository: FakeTagRepository
     @Autowired lateinit var horseRepository: FakeHorseRepository
+    @Autowired lateinit var foodPlanRepository: FakeFoodPlanRepository
 
     private val admin = testUser()
     private val rider = testUser()
@@ -56,6 +60,7 @@ class HorseControllerTest {
         stableRepository.stables.clear()
         tagRepository.tags.clear()
         horseRepository.horses.clear()
+        foodPlanRepository.plans.clear()
         userRepository.save(admin)
         userRepository.save(rider)
         userRepository.save(medic)
@@ -107,6 +112,18 @@ class HorseControllerTest {
         call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}", horseJson.replace("Blitz", "Donner")).andExpect {
             status { isOk() }
             jsonPath("$.name") { value("Donner") }
+        }
+    }
+
+    @Test
+    fun `edit horse links the food plan from the body`() {
+        val horse = horseRepository.save(testHorse())
+        val plan = foodPlanRepository.save(FoodPlan(stableId = STABLE_ID, name = "Heu", entries = emptyList(), updatedAt = Instant.EPOCH, updatedBy = admin.id))
+        val body = horseJson.replace("\"vetContact\"", "\"foodPlanId\":\"${plan.id.toHexString()}\",\"vetContact\"")
+
+        call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}", body).andExpect {
+            status { isOk() }
+            jsonPath("$.foodPlanId") { value(plan.id.toHexString()) }
         }
     }
 

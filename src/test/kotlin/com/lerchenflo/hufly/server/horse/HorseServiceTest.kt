@@ -2,7 +2,9 @@ package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.MutableClock
+import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.horse.model.Medication
+import com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
@@ -17,14 +19,16 @@ import com.lerchenflo.hufly.server.testdata.testUser
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** HOR-1..HOR-5, TAG-5, TAG-6 */
+/** HOR-1..HOR-5, TAG-5, TAG-6, FOD-1 */
 class HorseServiceTest {
 
     private val clock = MutableClock()
@@ -32,8 +36,9 @@ class HorseServiceTest {
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
     private val horseRepository = FakeHorseRepository()
+    private val foodPlanRepository = FakeFoodPlanRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
-    private val horseService = HorseService(horseRepository, userRepository, accessService, clock)
+    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, accessService, clock)
 
     private val admin = testUser()
     private val editorTag = testTag(permissions = setOf(Permission.HORSE_EDIT))
@@ -42,12 +47,19 @@ class HorseServiceTest {
     private val medicTag = testTag(permissions = setOf(Permission.HORSE_MEDICATION_EDIT))
     private val medic = testUser(roleTagIds = listOf(medicTag.id))
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
+    private val plannerTag = testTag(permissions = setOf(Permission.HORSE_EDIT, Permission.FOODPLAN_EDIT))
+    private val planner = testUser(roleTagIds = listOf(plannerTag.id))
+
+    private fun plan(stableId: org.bson.types.ObjectId = STABLE_ID, deleted: Boolean = false) = foodPlanRepository.save(
+        FoodPlan(stableId = stableId, name = "Heu", entries = emptyList(), updatedAt = Instant.EPOCH, updatedBy = admin.id, deleted = deleted)
+    )
 
     private val aspirin = Medication("Aspirin", "1x täglich", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 14))
 
     private fun data(
         name: String = "Blitz",
         ownerUserId: org.bson.types.ObjectId? = null,
+        foodPlanId: org.bson.types.ObjectId? = null,
     ) = HorseService.HorseData(
         name = name,
         description = "Brav",
@@ -58,12 +70,14 @@ class HorseServiceTest {
         ownerUserId = ownerUserId,
         medicalNotes = "",
         vetContact = "Dr. Huf, 0664 123",
+        foodPlanId = foodPlanId,
     )
 
     @BeforeTest
     fun setUp() {
-        listOf(admin, editor, rider, medic, foreigner).forEach { userRepository.save(it) }
+        listOf(admin, editor, rider, medic, foreigner, planner).forEach { userRepository.save(it) }
         tagRepository.save(editorTag)
+        tagRepository.save(plannerTag)
         tagRepository.save(medicTag)
         stableRepository.save(testStable(adminUserId = admin.id))
         clock.advance(Duration.ofDays(1))
@@ -113,13 +127,44 @@ class HorseServiceTest {
         val foodPlanId = org.bson.types.ObjectId.get()
         val horse = horseRepository.save(testHorse().copy(foodPlanId = foodPlanId))
 
-        horseService.updateHorse(editor, horse.id, data(name = "Donner"))
+        horseService.updateHorse(editor, horse.id, data(name = "Donner", foodPlanId = plan(deleted = true).id))
 
         val stored = horseRepository.findById(horse.id)!!
         assertEquals("Donner", stored.name)
         assertEquals(foodPlanId, stored.foodPlanId)
         assertEquals(editor.id, stored.updatedBy)
         assertEquals(clock.instant(), stored.updatedAt)
+    }
+
+    @Test
+    fun `admin adds a horse with a food plan`() {
+        val heu = plan()
+
+        val horse = horseService.createHorse(admin, data(foodPlanId = heu.id), emptyList())
+
+        assertEquals(heu.id, horseRepository.findById(horse.id)!!.foodPlanId)
+    }
+
+    @Test
+    fun `member with HORSE_EDIT and FOODPLAN_EDIT links and unlinks a food plan`() {
+        val horse = horseRepository.save(testHorse())
+        val heu = plan()
+
+        horseService.updateHorse(planner, horse.id, data(foodPlanId = heu.id))
+        assertEquals(heu.id, horseRepository.findById(horse.id)!!.foodPlanId)
+
+        horseService.updateHorse(planner, horse.id, data(foodPlanId = null))
+        assertNull(horseRepository.findById(horse.id)!!.foodPlanId)
+    }
+
+    @Test
+    fun `food plan must be a live plan of the own stable`() {
+        val horse = horseRepository.save(testHorse())
+
+        for (bad in listOf(plan(stableId = OTHER_STABLE_ID), plan(deleted = true))) {
+            assertStatus(HttpStatus.BAD_REQUEST) { horseService.updateHorse(planner, horse.id, data(foodPlanId = bad.id)) }
+            assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(foodPlanId = bad.id), emptyList()) }
+        }
     }
 
     @Test
