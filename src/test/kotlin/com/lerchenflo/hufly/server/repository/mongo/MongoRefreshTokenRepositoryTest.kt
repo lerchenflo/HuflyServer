@@ -84,14 +84,18 @@ class MongoRefreshTokenRepositoryTest {
     @Test
     fun `device and keep-current deletes match only the intended rows`() {
         val anna = ObjectId.get()
-        fun device(hash: String, name: String, type: DeviceType) = repository.save(
-            RefreshToken(userId = anna, hashedToken = hash, expiresAt = later, createdAt = Instant.EPOCH, deviceName = name, deviceType = type)
+        fun device(hash: String, name: String, type: DeviceType, id: String? = null) = repository.save(
+            RefreshToken(
+                userId = anna, hashedToken = hash, expiresAt = later, createdAt = Instant.EPOCH, deviceName = name, deviceType = type, deviceId = id,
+            )
         )
         val phone = device("d1", "Pixel 7", DeviceType.ANDROID)
         device("d2", "iPad", DeviceType.IOS)
         device("d3", "iPad", DeviceType.ANDROID)
+        device("d4", "iPad", DeviceType.IOS, id = "install-1")
 
-        assertEquals(1, repository.deleteByUserIdAndDeviceNameAndDeviceType(anna, "iPad", DeviceType.IOS))
+        assertEquals(1, repository.deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(anna, "iPad", DeviceType.IOS))
+        assertEquals(1, repository.deleteByUserIdAndDeviceId(anna, "install-1"))
         assertEquals(1, repository.deleteByUserIdAndIdNot(anna, phone.id))
         assertEquals(listOf(phone.id), repository.findByUserId(anna).map { it.id })
     }

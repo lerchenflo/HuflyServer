@@ -27,7 +27,7 @@ class AuthService(
 ) {
     data class TokenPair(val accessToken: String, val refreshToken: String)
 
-    data class Device(val name: String, val type: DeviceType) {
+    data class Device(val name: String, val type: DeviceType, val id: String? = null) {
         companion object {
             val UNKNOWN = Device(UNKNOWN_DEVICE_NAME, DeviceType.OTHER)
         }
@@ -46,14 +46,18 @@ class AuthService(
     /** Checked against for unknown emails so the response time does not reveal which emails exist. */
     private val dummyHash by lazy { hashEncoder.encode("unknown-user") }
 
-    /** Logging in again on the same device replaces that device's session. */
+    /** Logging in again on the same device replaces that device's session, see [RefreshToken.deviceName]. */
     fun login(email: String, password: String, device: Device = Device.UNKNOWN): TokenPair {
         val user = userRepository.findByEmail(normalizeEmail(email))
         val passwordMatches = hashEncoder.matches(password, user?.hashedPassword ?: dummyHash)
         if (user == null || !passwordMatches || user.deleted) {
             throw unauthorized("Invalid email or password")
         }
-        refreshTokenRepository.deleteByUserIdAndDeviceNameAndDeviceType(user.id, device.name, device.type)
+        if (device.id != null) {
+            refreshTokenRepository.deleteByUserIdAndDeviceId(user.id, device.id)
+        } else {
+            refreshTokenRepository.deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(user.id, device.name, device.type)
+        }
         return issueTokens(user.id, device)
     }
 
@@ -124,6 +128,7 @@ class AuthService(
                 createdAt = now,
                 deviceName = device.name,
                 deviceType = device.type,
+                deviceId = device.id,
             )
         )
         return TokenPair(jwtService.generateAccessToken(userId, session.id), refreshToken)

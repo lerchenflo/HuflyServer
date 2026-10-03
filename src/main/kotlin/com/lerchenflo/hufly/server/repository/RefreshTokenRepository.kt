@@ -14,7 +14,8 @@ interface RefreshTokenRepository : Repository<RefreshToken, ObjectId> {
     fun findByUserId(userId: ObjectId): List<RefreshToken>
     fun deleteById(id: ObjectId)
     fun deleteByUserIdAndIdNot(userId: ObjectId, id: ObjectId): Long
-    fun deleteByUserIdAndDeviceNameAndDeviceType(userId: ObjectId, deviceName: String, deviceType: DeviceType): Long
+    fun deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(userId: ObjectId, deviceName: String, deviceType: DeviceType): Long
+    fun deleteByUserIdAndDeviceId(userId: ObjectId, deviceId: String): Long
     fun findByHashedToken(hashedToken: String): RefreshToken?
     fun findByPreviousHashedToken(previousHashedToken: String): RefreshToken?
     fun deleteByHashedTokenOrPreviousHashedToken(hashedToken: String, previousHashedToken: String): Long

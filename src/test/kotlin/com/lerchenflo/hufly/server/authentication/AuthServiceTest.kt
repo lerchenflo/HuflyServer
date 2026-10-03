@@ -257,6 +257,40 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `with a device id two phones of the same name keep their own sessions`() {
+        val first = AuthService.Device("iPhone", DeviceType.IOS, id = "install-1")
+        val second = AuthService.Device("iPhone", DeviceType.IOS, id = "install-2")
+        val firstLogin = authService.login("anna@hufly.test", "Secret123", first)
+
+        val secondLogin = authService.login("anna@hufly.test", "Secret123", second)
+
+        assertEquals(2, refreshTokenRepository.tokens.size)
+        authService.refresh(firstLogin.refreshToken)
+        authService.refresh(secondLogin.refreshToken)
+    }
+
+    @Test
+    fun `logging in again with the same device id replaces its session even under a new name`() {
+        val old = authService.login("anna@hufly.test", "Secret123", AuthService.Device("iPhone", DeviceType.IOS, id = "install-1"))
+
+        authService.login("anna@hufly.test", "Secret123", AuthService.Device("Annas iPhone", DeviceType.IOS, id = "install-1"))
+
+        assertEquals("Annas iPhone", refreshTokenRepository.tokens.single().deviceName)
+        assertEquals("install-1", refreshTokenRepository.tokens.single().deviceId)
+        assertUnauthorized { authService.refresh(old.refreshToken) }
+    }
+
+    @Test
+    fun `a login without device id never replaces a session that has one`() {
+        val withId = authService.login("anna@hufly.test", "Secret123", AuthService.Device("iPhone", DeviceType.IOS, id = "install-1"))
+
+        authService.login("anna@hufly.test", "Secret123", AuthService.Device("iPhone", DeviceType.IOS))
+
+        assertEquals(2, refreshTokenRepository.tokens.size)
+        authService.refresh(withId.refreshToken)
+    }
+
+    @Test
     fun `refresh keeps the session id and records the last use`() {
         val login = authService.login("anna@hufly.test", "Secret123", pixel)
         clock.advance(Duration.ofHours(2))

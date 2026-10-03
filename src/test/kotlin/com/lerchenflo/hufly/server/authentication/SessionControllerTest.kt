@@ -121,4 +121,22 @@ class SessionControllerTest {
             content = """{"email":"anna@hufly.test","password":"Secret123","deviceName":"X","deviceType":"TOASTER"}"""
         }.andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `login takes a device id, keeps it private and rejects ids over 64 characters`() {
+        fun loginWith(deviceId: String) = mockMvc.post("/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"anna@hufly.test","password":"Secret123","deviceName":"iPhone","deviceType":"IOS","deviceId":"$deviceId"}"""
+        }
+
+        val body = loginWith("install-1").andExpect { status { isOk() } }.andReturn().response.contentAsString
+        loginWith("install-2").andExpect { status { isOk() } }
+        loginWith("x".repeat(65)).andExpect { status { isBadRequest() } }
+
+        val token = objectMapper.readValue(body, Map::class.java)["accessToken"]
+        mockMvc.get("/users/me/sessions") { header("Authorization", "Bearer $token") }.andExpect {
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[0].deviceId") { doesNotExist() }
+        }
+    }
 }

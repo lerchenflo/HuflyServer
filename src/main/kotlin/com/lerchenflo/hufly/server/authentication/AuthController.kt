@@ -27,10 +27,13 @@ class AuthController(
         @field:NotBlank @field:Size(max = 200) val password: String,
         @field:Size(max = 100) val deviceName: String? = null,
         val deviceType: DeviceType? = null,
+        /** Stable per app install; device names collide (every iPhone is "iPhone"). */
+        @field:Size(min = 1, max = 64) val deviceId: String? = null,
     ) {
         fun device() = AuthService.Device(
             name = deviceName?.takeIf { it.isNotBlank() }?.trim() ?: UNKNOWN_DEVICE_NAME,
             type = deviceType ?: DeviceType.OTHER,
+            id = deviceId,
         )
     }
 

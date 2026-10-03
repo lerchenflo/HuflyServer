@@ -25,9 +25,14 @@ data class RefreshToken(
     /** Slides forward on every rotation. Expired rows are removed by `RefreshTokenCleanup`. */
     @Indexed val expiresAt: Instant,
     val createdAt: Instant,
-    /** Logging in again on the same user, name and type replaces this session (USR-5). */
+    /**
+     * Logging in again on the same user and [deviceId] replaces this session; without a device id, on the same name
+     * and type (USR-5). Device names are not unique: since iOS 16 every iPhone is called "iPhone".
+     */
     val deviceName: String = UNKNOWN_DEVICE_NAME,
     val deviceType: DeviceType = DeviceType.OTHER,
+    /** Client-generated per app install; never sent back to clients. */
+    val deviceId: String? = null,
     /** Last refresh; null until the first one. */
     val lastUsedAt: Instant? = null,
 )

@@ -19,7 +19,7 @@ Spring Boot backend for the Hufly stable management app. Client: `../hufly` (Kot
 
 | Package | Content |
 |---|---|
-| `authentication/` | `AuthController` (`/auth/login` with optional device, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`), `SessionController` (`GET /users/me/sessions`, `DELETE /users/me/sessions/{id}`), `AuthService`, `RefreshTokenCleanup`, `model/RefreshToken` (one row per device) |
+| `authentication/` | `AuthController` (`/auth/login` with optional device; a `deviceId` per app install replaces that install's old session, else name + type do, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`), `SessionController` (`GET /users/me/sessions`, `DELETE /users/me/sessions/{id}`), `AuthService`, `RefreshTokenCleanup`, `model/RefreshToken` (one row per device) |
 | `core/mongo/` | `MongoTimeConfig`: every Instant is stored as epoch millis (Long), every LocalDate as epoch days (negative before 1970). No Mongo TTL indexes; expired refresh tokens go via `RefreshTokenCleanup` (hourly) |
 | `core/` | `CodedException` (400/409 with body `{code, message}` for client-side messages, so far in paddock endpoints), `idempotentCreate` (every client-created entity takes an optional `clientId`, max 64, unique per stable via a partial index; a retried POST answers the existing entity, soft-deleted too; check permissions first), `parseObjectId` (400 on malformed ids), `MAX_EPOCH_MILLIS` (bound for epoch-ms request fields), `ClockConfig` (inject `java.time.Clock`, never call `Instant.now()` directly) |
 | `core/access/` | `AccessService`: `requester(requireAuth())` (401 for deleted users), `isAdmin`, `effectivePermissions`, `requireAdmin`, `requirePermission` (403) |

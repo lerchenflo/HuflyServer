@@ -28,9 +28,15 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         return (before - tokens.size).toLong()
     }
 
-    override fun deleteByUserIdAndDeviceNameAndDeviceType(userId: ObjectId, deviceName: String, deviceType: DeviceType): Long {
+    override fun deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(userId: ObjectId, deviceName: String, deviceType: DeviceType): Long {
         val before = tokens.size
-        tokens.removeIf { it.userId == userId && it.deviceName == deviceName && it.deviceType == deviceType }
+        tokens.removeIf { it.userId == userId && it.deviceName == deviceName && it.deviceType == deviceType && it.deviceId == null }
+        return (before - tokens.size).toLong()
+    }
+
+    override fun deleteByUserIdAndDeviceId(userId: ObjectId, deviceId: String): Long {
+        val before = tokens.size
+        tokens.removeIf { it.userId == userId && it.deviceId == deviceId }
         return (before - tokens.size).toLong()
     }
 
