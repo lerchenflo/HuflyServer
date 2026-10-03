@@ -9,6 +9,8 @@ import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.horse.model.Medication
 import com.lerchenflo.hufly.server.repository.FoodPlanRepository
+import com.lerchenflo.hufly.server.repository.HorseConflictRepository
+import com.lerchenflo.hufly.server.repository.HorseGroupRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
@@ -29,6 +31,8 @@ class HorseService(
     private val horseRepository: HorseRepository,
     private val userRepository: UserRepository,
     private val foodPlanRepository: FoodPlanRepository,
+    private val groupRepository: HorseGroupRepository,
+    private val conflictRepository: HorseConflictRepository,
     private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val clock: Clock,
@@ -136,8 +140,16 @@ class HorseService(
     fun deleteHorse(requester: User, horseId: ObjectId) {
         accessService.requireAdmin(requester)
         val horse = stableHorse(requester, horseId)
-        horseRepository.save(horse.copy(deleted = true, pictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+        val now = clock.instant()
+        horseRepository.save(horse.copy(deleted = true, pictureUrl = null, updatedAt = now, updatedBy = requester.id))
         pictureStore.delete(PictureKind.HORSE, horse.id)
+        // Paddock assignments keep the horse: they are history.
+        groupRepository.findByStableIdAndDeletedFalse(requester.stableId).filter { horse.id in it.horseIds }.forEach {
+            groupRepository.save(it.copy(horseIds = it.horseIds - horse.id, updatedAt = now, updatedBy = requester.id))
+        }
+        conflictRepository.findByStableIdAndDeletedFalse(requester.stableId)
+            .filter { it.firstHorseId == horse.id || it.secondHorseId == horse.id }
+            .forEach { conflictRepository.save(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id)) }
     }
 
     private fun validate(requester: User, data: HorseData) {

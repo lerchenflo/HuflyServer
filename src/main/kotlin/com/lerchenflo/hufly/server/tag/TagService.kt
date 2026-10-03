@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.tag
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.Tag
@@ -19,20 +20,30 @@ class TagService(
     private val accessService: AccessService,
     private val clock: Clock,
 ) {
-    fun createTag(requester: User, name: String, type: TagType, color: String, permissions: Set<Permission>): Tag {
+    fun createTag(
+        requester: User,
+        name: String,
+        type: TagType,
+        color: String,
+        permissions: Set<Permission>,
+        clientId: String? = null,
+    ): Tag {
         accessService.requireAdmin(requester)
-        requirePermissionsFit(type, permissions)
-        return tagRepository.save(
-            Tag(
-                stableId = requester.stableId,
-                name = name,
-                type = type,
-                color = color,
-                permissions = permissions,
-                updatedAt = clock.instant(),
-                updatedBy = requester.id,
+        return idempotentCreate(clientId, { tagRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            requirePermissionsFit(type, permissions)
+            tagRepository.save(
+                Tag(
+                    stableId = requester.stableId,
+                    name = name,
+                    type = type,
+                    color = color,
+                    permissions = permissions,
+                    updatedAt = clock.instant(),
+                    updatedBy = requester.id,
+                    clientId = clientId,
+                )
             )
-        )
+        }
     }
 
     fun updateTag(requester: User, tagId: ObjectId, name: String, color: String, permissions: Set<Permission>): Tag {

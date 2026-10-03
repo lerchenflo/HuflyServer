@@ -7,6 +7,7 @@ class FakeTagRepository : TagRepository {
     val tags = mutableListOf<Tag>()
 
     override fun save(tag: Tag): Tag {
+        tags.requireUniqueClientId(tag, { it.id }, { it.stableId }, { it.clientId })
         tags.removeIf { it.id == tag.id }
         tags += tag
         return tag
@@ -16,4 +17,7 @@ class FakeTagRepository : TagRepository {
         tags.filter { it.stableId == stableId && !it.deleted }
 
     override fun findById(id: ObjectId): Tag? = tags.firstOrNull { it.id == id }
+
+    override fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Tag? =
+        tags.firstOrNull { it.stableId == stableId && it.clientId == clientId }
 }

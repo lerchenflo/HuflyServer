@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.paddock
 
+import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
@@ -59,10 +60,18 @@ class PaddockService(
         return paddockRepository.save(paddock.copy(name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
+    /** Future assignments on the paddock go, running ones end now, past ones stay as history. */
     fun deletePaddock(requester: User, paddockId: ObjectId) {
         requirePlanner(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
-        paddockRepository.save(paddock.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        val now = clock.instant()
+        paddockRepository.save(paddock.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+        assignmentRepository.findByPaddockIdAndDeletedFalse(paddock.id).forEach {
+            when {
+                it.startAt > now -> saveAssignment(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+                it.endAt == null || it.endAt > now -> saveAssignment(it.copy(endAt = now, updatedAt = now, updatedBy = requester.id))
+            }
+        }
     }
 
     // Groups
@@ -109,11 +118,11 @@ class PaddockService(
     }
 
     private fun newConflict(requester: User, firstHorseId: ObjectId, secondHorseId: ObjectId, reason: String, clientId: String?): HorseConflict {
-        if (firstHorseId == secondHorseId) throw badRequest("A horse cannot conflict with itself")
+        if (firstHorseId == secondHorseId) throw badRequest("SAME_HORSE", "A horse cannot conflict with itself")
         requireOwnHorses(requester, listOf(firstHorseId, secondHorseId))
         val pair = setOf(firstHorseId, secondHorseId)
         if (conflictRepository.findByStableIdAndDeletedFalse(requester.stableId).any { setOf(it.firstHorseId, it.secondHorseId) == pair }) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Conflict already exists")
+            throw CodedException(HttpStatus.CONFLICT, "CONFLICT_EXISTS", "Conflict already exists")
         }
         return conflictRepository.save(
             HorseConflict(
@@ -159,8 +168,9 @@ class PaddockService(
                 PaddockAssignment(
                     stableId = requester.stableId,
                     paddockId = paddockId,
-                    groupIds = groupIds.distinct(),
-                    horseIds = resolved,
+                    groupIds = resolved.groupIds,
+                    horseIds = resolved.horseIds,
+                    singleHorseIds = horseIds.distinct(),
                     startAt = startAt,
                     endAt = endAt,
                     comment = comment,
@@ -188,8 +198,9 @@ class PaddockService(
         return saveAssignment(
             assignment.copy(
                 paddockId = paddockId,
-                groupIds = groupIds.distinct(),
-                horseIds = resolved,
+                groupIds = resolved.groupIds,
+                horseIds = resolved.horseIds,
+                singleHorseIds = horseIds.distinct(),
                 startAt = startAt,
                 endAt = endAt,
                 comment = comment,
@@ -218,7 +229,9 @@ class PaddockService(
         )
     }
 
-    /** Group horses plus single horses, in that order, without duplicates. */
+    private data class ResolvedAssignment(val groupIds: List<ObjectId>, val horseIds: List<ObjectId>)
+
+    /** Live group horses plus single horses, in that order, without duplicates. Deleted groups are skipped. */
     private fun resolveAssignment(
         requester: User,
         paddockId: ObjectId,
@@ -226,14 +239,18 @@ class PaddockService(
         horseIds: List<ObjectId>,
         startAt: Instant,
         endAt: Instant?,
-    ): List<ObjectId> {
-        if (ownPaddock(requester, paddockId) == null) throw badRequest("Unknown paddock")
-        val groups = groupIds.map { ownGroup(requester, it) ?: throw badRequest("Unknown group") }
+    ): ResolvedAssignment {
+        if (ownPaddock(requester, paddockId) == null) throw badRequest("UNKNOWN_PADDOCK", "Unknown paddock")
+        val groups = groupIds.distinct().mapNotNull { id ->
+            val group = groupRepository.findById(id)?.takeIf { it.stableId == requester.stableId }
+                ?: throw badRequest("UNKNOWN_GROUP", "Unknown group")
+            group.takeIf { !it.deleted }
+        }
         requireOwnHorses(requester, horseIds)
-        if (endAt != null && endAt < startAt) throw badRequest("End before start")
+        if (endAt != null && endAt < startAt) throw badRequest("END_BEFORE_START", "End before start")
         val resolved = (groups.flatMap { it.horseIds } + horseIds).distinct()
-        if (resolved.isEmpty()) throw badRequest("No horses")
-        return resolved
+        if (resolved.isEmpty()) throw badRequest("NO_HORSES", "No horses")
+        return ResolvedAssignment(groups.map { it.id }, resolved)
     }
 
     private fun saveAssignment(assignment: PaddockAssignment): PaddockAssignment =
@@ -245,7 +262,7 @@ class PaddockService(
 
     private fun requireOwnHorses(requester: User, horseIds: List<ObjectId>) {
         val valid = horseIds.all { id -> horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }
-        if (!valid) throw badRequest("Unknown horse")
+        if (!valid) throw badRequest("UNKNOWN_HORSE", "Unknown horse")
     }
 
     private fun ownPaddock(requester: User, id: ObjectId) =
@@ -262,5 +279,5 @@ class PaddockService(
 
     private fun notFound() = ResponseStatusException(HttpStatus.NOT_FOUND, "Not found")
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
+    private fun badRequest(code: String, reason: String) = CodedException(HttpStatus.BAD_REQUEST, code, reason)
 }

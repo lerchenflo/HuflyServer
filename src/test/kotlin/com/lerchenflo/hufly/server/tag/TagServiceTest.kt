@@ -118,4 +118,12 @@ class TagServiceTest {
         assertStatus(HttpStatus.FORBIDDEN) { tagService.updateTag(rider, tag.id, "X", "#000000", emptySet()) }
         assertStatus(HttpStatus.FORBIDDEN) { tagService.deleteTag(rider, tag.id) }
     }
+
+    @Test
+    fun `a retried tag create answers the first tag`() {
+        val first = tagService.createTag(admin, "Heu", TagType.FOOD, "#00AA00", emptySet(), clientId = "t1")
+
+        assertEquals(first, tagService.createTag(admin, "Heu", TagType.FOOD, "#00AA00", emptySet(), clientId = "t1"))
+        assertEquals(1, tagRepository.tags.size)
+    }
 }

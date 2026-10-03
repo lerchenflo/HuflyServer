@@ -41,8 +41,10 @@ class HorseServiceTest {
     private val horseRepository = FakeHorseRepository()
     private val foodPlanRepository = FakeFoodPlanRepository()
     private val pictureStore = FakePictureStore()
+    private val groupRepository = com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository()
+    private val conflictRepository = com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
-    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, pictureStore, accessService, clock)
+    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, pictureStore, accessService, clock)
 
     private val admin = testUser()
     private val editorTag = testTag(permissions = setOf(Permission.HORSE_EDIT))
@@ -322,5 +324,33 @@ class HorseServiceTest {
 
         assertEquals(first, horseService.createHorse(admin, data(), emptyList(), clientId = "c1"))
         assertEquals(1, horseRepository.horses.size)
+    }
+
+    @Test
+    fun `deleting a horse removes it from groups and drops its conflicts`() {
+        val horse = horseRepository.save(testHorse())
+        val other = horseRepository.save(testHorse())
+        val group = groupRepository.save(
+            com.lerchenflo.hufly.server.paddock.model.HorseGroup(
+                stableId = STABLE_ID, name = "G", horseIds = listOf(horse.id, other.id), updatedAt = Instant.EPOCH, updatedBy = admin.id,
+            )
+        )
+        val untouchedGroup = groupRepository.save(group.copy(id = org.bson.types.ObjectId.get(), horseIds = listOf(other.id)))
+        val conflict = conflictRepository.save(
+            com.lerchenflo.hufly.server.paddock.model.HorseConflict(
+                stableId = STABLE_ID, firstHorseId = other.id, secondHorseId = horse.id, reason = "", updatedAt = Instant.EPOCH, updatedBy = admin.id,
+            )
+        )
+
+        horseService.deleteHorse(admin, horse.id)
+
+        val storedGroup = groupRepository.findById(group.id)!!
+        assertEquals(listOf(other.id), storedGroup.horseIds)
+        assertEquals(clock.instant(), storedGroup.updatedAt)
+        assertEquals(admin.id, storedGroup.updatedBy)
+        assertEquals(untouchedGroup, groupRepository.findById(untouchedGroup.id))
+        val storedConflict = conflictRepository.findById(conflict.id)!!
+        assertTrue(storedConflict.deleted)
+        assertEquals(clock.instant(), storedConflict.updatedAt)
     }
 }

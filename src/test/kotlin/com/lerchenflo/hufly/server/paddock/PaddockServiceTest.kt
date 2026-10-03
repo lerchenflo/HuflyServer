@@ -245,4 +245,84 @@ class PaddockServiceTest {
         assertEquals(1, conflictRepository.conflicts.size)
         assertEquals(1, assignmentRepository.assignments.size)
     }
+
+    private fun assertCode(code: String, block: () -> Unit) {
+        assertEquals(code, kotlin.test.assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { block() }.code)
+    }
+
+    // Paddock delete cascade
+
+    @Test
+    fun `deleting a paddock drops future assignments, ends running ones and keeps the past`() {
+        val now = clock.instant()
+        val paddock = service.createPaddock(planner, "Koppel", "")
+        val other = service.createPaddock(planner, "Andere", "")
+        val past = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(7200), now.minusSeconds(3600), "")
+        val running = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(60), null, "")
+        val runningUntilLater = service.createAssignment(planner, paddock.id, emptyList(), listOf(donner.id), now.minusSeconds(60), now.plusSeconds(600), "")
+        val future = service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
+        val elsewhere = service.createAssignment(planner, other.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
+
+        service.deletePaddock(planner, paddock.id)
+
+        fun stored(id: ObjectId) = assignmentRepository.findById(id)!!
+        assertEquals(past, stored(past.id))
+        assertEquals(now, stored(running.id).endAt)
+        assertEquals(now, stored(runningUntilLater.id).endAt)
+        assertTrue(stored(future.id).deleted)
+        assertEquals(elsewhere, stored(elsewhere.id))
+        assertTrue(listOf(running, runningUntilLater, future).all { stored(it.id).version > elsewhere.version })
+    }
+
+    // Deleted groups in assignments
+
+    @Test
+    fun `deleted groups are ignored in assignments, unknown ones still answer 400`() {
+        val paddock = service.createPaddock(planner, "Koppel", "")
+        val live = service.createGroup(planner, "Wallache", listOf(blitz.id))
+        val gone = service.createGroup(planner, "Stuten", listOf(donner.id))
+        service.deleteGroup(planner, gone.id)
+
+        val assignment = service.createAssignment(planner, paddock.id, listOf(live.id, gone.id), emptyList(), start, null, "")
+
+        assertEquals(listOf(live.id), assignment.groupIds)
+        assertEquals(listOf(blitz.id), assignment.horseIds)
+        assertCode("UNKNOWN_GROUP") { service.createAssignment(planner, paddock.id, listOf(ObjectId.get()), listOf(blitz.id), start, null, "") }
+        assertCode("NO_HORSES") { service.createAssignment(planner, paddock.id, listOf(gone.id), emptyList(), start, null, "") }
+    }
+
+    // Singles
+
+    @Test
+    fun `assignment keeps the individually picked horses`() {
+        val paddock = service.createPaddock(planner, "Koppel", "")
+        val group = service.createGroup(planner, "Wallache", listOf(blitz.id, donner.id))
+
+        val assignment = service.createAssignment(planner, paddock.id, listOf(group.id), listOf(wolke.id, blitz.id, wolke.id), start, null, "")
+        assertEquals(listOf(wolke.id, blitz.id), assignment.singleHorseIds)
+
+        val edited = service.updateAssignment(planner, assignment.id, paddock.id, emptyList(), listOf(donner.id), start, null, "")
+        assertEquals(listOf(donner.id), edited.singleHorseIds)
+    }
+
+    // Error codes
+
+    @Test
+    fun `assignment and conflict errors carry machine readable codes`() {
+        val paddock = service.createPaddock(planner, "Koppel", "")
+
+        assertCode("UNKNOWN_PADDOCK") { service.createAssignment(planner, ObjectId.get(), emptyList(), listOf(blitz.id), start, null, "") }
+        assertCode("UNKNOWN_HORSE") { service.createAssignment(planner, paddock.id, emptyList(), listOf(foreignHorse.id), start, null, "") }
+        assertCode("END_BEFORE_START") { service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, start.minusSeconds(1), "") }
+        assertCode("SAME_HORSE") { service.createConflict(planner, blitz.id, blitz.id, "") }
+        service.createConflict(planner, blitz.id, donner.id, "")
+        assertCode("CONFLICT_EXISTS") { service.createConflict(planner, donner.id, blitz.id, "") }
+    }
+
+    @Test
+    fun `a retried conflict create wins over the duplicate pair check`() {
+        val first = service.createConflict(planner, blitz.id, donner.id, "", clientId = "k1")
+
+        assertEquals(first, service.createConflict(planner, blitz.id, donner.id, "", clientId = "k1"))
+    }
 }

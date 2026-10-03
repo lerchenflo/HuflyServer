@@ -76,6 +76,9 @@ class FakePaddockAssignmentRepository : PaddockAssignmentRepository {
 
     override fun findById(id: ObjectId): PaddockAssignment? = assignments.firstOrNull { it.id == id }
 
+    override fun findByPaddockIdAndDeletedFalse(paddockId: ObjectId): List<PaddockAssignment> =
+        assignments.filter { it.paddockId == paddockId && !it.deleted }
+
     override fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): PaddockAssignment? =
         assignments.firstOrNull { it.stableId == stableId && it.clientId == clientId }
 

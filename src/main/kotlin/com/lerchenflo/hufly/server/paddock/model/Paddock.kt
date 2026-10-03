@@ -59,9 +59,11 @@ data class HorseConflict(
 data class PaddockAssignment(
     @Id val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
-    val paddockId: ObjectId,
+    @Indexed val paddockId: ObjectId,
     val groupIds: List<ObjectId>,
     val horseIds: List<ObjectId>,
+    /** The horses picked one by one, so an edit shows them apart from the group horses. */
+    val singleHorseIds: List<ObjectId> = emptyList(),
     val startAt: Instant,
     val endAt: Instant?,
     val comment: String,

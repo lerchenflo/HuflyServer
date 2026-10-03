@@ -33,6 +33,7 @@ interface HorseConflictRepository : Repository<HorseConflict, ObjectId> {
 interface PaddockAssignmentRepository : Repository<PaddockAssignment, ObjectId> {
     fun save(assignment: PaddockAssignment): PaddockAssignment
     fun findById(id: ObjectId): PaddockAssignment?
+    fun findByPaddockIdAndDeletedFalse(paddockId: ObjectId): List<PaddockAssignment>
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): PaddockAssignment?
 
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")

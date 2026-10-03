@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.tag
 
+import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -38,6 +39,7 @@ class TagController(
         val type: TagType,
         @field:Pattern(regexp = COLOR_PATTERN) val color: String,
         val permissions: Set<Permission> = emptySet(),
+        @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
     data class UpdateTagRequest(
@@ -63,7 +65,7 @@ class TagController(
     @PostMapping
     fun createTag(@Valid @RequestBody request: CreateTagRequest): TagResponse {
         val requester = accessService.requester(requireAuth())
-        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions).toTagResponse()
+        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions, request.clientId).toTagResponse()
     }
 
     @PutMapping("/{tagId}")

@@ -152,4 +152,23 @@ class PaddockControllerTest {
         call(HttpMethod.POST, "/paddockassignments", """{"paddockId":"nope","horseIds":[],"startAt":9000000000000000000}""")
             .andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `400 bodies carry a code and a message`() {
+        call(HttpMethod.POST, "/paddockassignments", """{"paddockId":"${ObjectId.get().toHexString()}","horseIds":[],"startAt":0}""").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("UNKNOWN_PADDOCK") }
+            jsonPath("$.message") { isString() }
+        }
+    }
+
+    @Test
+    fun `assignment responses list the single horses`() {
+        val paddockId = idOf(HttpMethod.POST, "/paddocks", """{"name":"Koppel"}""")
+
+        call(HttpMethod.POST, "/paddockassignments", """{"paddockId":"$paddockId","horseIds":["${blitz.id.toHexString()}"],"startAt":0}""").andExpect {
+            status { isOk() }
+            jsonPath("$.singleHorseIds[0]") { value(blitz.id.toHexString()) }
+        }
+    }
 }

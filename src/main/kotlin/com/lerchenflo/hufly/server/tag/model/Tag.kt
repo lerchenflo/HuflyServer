@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.tag.model
 
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
@@ -26,6 +27,7 @@ enum class Permission(val impliedView: Permission? = null) {
 }
 
 @Document("tags")
+@CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class Tag(
     @Id val id: ObjectId = ObjectId.get(),
     @Indexed val stableId: ObjectId,
@@ -37,4 +39,6 @@ data class Tag(
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
+    /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
+    val clientId: String? = null,
 )
