@@ -2,15 +2,13 @@ services:
   hufly_db:
     image: mongo:latest
     #restart: unless-stopped
-    logging:
-      driver: none
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
     volumes:
-      - ./mongodb_data:/data/db
+      - mongodb_data:/data/db
     networks:
       - spring-mongo-network
     healthcheck:
@@ -57,9 +55,13 @@ services:
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
       PICTURES_DIR: /app/pictures
     volumes:
-      - ./pictures_data:/app/pictures
+      - pictures_data:/app/pictures
     networks:
       - spring-mongo-network
+
+volumes:
+  mongodb_data:
+  pictures_data:
 
 networks:
   spring-mongo-network:
