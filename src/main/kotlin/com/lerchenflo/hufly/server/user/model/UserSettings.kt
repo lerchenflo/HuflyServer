@@ -18,3 +18,5 @@ data class UserSettingsResponse(
     /** Epoch milliseconds; null before the first save. */
     val updatedAt: Long?,
 )
+
+fun UserSettings?.toResponse() = UserSettingsResponse(this?.values ?: emptyMap(), this?.updatedAt?.toEpochMilli())

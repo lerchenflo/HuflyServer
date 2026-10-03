@@ -92,4 +92,31 @@ class UserSettingsControllerTest {
         call(HttpMethod.PUT, """{"values":{"k":"${"x".repeat(5001)}"}}""").andExpect { status { isBadRequest() } }
         call(HttpMethod.PUT, """{"values":{"${"k".repeat(101)}":"v"}}""").andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `an outdated expectedUpdatedAt answers 409 with the current settings`() {
+        call(HttpMethod.PUT, """{"values":{"theme":"dark"},"expectedUpdatedAt":null}""").andExpect { status { isOk() } }
+        val stored = settingsRepository.findById(anna.id)!!.updatedAt.toEpochMilli()
+
+        call(HttpMethod.PUT, """{"values":{"theme":"light"},"expectedUpdatedAt":${stored - 1}}""").andExpect {
+            status { isConflict() }
+            jsonPath("$.values.theme") { value("dark") }
+            jsonPath("$.updatedAt") { value(stored) }
+        }
+        call(HttpMethod.PUT, """{"values":{"theme":"light"},"expectedUpdatedAt":null}""").andExpect { status { isConflict() } }
+        call(HttpMethod.PUT, """{"values":{"theme":"light"},"expectedUpdatedAt":$stored}""").andExpect {
+            status { isOk() }
+            jsonPath("$.values.theme") { value("light") }
+        }
+        call(HttpMethod.PUT, """{"values":{"theme":"blue"}}""").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `a conflict before the first save answers empty settings`() {
+        call(HttpMethod.PUT, """{"values":{"theme":"dark"},"expectedUpdatedAt":5}""").andExpect {
+            status { isConflict() }
+            jsonPath("$.values.length()") { value(0) }
+            jsonPath("$.updatedAt") { value(null) }
+        }
+    }
 }
