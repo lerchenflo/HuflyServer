@@ -2,6 +2,9 @@
 
 Client-side product TODOs live in the Hufly app repo (`../hufly/TODO.md`). Requirements: `../hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
+- [ ] TODO: Get the App icon from the client and use it for the website. also use the app icons colors.
+- [ ] TODO: Implement smooth scrolling for the website
+
 ## Next (in order)
 
 Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green tests, committed on `feature/auth-and-app-start`. The server runs locally with `docker compose up --build -d`.
