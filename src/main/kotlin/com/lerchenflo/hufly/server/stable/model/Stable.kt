@@ -14,6 +14,8 @@ data class Stable(
     val adminUserId: ObjectId,
     val subscriptionStatus: SubscriptionStatus,
     val subscriptionValidUntil: Instant?,
+    /** Stables saved before meal times existed read as the defaults. */
+    val mealTimes: MealTimes = MealTimes(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val updatedBy: ObjectId,

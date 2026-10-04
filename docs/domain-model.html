@@ -216,6 +216,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "adminUserId: ObjectId",
     "subscriptionStatus: SubscriptionStatus",
     "subscriptionValidUntil: Instant?",
+    "mealTimes: MealTimes",
     "createdAt: Instant",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
@@ -224,7 +225,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "stable",
    "kind": "class",
    "name": "Stable",
-   "note": "Created when someone pays. Exactly one admin, fixed to the paying user (no handover). The subscription lives only here: the stable pays, its members get access through it.",
+   "note": "Created when someone pays. Exactly one admin, fixed to the paying user (no handover). The subscription lives only here: the stable pays, its members get access through it. mealTimes: start of each feeding (24 h \"HH:mm\", morning \u003c lunch \u003c dinner \u003c night; defaults 06:00, 12:00, 18:00, 22:00), set by the admin via /stables/me/mealtimes.",
    "pkg": "stable",
    "x": 395,
    "y": 220
