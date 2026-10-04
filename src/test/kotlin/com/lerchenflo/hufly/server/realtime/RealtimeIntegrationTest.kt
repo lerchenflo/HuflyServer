@@ -1,11 +1,15 @@
 package com.lerchenflo.hufly.server.realtime
 
 import com.lerchenflo.hufly.server.core.security.JwtService
+import com.lerchenflo.hufly.server.paddock.model.HorseGroup
+import com.lerchenflo.hufly.server.repository.HorseGroupRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
+import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
+import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
@@ -28,6 +32,9 @@ import org.testcontainers.mongodb.MongoDBContainer
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import java.lang.reflect.Type
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.util.concurrent.CompletableFuture
 import java.time.Instant
 import java.util.concurrent.LinkedBlockingQueue
@@ -57,6 +64,8 @@ class RealtimeIntegrationTest {
     @Autowired lateinit var userRepository: UserRepository
     @Autowired lateinit var horseRepository: HorseRepository
     @Autowired lateinit var settingsRepository: UserSettingsRepository
+    @Autowired lateinit var stableRepository: StableRepository
+    @Autowired lateinit var groupRepository: HorseGroupRepository
 
     private class Inbox : StompFrameHandler {
         val messages = LinkedBlockingQueue<String>()
@@ -110,6 +119,80 @@ class RealtimeIntegrationTest {
 
         assertEquals("""{"type":"changed","collection":"usersettings"}""", anna.next())
         assertTrue(ben.nothing())
+    }
+
+    private val http = HttpClient.newHttpClient()
+
+    private fun call(method: String, path: String, userId: ObjectId, sessionId: ObjectId?, body: String? = null): Int {
+        val request = HttpRequest.newBuilder(URI("http://localhost:$port$path"))
+            .header("Authorization", "Bearer ${jwtService.generateAccessToken(userId, sessionId)}")
+            .header("Content-Type", "application/json")
+            .method(method, body?.let { HttpRequest.BodyPublishers.ofString(it) } ?: HttpRequest.BodyPublishers.noBody())
+            .build()
+        return http.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()
+    }
+
+    private fun adminOfNewStable(): Pair<ObjectId, ObjectId> {
+        val stableId = ObjectId.get()
+        val admin = userRepository.save(testUser(stableId = stableId))
+        stableRepository.save(testStable(id = stableId, adminUserId = admin.id))
+        return admin.id to stableId
+    }
+
+    private fun hint(collection: String, origin: ObjectId? = null) =
+        if (origin == null) """{"type":"changed","collection":"$collection"}"""
+        else """{"type":"changed","collection":"$collection","originSessionId":"${origin.toHexString()}"}"""
+
+    @Test
+    fun `the hint of the document a request answers names the requesting session for every member`() {
+        val (adminId, stableId) = adminOfNewStable()
+        val member = userRepository.save(testUser(stableId = stableId))
+        val session = ObjectId.get()
+        val adminInbox = subscribe(connect(adminId))
+        val memberInbox = subscribe(connect(member.id))
+
+        val status = call("POST", "/tags", adminId, session, """{"name":"Hufschmied","type":"ACTIVITY","color":"#8d6e63"}""")
+
+        assertEquals(200, status)
+        assertEquals(hint("tags", session), adminInbox.next())
+        assertEquals(hint("tags", session), memberInbox.next())
+    }
+
+    @Test
+    fun `side effects of a request carry no origin`() {
+        val (adminId, stableId) = adminOfNewStable()
+        val horse = horseRepository.save(testHorse(stableId = stableId))
+        groupRepository.save(HorseGroup(stableId = stableId, name = "Wallache", horseIds = listOf(horse.id), updatedAt = Instant.EPOCH, updatedBy = adminId))
+        val session = ObjectId.get()
+        val inbox = subscribe(connect(adminId))
+
+        val status = call("DELETE", "/horses/${horse.id.toHexString()}", adminId, session)
+
+        assertEquals(200, status)
+        assertEquals(setOf(hint("horses", session), hint("horsegroups")), setOf(inbox.next(), inbox.next()))
+    }
+
+    @Test
+    fun `a token without a session sends no origin`() {
+        val (adminId, _) = adminOfNewStable()
+        val inbox = subscribe(connect(adminId))
+
+        call("POST", "/tags", adminId, null, """{"name":"Hafer","type":"FOOD","color":"#8d6e63"}""")
+
+        assertEquals(hint("tags"), inbox.next())
+    }
+
+    @Test
+    fun `a guarded settings save tells the owner's devices and names the session`() {
+        val owner = userRepository.save(testUser())
+        settingsRepository.save(UserSettings(owner.id, mapOf("theme" to "dark"), Instant.ofEpochMilli(1000)))
+        val session = ObjectId.get()
+        val inbox = subscribe(connect(owner.id))
+
+        val status = call("PUT", "/users/me/settings", owner.id, session, """{"values":{"theme":"light"},"expectedUpdatedAt":1000}""")
+
+        assertEquals(200, status)
+        assertEquals(hint("usersettings", session), inbox.next())
     }
 
     @Test

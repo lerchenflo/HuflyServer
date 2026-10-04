@@ -2,20 +2,6 @@
 
 Client sessions append required server work here; a server session implements each entry (TDD), then deletes it. Format per entry: endpoint, method, request/response JSON with exact field names, auth requirement, error cases.
 
-## Realtime: mark change hints caused by the receiving device (`originSessionId`)
-
-Client: since 2026-10-04 the app skips a hint whose `originSessionId` equals the `sid` claim of its own access token (other devices of the same user have a different `sid` and still pull). Without the field nothing changes (backwards compatible), so the server may ship this any time.
-
-- Destination unchanged: `/user/queue/changes`. Payload gains one optional field:
-  `{"type":"changed","collection":"horses","originSessionId":"6650f1c2a1b2c3d4e5f60718"}`
-- `originSessionId` (string, ObjectId hex or omitted/null) = `currentSessionId()` of the HTTP request whose handler saved the document (the access token's `sid`).
-- Set it ONLY for a save whose resulting state the requesting device already gets from that request's own answer: the document the endpoint creates/updates and returns (POST/PUT body), the document a DELETE soft-deletes, `PUT /users/me/settings`. Omit it (null) for everything else:
-  - side effects and cascades of the request, also in the same collection (paddock delete ending/deleting assignments, tag delete touching users, event delete touching invitations, a horse delete touching groups/assignments, version bumps of other documents, ...);
-  - saves outside an HTTP request (schedulers, startup, admin scripts) and requests with a token without `sid`.
-  When unsure, omit: a missing value only costs the client one extra delta pull, a wrong value makes it miss a change.
-- Suggested shape: a request-scoped holder where the endpoint registers the id of the document it answers with; `ChangeListener.onAfterSave` sets `originSessionId = currentSessionId()` only when the saved document's id is registered. Hints are still sent to every connected user of the stable, including the originating session (the client filters).
-- Auth/errors: none new. Test: a PUT by session A sends A's hint with `originSessionId = A` to all users; a cascade save of the same request sends `originSessionId` null.
-
 ## Recurring events and recurring tasks (series, per-date changes, per-date answers and ticks)
 
 Client: since 2026-10-04 the app creates series offline and expands their dates itself. Until the server ships this, a series reaches the server as its first date only (the unknown `recurrence` field is ignored) and every per-date write is rejected (404) and dropped by the client, so nothing breaks, but series do not sync. Domain-model doc: please add the `recurrence` object to Event and StableTask and the three new entities below (EventOccurrence, EventOccurrenceAnswer, TaskOccurrence) to `docs/domain-model.html` and replace the "Recurring ... deferred" notes. Requirement: events and tasks of a stable can repeat (weekly lessons, daily chores).

@@ -15,7 +15,7 @@ class UserSettingsServiceTest {
 
     private val clock = MutableClock()
     private val repository = FakeUserSettingsRepository()
-    private val service = UserSettingsService(repository, clock)
+    private val service = UserSettingsService(repository, clock) {}
     private val anna = ObjectId.get()
 
     private fun saved(result: PutResult) = assertIs<PutResult.Saved>(result).settings

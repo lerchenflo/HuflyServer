@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.requireAuth
+import com.lerchenflo.hufly.server.realtime.markAnswered
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.user.model.UserSettingsResponse
 import com.lerchenflo.hufly.server.user.model.toResponse
@@ -60,7 +61,10 @@ class UserSettingsController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Setting key not allowed")
         }
         return when (val result = settingsService.put(requester.id, request.values, request.condition())) {
-            is UserSettingsService.PutResult.Saved -> ResponseEntity.ok(result.settings.toResponse())
+            is UserSettingsService.PutResult.Saved -> {
+                markAnswered(requester.id)
+                ResponseEntity.ok(result.settings.toResponse())
+            }
             is UserSettingsService.PutResult.Conflict -> ResponseEntity.status(HttpStatus.CONFLICT).body(result.current.toResponse())
         }
     }

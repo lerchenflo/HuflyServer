@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.realtime
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.lerchenflo.hufly.server.repository.UserRepository
 import org.bson.types.ObjectId
 import org.springframework.context.event.EventListener
@@ -19,7 +20,8 @@ class ChangeNotifier(
     private val userRegistry: SimpUserRegistry,
     private val userRepository: UserRepository,
 ) {
-    data class ChangeHint(val type: String = "changed", val collection: String)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    data class ChangeHint(val type: String = "changed", val collection: String, val originSessionId: String? = null)
 
     /** User id -> stable id of connected users, filled on connect so sending needs no database lookups. */
     private val stableOfUser = ConcurrentHashMap<String, ObjectId>()
@@ -30,19 +32,19 @@ class ChangeNotifier(
         userRepository.findById(ObjectId(userId))?.let { stableOfUser[userId] = it.stableId }
     }
 
-    fun notifyStable(stableId: ObjectId, collection: String) {
-        userRegistry.users
-            .map { it.name }
-            .filter { stableOfUser[it] == stableId }
-            .forEach { send(it, collection) }
+    fun send(target: HintTarget, collection: String, originSessionId: ObjectId?) {
+        val hint = ChangeHint(collection = collection, originSessionId = originSessionId?.toHexString())
+        val userNames = when (target) {
+            is HintTarget.Stable -> userRegistry.users.map { it.name }.filter { stableOfUser[it] == target.stableId }
+            is HintTarget.User -> listOf(target.userId.toHexString()).filter { userRegistry.getUser(it) != null }
+        }
+        userNames.forEach { messagingTemplate.convertAndSendToUser(it, "/queue/changes", hint) }
     }
+}
 
-    fun notifyUser(userId: ObjectId, collection: String) {
-        val name = userId.toHexString()
-        if (userRegistry.getUser(name) != null) send(name, collection)
-    }
-
-    private fun send(userName: String, collection: String) {
-        messagingTemplate.convertAndSendToUser(userName, "/queue/changes", ChangeHint(collection = collection))
-    }
+sealed interface HintTarget {
+    /** Every connected member of the stable. */
+    data class Stable(val stableId: ObjectId) : HintTarget
+    /** Only the user's own devices. */
+    data class User(val userId: ObjectId) : HintTarget
 }

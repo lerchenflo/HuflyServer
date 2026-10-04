@@ -25,22 +25,27 @@ import org.springframework.stereotype.Component
 @Component
 class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventListener<Any>() {
 
-    override fun onAfterSave(event: AfterSaveEvent<Any>) {
-        when (val saved = event.source) {
-            is UserSettings -> notifier.notifyUser(saved.userId, "usersettings")
-            is Stable -> notifier.notifyStable(saved.id, "stable")
-            is User -> notifier.notifyStable(saved.stableId, "users")
-            is Tag -> notifier.notifyStable(saved.stableId, "tags")
-            is Horse -> notifier.notifyStable(saved.stableId, "horses")
-            is FoodPlan -> notifier.notifyStable(saved.stableId, "foodplans")
-            is HorseLogEntry -> notifier.notifyStable(saved.stableId, "horselog")
-            is Paddock -> notifier.notifyStable(saved.stableId, "paddocks")
-            is HorseGroup -> notifier.notifyStable(saved.stableId, "horsegroups")
-            is HorseConflict -> notifier.notifyStable(saved.stableId, "horseconflicts")
-            is PaddockAssignment -> notifier.notifyStable(saved.stableId, "paddockassignments")
-            is StableTask -> notifier.notifyStable(saved.stableId, "tasks")
-            is Event -> notifier.notifyStable(saved.stableId, "events")
-            is EventInvitation -> notifier.notifyStable(saved.stableId, "eventinvitations")
+    override fun onAfterSave(event: AfterSaveEvent<Any>) = publish(event.source)
+
+    /** Also for saves that bypass the repository events, like an atomic `@Update`. */
+    fun publish(saved: Any) {
+        val (target, collection, id) = when (saved) {
+            is UserSettings -> Triple(HintTarget.User(saved.userId), "usersettings", saved.userId)
+            is Stable -> Triple(HintTarget.Stable(saved.id), "stable", saved.id)
+            is User -> Triple(HintTarget.Stable(saved.stableId), "users", saved.id)
+            is Tag -> Triple(HintTarget.Stable(saved.stableId), "tags", saved.id)
+            is Horse -> Triple(HintTarget.Stable(saved.stableId), "horses", saved.id)
+            is FoodPlan -> Triple(HintTarget.Stable(saved.stableId), "foodplans", saved.id)
+            is HorseLogEntry -> Triple(HintTarget.Stable(saved.stableId), "horselog", saved.id)
+            is Paddock -> Triple(HintTarget.Stable(saved.stableId), "paddocks", saved.id)
+            is HorseGroup -> Triple(HintTarget.Stable(saved.stableId), "horsegroups", saved.id)
+            is HorseConflict -> Triple(HintTarget.Stable(saved.stableId), "horseconflicts", saved.id)
+            is PaddockAssignment -> Triple(HintTarget.Stable(saved.stableId), "paddockassignments", saved.id)
+            is StableTask -> Triple(HintTarget.Stable(saved.stableId), "tasks", saved.id)
+            is Event -> Triple(HintTarget.Stable(saved.stableId), "events", saved.id)
+            is EventInvitation -> Triple(HintTarget.Stable(saved.stableId), "eventinvitations", saved.id)
+            else -> return
         }
+        queueOrSend(notifier, target, collection, id)
     }
 }
