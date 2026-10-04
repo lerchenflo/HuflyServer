@@ -132,4 +132,20 @@ class TaskSeriesControllerTest {
         call(HttpMethod.PUT, "/tasks/$taskId/occurrences/$second", occurrenceJson, userId = anna.id).andExpect { status { isForbidden() } }
         call(HttpMethod.GET, "/taskoccurrences/sync?since=-1").andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `a date carries its own assignees`() {
+        val taskId = createSeries()
+        val body = occurrenceJson.replace("\"horseIds\":null", "\"horseIds\":null,\"assigneeUserIds\":[\"${admin.id.toHexString()}\"]")
+
+        call(HttpMethod.PUT, "/tasks/$taskId/occurrences/$second", body).andExpect {
+            status { isOk() }
+            jsonPath("$.assigneeUserIds[0]") { value(admin.id.toHexString()) }
+        }
+        call(HttpMethod.PUT, "/tasks/$taskId/occurrences/$second", occurrenceJson).andExpect {
+            jsonPath("$.assigneeUserIds") { value(null) }
+        }
+        call(HttpMethod.PUT, "/tasks/$taskId/occurrences/$second", body.replace(admin.id.toHexString(), "nope"))
+            .andExpect { status { isBadRequest() } }
+    }
 }

@@ -87,7 +87,8 @@ class TaskSeriesServiceTest {
         comment: String? = null,
         dueAt: Instant? = null,
         horseIds: List<ObjectId>? = null,
-    ) = TaskOccurrenceChange(cancelled, title, comment, dueAt, horseIds)
+        assigneeUserIds: List<ObjectId>? = null,
+    ) = TaskOccurrenceChange(cancelled, title, comment, dueAt, horseIds, assigneeUserIds)
 
     @Test
     fun `a series keeps its rule and an update without one makes it a single task`() {
@@ -203,5 +204,61 @@ class TaskSeriesServiceTest {
 
         assertEquals(listOf(occurrence.id.toHexString()), service.sync(planner, before, 100).deletedEntries)
         assertTrue(occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).isEmpty())
+    }
+
+    // Other assignees for a single date
+
+    @Test
+    fun `a date names its own assignees until a change without them`() {
+        val task = series()
+
+        assertEquals(listOf(ben.id), service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id))).assigneeUserIds)
+        assertNull(service.putOccurrence(planner, task.id, second, change()).assigneeUserIds)
+    }
+
+    @Test
+    fun `date assignees must be distinct live users of the stable`() {
+        val task = series()
+        val foreigner = testUser(stableId = OTHER_STABLE_ID).also { userRepository.save(it) }
+
+        listOf(emptyList(), listOf(ObjectId.get()), listOf(foreigner.id), listOf(ben.id, ben.id)).forEach {
+            assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(planner, task.id, second, change(assigneeUserIds = it)) }
+        }
+    }
+
+    @Test
+    fun `the stand-in ticks the date, the replaced series assignee cannot`() {
+        val task = series(assignees = listOf(anna.id))
+        service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id)))
+
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, second, true) }
+        assertEquals(ben.id, service.setDone(ben, task.id, second, true).doneByUserId)
+        assertEquals(anna.id, service.setDone(anna, task.id, first, true).doneByUserId)
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(ben, task.id, first, true) }
+    }
+
+    @Test
+    fun `a stand-in sees the series and its dates and pulls them from where they synced before`() {
+        val task = series(assignees = listOf(anna.id))
+        service.putOccurrence(planner, task.id, first, change(comment = "Mehr Heu"))
+        val tasksBefore = taskService.sync(ben, 0, 100).newVersion
+        val datesBefore = service.sync(ben, 0, 100).newVersion
+        assertTrue(taskService.sync(ben, 0, 100).updatedEntries.isEmpty())
+
+        service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id)))
+
+        assertEquals(listOf(task.id.toHexString()), taskService.sync(ben, tasksBefore, 100).updatedEntries.map { it.id })
+        assertEquals(2, service.sync(ben, datesBefore, 100).updatedEntries.size)
+    }
+
+    @Test
+    fun `a stand-in who no longer covers a date gets the series as deleted`() {
+        val task = series(assignees = listOf(anna.id))
+        service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id)))
+        val before = taskService.sync(ben, 0, 100).newVersion
+
+        service.putOccurrence(planner, task.id, second, change())
+
+        assertEquals(listOf(task.id.toHexString()), taskService.sync(ben, before, 100).deletedEntries)
     }
 }

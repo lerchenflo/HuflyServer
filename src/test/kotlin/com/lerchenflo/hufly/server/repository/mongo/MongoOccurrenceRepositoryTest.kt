@@ -106,6 +106,16 @@ class MongoOccurrenceRepositoryTest {
     }
 
     @Test
+    fun `dates are found by their own assignees`() {
+        val standIn = ObjectId.get()
+        val covered = taskOccurrenceRepository.save(taskOccurrence(1).copy(assigneeUserIds = listOf(ObjectId.get(), standIn)))
+        taskOccurrenceRepository.save(taskOccurrence(2).copy(assigneeUserIds = listOf(standIn), deleted = true))
+        taskOccurrenceRepository.save(taskOccurrence(3))
+
+        assertEquals(listOf(covered.id), taskOccurrenceRepository.findCoveredBy(standIn).map { it.id })
+    }
+
+    @Test
     fun `series rules survive a round trip`() {
         val recurrence = Recurrence(RecurrenceFrequency.WEEKLY, 2, listOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), LocalDate.parse("2026-12-31"), null, "Europe/Vienna")
         val event = eventRepository.save(

@@ -33,6 +33,10 @@ interface TaskOccurrenceRepository : Repository<TaskOccurrence, ObjectId> {
     fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Instant): TaskOccurrence?
     fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence>
 
+    /** Live dates that name [userId] among their own assignees. */
+    @Query("{ 'assigneeUserIds': ?0, 'deleted': false }")
+    fun findCoveredBy(userId: ObjectId): List<TaskOccurrence>
+
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")
     fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<TaskOccurrence>
 }

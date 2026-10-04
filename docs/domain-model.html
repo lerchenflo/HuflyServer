@@ -700,6 +700,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "comment: String?",
     "dueAt: Instant?",
     "horseIds: List\u003cObjectId>?",
+    "assigneeUserIds: List\u003cObjectId>?",
     "doneByUserId: ObjectId?",
     "doneAt: Instant?",
     "updatedAt: Instant",
@@ -710,7 +711,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "taskocc",
    "kind": "class",
    "name": "TaskOccurrence",
-   "note": "One date of a task series, unique per (taskId, occurrenceDueAt): its change (TASK_EDIT) and its tick (assignees or TASK_EDIT); each write keeps the other's fields. Version sync, visibility like the task.",
+   "note": "One date of a task series, unique per (taskId, occurrenceDueAt): its change (TASK_EDIT) and its tick (assignees or TASK_EDIT); each write keeps the other's fields. Version sync, visibility like the task. assigneeUserIds replaces the series' assignees for that date (holiday cover): only they (or TASK_EDIT) tick it, and a stand-in sees the whole series.",
    "pkg": "task",
    "x": 1480,
    "y": 420

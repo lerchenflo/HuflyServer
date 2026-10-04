@@ -59,6 +59,8 @@ class TaskController(
         val comment: String?,
         val dueAt: Long?,
         @field:Size(max = 50) val horseIds: List<String>?,
+        /** Null means the series' assignees. */
+        @field:Size(max = 50) val assigneeUserIds: List<String>? = null,
     )
 
     @PostMapping
@@ -106,6 +108,7 @@ class TaskController(
             comment = request.comment,
             dueAt = request.dueAt?.let(::epochMillisToInstant),
             horseIds = request.horseIds?.map(::parseObjectId),
+            assigneeUserIds = request.assigneeUserIds?.map(::parseObjectId),
         )
         return occurrenceService.putOccurrence(requester, parseObjectId(taskId), epochMillisToInstant(occurrenceDueAt), change)
             .toTaskOccurrenceResponse()

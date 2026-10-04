@@ -32,6 +32,8 @@ data class TaskOccurrenceChange(
     val comment: String?,
     val dueAt: Instant?,
     val horseIds: List<ObjectId>?,
+    /** Null means the series' assignees. */
+    val assigneeUserIds: List<ObjectId>? = null,
 )
 
 /**
@@ -52,23 +54,28 @@ class TaskOccurrenceService(
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = seriesTask(requester, taskId, occurrenceDueAt)
         validate(requester, change)
-        return upsert(requester, task, occurrenceDueAt) {
+        val previousAssignees = occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)
+            ?.takeUnless { it.deleted }?.assigneeUserIds.orEmpty().toSet()
+        val saved = upsert(requester, task, occurrenceDueAt) {
             it.copy(
                 cancelled = change.cancelled,
                 title = change.title,
                 comment = change.comment,
                 dueAt = change.dueAt,
                 horseIds = change.horseIds?.distinct(),
+                assigneeUserIds = change.assigneeUserIds,
             )
         }
+        // Stand-ins see the whole series, so a changed cover changes who sees it.
+        if (saved.assigneeUserIds.orEmpty().toSet() != previousAssignees) taskService.restamp(task)
+        return saved
     }
 
     fun setDone(requester: User, taskId: ObjectId, occurrenceDueAt: Instant, done: Boolean): TaskOccurrence {
-        taskService.requireMayTick(requester, taskService.stableTask(requester, taskId))
         val task = seriesTask(requester, taskId, occurrenceDueAt)
-        if (occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)?.let { it.cancelled && !it.deleted } == true) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
-        }
+        val occurrence = occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)?.takeUnless { it.deleted }
+        taskService.requireMayTick(requester, occurrence?.assigneeUserIds ?: task.assigneeUserIds)
+        if (occurrence?.cancelled == true) throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
         val now = clock.instant()
         return upsert(requester, task, occurrenceDueAt) {
             it.copy(doneByUserId = if (done) requester.id else null, doneAt = if (done) now else null)
@@ -79,14 +86,14 @@ class TaskOccurrenceService(
         val seesAll = taskService.seesAll(requester)
         val watermark = versionCounterService.safeWatermark(SyncCollection.TASK_OCCURRENCES)
         val rows = occurrenceRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
-        val assignedTaskIds = if (seesAll) emptySet() else taskRepository.findByIdIn(rows.map { it.taskId }.toSet())
-            .filter { requester.id in it.assigneeUserIds }.mapTo(mutableSetOf()) { it.id }
+        val visibleTaskIds = if (seesAll) emptySet() else taskRepository.findByIdIn(rows.map { it.taskId }.toSet())
+            .filter { requester.id in it.assigneeUserIds }.mapTo(taskService.coveredTaskIds(requester.id).toMutableSet()) { it.id }
         return versionSync(
             rows, since, pageSize,
             id = { it.id.toHexString() },
             version = { it.version },
             deleted = { it.deleted },
-            visible = { seesAll || it.taskId in assignedTaskIds },
+            visible = { seesAll || it.taskId in visibleTaskIds },
             toResponse = { it.toTaskOccurrenceResponse() },
         )
     }
@@ -111,6 +118,10 @@ class TaskOccurrenceService(
         change.horseIds?.let {
             if (it.size > MAX_HORSES) throw badRequest("At most $MAX_HORSES horses")
             taskService.requireHorses(requester, it)
+        }
+        change.assigneeUserIds?.let {
+            if (it.distinct().size != it.size) throw badRequest("Unknown or missing assignee")
+            taskService.requireAssignees(requester, it)
         }
     }
 

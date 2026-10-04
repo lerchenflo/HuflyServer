@@ -115,7 +115,7 @@ class TaskService(
 
     fun setDone(requester: User, taskId: ObjectId, done: Boolean): StableTask {
         val task = stableTask(requester, taskId)
-        requireMayTick(requester, task)
+        requireMayTick(requester, task.assigneeUserIds)
         if (task.recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates of a series are ticked one by one")
         val now = clock.instant()
         return save(
@@ -130,6 +130,7 @@ class TaskService(
 
     fun sync(requester: User, since: Long, pageSize: Int): VersionSyncResponse<TaskResponse> {
         val seesAll = seesAll(requester)
+        val coveredTaskIds = if (seesAll) emptySet() else coveredTaskIds(requester.id)
         val watermark = versionCounterService.safeWatermark(SyncCollection.TASKS)
         val rows = taskRepository.findVersionPage(
             requester.stableId, since, watermark, Limit.of(pageSize + 1),
@@ -139,7 +140,7 @@ class TaskService(
             id = { it.id.toHexString() },
             version = { it.version },
             deleted = { it.deleted },
-            visible = { seesAll || requester.id in it.assigneeUserIds },
+            visible = { seesAll || requester.id in it.assigneeUserIds || it.id in coveredTaskIds },
             toResponse = { it.toTaskResponse() },
         )
     }
@@ -152,14 +153,24 @@ class TaskService(
             occurrenceRepository.save(occurrence.copy(version = version))
         }
 
-    /** Assignees tick their task; everyone else needs TASK_EDIT. */
-    internal fun requireMayTick(requester: User, task: StableTask) {
-        if (requester.id !in task.assigneeUserIds) accessService.requirePermission(requester, Permission.TASK_EDIT)
+    /** Assignees tick their task (or date); everyone else needs TASK_EDIT. */
+    internal fun requireMayTick(requester: User, assigneeUserIds: List<ObjectId>) {
+        if (requester.id !in assigneeUserIds) accessService.requirePermission(requester, Permission.TASK_EDIT)
+    }
+
+    /** Series a user sees without TASK_VIEW only because they stand in on one of its dates. */
+    internal fun coveredTaskIds(userId: ObjectId): Set<ObjectId> =
+        occurrenceRepository.findCoveredBy(userId).mapTo(mutableSetOf()) { it.taskId }
+
+    /** New viewers then pull the task and its older dates, and users who lost it get them as deleted. */
+    internal fun restamp(task: StableTask) {
+        save(task)
+        occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).forEach { saveOccurrence(it) }
     }
 
     internal fun seesAll(requester: User) = Permission.TASK_VIEW in accessService.effectivePermissions(requester)
 
-    private fun requireAssignees(requester: User, assigneeUserIds: List<ObjectId>) {
+    internal fun requireAssignees(requester: User, assigneeUserIds: List<ObjectId>) {
         val valid = assigneeUserIds.isNotEmpty() && assigneeUserIds.all { id ->
             userRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }

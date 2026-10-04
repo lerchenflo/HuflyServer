@@ -77,6 +77,9 @@ class FakeTaskOccurrenceRepository : TaskOccurrenceRepository {
     override fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence> =
         occurrences.filter { it.taskId == taskId && !it.deleted }
 
+    override fun findCoveredBy(userId: ObjectId): List<TaskOccurrence> =
+        occurrences.filter { it.assigneeUserIds?.contains(userId) == true && !it.deleted }
+
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<TaskOccurrence> =
         occurrences.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }

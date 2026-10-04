@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.task.model
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
@@ -23,6 +24,8 @@ data class TaskOccurrence(
     val comment: String? = null,
     val dueAt: Instant? = null,
     val horseIds: List<ObjectId>? = null,
+    /** Replaces the series' assignees for this date only (e.g. a holiday cover). */
+    @Indexed val assigneeUserIds: List<ObjectId>? = null,
     val doneByUserId: ObjectId? = null,
     val doneAt: Instant? = null,
     val updatedAt: Instant,
@@ -42,6 +45,7 @@ data class TaskOccurrenceResponse(
     val comment: String?,
     val dueAt: Long?,
     val horseIds: List<String>?,
+    val assigneeUserIds: List<String>?,
     val doneByUserId: String?,
     val doneAt: Long?,
     val updatedAt: Long,
@@ -59,6 +63,7 @@ fun TaskOccurrence.toTaskOccurrenceResponse() = TaskOccurrenceResponse(
     comment = comment,
     dueAt = dueAt?.toEpochMilli(),
     horseIds = horseIds?.map { it.toHexString() },
+    assigneeUserIds = assigneeUserIds?.map { it.toHexString() },
     doneByUserId = doneByUserId?.toHexString(),
     doneAt = doneAt?.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
