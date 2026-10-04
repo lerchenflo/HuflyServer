@@ -10,6 +10,7 @@ interface TaskRepository : Repository<StableTask, ObjectId> {
     fun save(task: StableTask): StableTask
     fun findById(id: ObjectId): StableTask?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): StableTask?
+    fun findByIdIn(ids: Collection<ObjectId>): List<StableTask>
 
     /** A derived `VersionGreaterThanAndVersionLessThanEqual` query puts `version` twice into one document, which Mongo rejects. */
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")

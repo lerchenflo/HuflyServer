@@ -3,11 +3,15 @@ package com.lerchenflo.hufly.server.task
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.epochMillisToInstant
 import com.lerchenflo.hufly.server.core.parseObjectId
+import com.lerchenflo.hufly.server.core.recurrence.RecurrenceRequest
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.requireValidVersionSyncRequest
+import com.lerchenflo.hufly.server.task.model.TaskOccurrenceResponse
 import com.lerchenflo.hufly.server.task.model.TaskResponse
+import com.lerchenflo.hufly.server.task.model.toTaskOccurrenceResponse
 import com.lerchenflo.hufly.server.task.model.toTaskResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -30,6 +34,7 @@ import java.time.Instant
 class TaskController(
     private val accessService: AccessService,
     private val taskService: TaskService,
+    private val occurrenceService: TaskOccurrenceService,
 ) {
 
     data class TaskRequest(
@@ -41,16 +46,27 @@ class TaskController(
         @field:Size(max = 50) val horseIds: List<String> = emptyList(),
         /** Only read on create. */
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
+        /** Null makes it a single task, also on update. */
+        val recurrence: RecurrenceRequest? = null,
     )
 
     data class DoneRequest(val done: Boolean)
+
+    /** Null fields keep the series' value. */
+    data class OccurrenceRequest(
+        val cancelled: Boolean,
+        val title: String?,
+        val comment: String?,
+        val dueAt: Long?,
+        @field:Size(max = 50) val horseIds: List<String>?,
+    )
 
     @PostMapping
     fun createTask(@Valid @RequestBody request: TaskRequest): TaskResponse {
         val requester = accessService.requester(requireAuth())
         return taskService.createTask(
             requester, request.title, request.comment, Instant.ofEpochMilli(request.dueAt), request.assigneeUserIds.map(::parseObjectId),
-            request.horseIds.map(::parseObjectId), request.clientId,
+            request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
         ).toTaskResponse()
     }
 
@@ -61,6 +77,7 @@ class TaskController(
             requester, parseObjectId(taskId), request.title, request.comment, Instant.ofEpochMilli(request.dueAt),
             request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId),
+            request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
         ).toTaskResponse()
     }
 
@@ -76,6 +93,35 @@ class TaskController(
         return taskService.setDone(requester, parseObjectId(taskId), request.done).toTaskResponse()
     }
 
+    @PutMapping("/{taskId}/occurrences/{occurrenceDueAt}")
+    fun putOccurrence(
+        @PathVariable taskId: String,
+        @PathVariable occurrenceDueAt: Long,
+        @Valid @RequestBody request: OccurrenceRequest,
+    ): TaskOccurrenceResponse {
+        val requester = accessService.requester(requireAuth())
+        val change = TaskOccurrenceChange(
+            cancelled = request.cancelled,
+            title = request.title,
+            comment = request.comment,
+            dueAt = request.dueAt?.let(::epochMillisToInstant),
+            horseIds = request.horseIds?.map(::parseObjectId),
+        )
+        return occurrenceService.putOccurrence(requester, parseObjectId(taskId), epochMillisToInstant(occurrenceDueAt), change)
+            .toTaskOccurrenceResponse()
+    }
+
+    @PostMapping("/{taskId}/occurrences/{occurrenceDueAt}/done")
+    fun setOccurrenceDone(
+        @PathVariable taskId: String,
+        @PathVariable occurrenceDueAt: Long,
+        @RequestBody request: DoneRequest,
+    ): TaskOccurrenceResponse {
+        val requester = accessService.requester(requireAuth())
+        return occurrenceService.setDone(requester, parseObjectId(taskId), epochMillisToInstant(occurrenceDueAt), request.done)
+            .toTaskOccurrenceResponse()
+    }
+
     @GetMapping("/sync")
     fun sync(
         @RequestParam(value = "since", defaultValue = "0") since: Long,
@@ -84,5 +130,21 @@ class TaskController(
         val requester = accessService.requester(requireAuth())
         requireValidVersionSyncRequest(since, pageSize)
         return taskService.sync(requester, since, pageSize)
+    }
+}
+
+@RestController
+class TaskOccurrenceSyncController(
+    private val accessService: AccessService,
+    private val occurrenceService: TaskOccurrenceService,
+) {
+    @GetMapping("/taskoccurrences/sync")
+    fun sync(
+        @RequestParam(value = "since", defaultValue = "0") since: Long,
+        @RequestParam(value = "page_size", defaultValue = "400") pageSize: Int,
+    ): VersionSyncResponse<TaskOccurrenceResponse> {
+        val requester = accessService.requester(requireAuth())
+        requireValidVersionSyncRequest(since, pageSize)
+        return occurrenceService.sync(requester, since, pageSize)
     }
 }

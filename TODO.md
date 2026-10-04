@@ -25,7 +25,8 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 - [ ] Payment model and subscription expiry (BIZ-6).
 
 ## Deferred features
+- [ ] LOW (security check 2026-10-04, series): `isOccurrence` scans an open-ended series up to the requested date (at most ~360 000 dates for DAILY up to year 3000), and every valid date of an open series can get its own `EventOccurrence`/`TaskOccurrence` row, so restamping grows with them. Bound the key to e.g. 10 years after the first date and cap rows per series if abuse shows up.
 - [ ] LOW: STOMP sessions stay open after the access token expires, the session is logged out or the user is deleted. They only receive collection names (no data). Close them on logout/deletion, or require reconnecting with a fresh token.
 - [ ] Security check 2026-10-02 (food plans, horse log, paddocks, settings, events): no HIGH or MEDIUM. LOW fixed: at most 500 live invitations per event. NOTE: rows a user may not see come as ids in `deletedEntries` (ids only, no content).
 - [ ] General API rate limiting per user (only password logins are limited so far). Picture uploads decode up to 40 MP (~160 MB heap each) and need a tight per-user limit. Move limiter and version-counter state to a shared store (Redis) before running more than one server instance.
-- [ ] Emailing generated passwords (USR-3), push notifications to closed apps via FCM/APNs (EVT-9; open apps already get STOMP hints), recurring events and tasks (EVT-10, TSK-5).
+- [ ] Emailing generated passwords (USR-3), push notifications to closed apps via FCM/APNs (EVT-9; open apps already get STOMP hints).

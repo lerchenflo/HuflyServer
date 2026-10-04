@@ -2,6 +2,8 @@ package com.lerchenflo.hufly.server.realtime
 
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
+import com.lerchenflo.hufly.server.event.model.EventOccurrence
+import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.horselog.model.HorseLogEntry
@@ -12,6 +14,7 @@ import com.lerchenflo.hufly.server.paddock.model.PaddockAssignment
 import com.lerchenflo.hufly.server.stable.model.Stable
 import com.lerchenflo.hufly.server.tag.model.Tag
 import com.lerchenflo.hufly.server.task.model.StableTask
+import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.user.model.User
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener
@@ -44,6 +47,9 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is StableTask -> Triple(HintTarget.Stable(saved.stableId), "tasks", saved.id)
             is Event -> Triple(HintTarget.Stable(saved.stableId), "events", saved.id)
             is EventInvitation -> Triple(HintTarget.Stable(saved.stableId), "eventinvitations", saved.id)
+            is EventOccurrence -> Triple(HintTarget.Stable(saved.stableId), "eventoccurrences", saved.id)
+            is EventOccurrenceAnswer -> Triple(HintTarget.Stable(saved.stableId), "eventoccurrenceanswers", saved.id)
+            is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
             else -> return
         }
         queueOrSend(notifier, target, collection, id)

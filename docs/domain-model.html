@@ -532,6 +532,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "startAt: Instant",
     "endAt: Instant",
     "horseIds: List\u003cObjectId>",
+    "recurrence: Recurrence?",
     "createdAt: Instant",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
@@ -541,7 +542,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "event",
    "kind": "class",
    "name": "Event",
-   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. Recurring events deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. With recurrence it is a series (EVT-10): startAt/endAt are the first date, each date lasts endAt - startAt, dates are keyed by their original start (occurrenceStartAt). Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "event",
    "x": 395,
    "y": 520
@@ -555,6 +556,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "status: InvitationStatus",
     "invitedAt: Instant",
     "respondedAt: Instant?",
+    "occurrenceStartAt: Instant?",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
     "deleted: Boolean",
@@ -563,7 +565,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "inv",
    "kind": "class",
    "name": "EventInvitation",
-   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. occurrenceStartAt set = invited to that one date of a series only (e.g. a stand-in); answered like any invitation.",
    "pkg": "event",
    "x": 395,
    "y": 820
@@ -591,6 +593,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "dueAt: Instant",
     "assigneeUserIds: List\u003cObjectId>",
     "horseIds: List\u003cObjectId>",
+    "recurrence: Recurrence?",
     "createdByUserId: ObjectId",
     "doneByUserId: ObjectId?",
     "doneAt: Instant?",
@@ -602,9 +605,113 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "task",
    "kind": "class",
    "name": "StableTask",
-   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. Recurring tasks deferred. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. With recurrence it is a series (TSK-5): dueAt is the first date, dates are ticked one by one via TaskOccurrence. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "task",
    "x": 1180,
+   "y": 420
+  },
+  {
+   "fields": [
+    "frequency: RecurrenceFrequency",
+    "interval: Int",
+    "weekdays: List\u003cDayOfWeek>",
+    "until: LocalDate?",
+    "count: Int?",
+    "timeZone: String"
+   ],
+   "id": "recurrence",
+   "kind": "class",
+   "name": "Recurrence",
+   "note": "Embedded in Event and StableTask. DAILY or WEEKLY every interval (1..99) days/weeks; weekdays only for WEEKLY (empty = weekday of the first date); at most one of until (inclusive, local date) and count (1..999); expanded in the IANA timeZone keeping the first date's wall-clock time. Server and client must expand identically.",
+   "pkg": "event",
+   "x": 700,
+   "y": 300
+  },
+  {
+   "fields": [
+    "DAILY",
+    "WEEKLY"
+   ],
+   "id": "recfreq",
+   "kind": "enum",
+   "name": "RecurrenceFrequency",
+   "note": "How a series repeats.",
+   "pkg": "event",
+   "x": 1000,
+   "y": 300
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "stableId: ObjectId",
+    "eventId: ObjectId",
+    "occurrenceStartAt: Instant",
+    "cancelled: Boolean",
+    "title: String?",
+    "description: String?",
+    "startAt: Instant?",
+    "endAt: Instant?",
+    "horseIds: List\u003cObjectId>?",
+    "updatedAt: Instant",
+    "updatedBy: ObjectId",
+    "deleted: Boolean",
+    "version: Long"
+   ],
+   "id": "evocc",
+   "kind": "class",
+   "name": "EventOccurrence",
+   "note": "Change to one date of an event series, unique per (eventId, occurrenceStartAt). Null fields keep the series' value. Written by whoever may edit the event (upsert). Version sync, visibility like the event.",
+   "pkg": "event",
+   "x": 700,
+   "y": 520
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "stableId: ObjectId",
+    "eventId: ObjectId",
+    "invitationId: ObjectId",
+    "userId: ObjectId",
+    "occurrenceStartAt: Instant",
+    "status: InvitationStatus",
+    "respondedAt: Instant",
+    "updatedAt: Instant",
+    "updatedBy: ObjectId",
+    "deleted: Boolean",
+    "version: Long"
+   ],
+   "id": "evoccans",
+   "kind": "class",
+   "name": "EventOccurrenceAnswer",
+   "note": "An invitee's answer for one date of a series invitation, unique per (invitationId, occurrenceStartAt). Wins over the invitation's own status for that date; the invitation's status is the default for every other date. Version sync, visibility like the invitations.",
+   "pkg": "event",
+   "x": 700,
+   "y": 820
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "stableId: ObjectId",
+    "taskId: ObjectId",
+    "occurrenceDueAt: Instant",
+    "cancelled: Boolean",
+    "title: String?",
+    "comment: String?",
+    "dueAt: Instant?",
+    "horseIds: List\u003cObjectId>?",
+    "doneByUserId: ObjectId?",
+    "doneAt: Instant?",
+    "updatedAt: Instant",
+    "updatedBy: ObjectId",
+    "deleted: Boolean",
+    "version: Long"
+   ],
+   "id": "taskocc",
+   "kind": "class",
+   "name": "TaskOccurrence",
+   "note": "One date of a task series, unique per (taskId, occurrenceDueAt): its change (TASK_EDIT) and its tick (assignees or TASK_EDIT); each write keeps the other's fields. Version sync, visibility like the task.",
+   "pkg": "task",
+   "x": 1480,
    "y": 420
   }
  ],
@@ -684,7 +791,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   {
    "done": true,
    "id": "q5",
-   "text": "Decided: several assignees per task, done as soon as any assignee ticks it. Recurring tasks and events deferred."
+   "text": "Decided: several assignees per task, done as soon as any assignee ticks it. Recurring tasks and events: series with per-date changes, answers and ticks (2026-10-04)."
   },
   {
    "done": true,
@@ -1003,6 +1110,51 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "assignees",
    "to": "user",
    "toCard": "1..*"
+  },
+  {
+   "from": "evocc",
+   "fromCard": "*",
+   "id": "r_evocc",
+   "kind": "assoc",
+   "label": "date of",
+   "to": "event",
+   "toCard": "1"
+  },
+  {
+   "from": "evoccans",
+   "fromCard": "*",
+   "id": "r_evoccans",
+   "kind": "assoc",
+   "label": "answers a date of",
+   "to": "inv",
+   "toCard": "1"
+  },
+  {
+   "from": "taskocc",
+   "fromCard": "*",
+   "id": "r_taskocc",
+   "kind": "assoc",
+   "label": "date of",
+   "to": "task",
+   "toCard": "1"
+  },
+  {
+   "from": "event",
+   "fromCard": "*",
+   "id": "r_evrec",
+   "kind": "assoc",
+   "label": "repeats by",
+   "to": "recurrence",
+   "toCard": "0..1"
+  },
+  {
+   "from": "task",
+   "fromCard": "*",
+   "id": "r_taskrec",
+   "kind": "assoc",
+   "label": "repeats by",
+   "to": "recurrence",
+   "toCard": "0..1"
   }
  ]
 }

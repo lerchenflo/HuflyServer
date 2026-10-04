@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event.model
 
+import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -20,6 +21,8 @@ data class Event(
     val startAt: Instant,
     val endAt: Instant,
     val horseIds: List<ObjectId>,
+    /** Null for a single event; else [startAt]/[endAt] are those of the first date (EVT-10). */
+    val recurrence: Recurrence? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val updatedBy: ObjectId,
@@ -41,6 +44,8 @@ data class EventInvitation(
     val status: InvitationStatus,
     val invitedAt: Instant,
     val respondedAt: Instant?,
+    /** Null invites to the event or the whole series; else to that one date of the series. */
+    val occurrenceStartAt: Instant? = null,
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,

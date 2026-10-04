@@ -7,6 +7,8 @@ import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
 import com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository
+import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository
+import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.FakeEventRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
@@ -44,7 +46,8 @@ class EventServiceTest {
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val service = EventService(
-        eventRepository, invitationRepository, userRepository, horseRepository, accessService, versionCounterService, clock,
+        eventRepository, invitationRepository, FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
+        userRepository, horseRepository, accessService, versionCounterService, clock,
     )
 
     private val admin = testUser()

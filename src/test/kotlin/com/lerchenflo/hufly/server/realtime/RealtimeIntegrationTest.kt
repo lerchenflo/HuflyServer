@@ -1,10 +1,17 @@
 package com.lerchenflo.hufly.server.realtime
 
 import com.lerchenflo.hufly.server.core.security.JwtService
+import com.lerchenflo.hufly.server.event.model.EventOccurrence
+import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
+import com.lerchenflo.hufly.server.event.model.InvitationStatus
 import com.lerchenflo.hufly.server.paddock.model.HorseGroup
+import com.lerchenflo.hufly.server.repository.EventOccurrenceAnswerRepository
+import com.lerchenflo.hufly.server.repository.EventOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.HorseGroupRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
+import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
+import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
@@ -66,6 +73,9 @@ class RealtimeIntegrationTest {
     @Autowired lateinit var settingsRepository: UserSettingsRepository
     @Autowired lateinit var stableRepository: StableRepository
     @Autowired lateinit var groupRepository: HorseGroupRepository
+    @Autowired lateinit var eventOccurrenceRepository: EventOccurrenceRepository
+    @Autowired lateinit var answerRepository: EventOccurrenceAnswerRepository
+    @Autowired lateinit var taskOccurrenceRepository: TaskOccurrenceRepository
 
     private class Inbox : StompFrameHandler {
         val messages = LinkedBlockingQueue<String>()
@@ -106,6 +116,28 @@ class RealtimeIntegrationTest {
         assertEquals("""{"type":"changed","collection":"horses"}""", anna.next())
         assertEquals("""{"type":"changed","collection":"horses"}""", ben.next())
         assertTrue(foreigner.nothing())
+    }
+
+    @Test
+    fun `dates of series send hints under the client's collection names`() {
+        val stableId = ObjectId.get()
+        val inbox = subscribe(connect(userRepository.save(testUser(stableId = stableId)).id))
+        val user = ObjectId.get()
+        val at = Instant.parse("2026-10-20T16:00:00Z")
+
+        eventOccurrenceRepository.save(
+            EventOccurrence(stableId = stableId, eventId = ObjectId.get(), occurrenceStartAt = at, cancelled = true, title = null,
+                description = null, startAt = null, endAt = null, horseIds = null, updatedAt = at, updatedBy = user)
+        )
+        answerRepository.save(
+            EventOccurrenceAnswer(stableId = stableId, eventId = ObjectId.get(), invitationId = ObjectId.get(), userId = user,
+                occurrenceStartAt = at, status = InvitationStatus.DECLINED, respondedAt = at, updatedAt = at, updatedBy = user)
+        )
+        taskOccurrenceRepository.save(TaskOccurrence(stableId = stableId, taskId = ObjectId.get(), occurrenceDueAt = at, updatedAt = at, updatedBy = user))
+
+        assertEquals(hint("eventoccurrences"), inbox.next())
+        assertEquals(hint("eventoccurrenceanswers"), inbox.next())
+        assertEquals(hint("taskoccurrences"), inbox.next())
     }
 
     @Test

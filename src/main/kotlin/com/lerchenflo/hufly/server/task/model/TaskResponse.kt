@@ -1,5 +1,8 @@
 package com.lerchenflo.hufly.server.task.model
 
+import com.lerchenflo.hufly.server.core.recurrence.RecurrenceResponse
+import com.lerchenflo.hufly.server.core.recurrence.toRecurrenceResponse
+
 /** Timestamps are epoch milliseconds. */
 data class TaskResponse(
     val id: String,
@@ -9,6 +12,7 @@ data class TaskResponse(
     val dueAt: Long,
     val assigneeUserIds: List<String>,
     val horseIds: List<String>,
+    val recurrence: RecurrenceResponse?,
     val createdByUserId: String,
     val doneByUserId: String?,
     val doneAt: Long?,
@@ -25,6 +29,7 @@ fun StableTask.toTaskResponse() = TaskResponse(
     dueAt = dueAt.toEpochMilli(),
     assigneeUserIds = assigneeUserIds.map { it.toHexString() },
     horseIds = horseIds.map { it.toHexString() },
+    recurrence = recurrence?.toRecurrenceResponse(),
     createdByUserId = createdByUserId.toHexString(),
     doneByUserId = doneByUserId?.toHexString(),
     doneAt = doneAt?.toEpochMilli(),

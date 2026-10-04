@@ -16,6 +16,9 @@ enum class SyncCollection(val key: String) {
     HORSE_LOG("horseLog"),
     TASKS("tasks"),
     PADDOCK_ASSIGNMENTS("paddockAssignments"),
+    EVENT_OCCURRENCES("eventOccurrences"),
+    EVENT_OCCURRENCE_ANSWERS("eventOccurrenceAnswers"),
+    TASK_OCCURRENCES("taskOccurrences"),
 }
 
 @Document("counters")

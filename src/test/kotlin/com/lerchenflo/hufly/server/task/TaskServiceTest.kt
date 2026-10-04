@@ -7,6 +7,7 @@ import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
+import com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
@@ -39,7 +40,9 @@ class TaskServiceTest {
     private val horseRepository = FakeHorseRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
-    private val taskService = TaskService(taskRepository, userRepository, horseRepository, accessService, versionCounterService, clock)
+    private val taskService = TaskService(
+        taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, accessService, versionCounterService, clock,
+    )
 
     private val admin = testUser()
     private val plannerTag = testTag(permissions = setOf(Permission.TASK_EDIT))

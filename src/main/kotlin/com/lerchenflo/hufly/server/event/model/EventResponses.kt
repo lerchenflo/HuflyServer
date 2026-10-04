@@ -1,5 +1,8 @@
 package com.lerchenflo.hufly.server.event.model
 
+import com.lerchenflo.hufly.server.core.recurrence.RecurrenceResponse
+import com.lerchenflo.hufly.server.core.recurrence.toRecurrenceResponse
+
 /** Timestamps are epoch milliseconds. */
 data class EventResponse(
     val id: String,
@@ -10,6 +13,7 @@ data class EventResponse(
     val startAt: Long,
     val endAt: Long,
     val horseIds: List<String>,
+    val recurrence: RecurrenceResponse?,
     val createdAt: Long,
     val updatedAt: Long,
     val updatedBy: String,
@@ -24,6 +28,7 @@ data class EventInvitationResponse(
     val status: InvitationStatus,
     val invitedAt: Long,
     val respondedAt: Long?,
+    val occurrenceStartAt: Long?,
     val updatedAt: Long,
     val updatedBy: String,
     val version: Long,
@@ -38,6 +43,7 @@ fun Event.toEventResponse() = EventResponse(
     startAt = startAt.toEpochMilli(),
     endAt = endAt.toEpochMilli(),
     horseIds = horseIds.map { it.toHexString() },
+    recurrence = recurrence?.toRecurrenceResponse(),
     createdAt = createdAt.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
@@ -52,6 +58,7 @@ fun EventInvitation.toEventInvitationResponse() = EventInvitationResponse(
     status = status,
     invitedAt = invitedAt.toEpochMilli(),
     respondedAt = respondedAt?.toEpochMilli(),
+    occurrenceStartAt = occurrenceStartAt?.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
     version = version,

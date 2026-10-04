@@ -2,15 +2,18 @@ package com.lerchenflo.hufly.server.task
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
+import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.versionSync
 import com.lerchenflo.hufly.server.repository.HorseRepository
+import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.task.model.StableTask
+import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.task.model.TaskResponse
 import com.lerchenflo.hufly.server.task.model.toTaskResponse
 import com.lerchenflo.hufly.server.user.model.User
@@ -26,6 +29,7 @@ import java.time.Instant
 @Service
 class TaskService(
     private val taskRepository: TaskRepository,
+    private val occurrenceRepository: TaskOccurrenceRepository,
     private val userRepository: UserRepository,
     private val horseRepository: HorseRepository,
     private val accessService: AccessService,
@@ -40,6 +44,7 @@ class TaskService(
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         clientId: String? = null,
+        recurrence: Recurrence? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -53,6 +58,7 @@ class TaskService(
                     dueAt = dueAt,
                     assigneeUserIds = assigneeUserIds,
                     horseIds = horseIds,
+                    recurrence = recurrence,
                     createdByUserId = requester.id,
                     doneByUserId = null,
                     doneAt = null,
@@ -72,33 +78,45 @@ class TaskService(
         dueAt: Instant,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
+        recurrence: Recurrence? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
         requireAssignees(requester, assigneeUserIds)
         requireHorses(requester, horseIds)
-        return save(
+        val saved = save(
             task.copy(
                 title = title,
                 comment = comment,
                 dueAt = dueAt,
                 assigneeUserIds = assigneeUserIds,
                 horseIds = horseIds,
+                recurrence = recurrence,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
         )
+        // Visibility of dates follows the assignees: new ones must pull older dates, removed ones get them as deleted.
+        if (saved.assigneeUserIds.toSet() != task.assigneeUserIds.toSet()) {
+            occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).forEach { saveOccurrence(it) }
+        }
+        return saved
     }
 
     fun deleteTask(requester: User, taskId: ObjectId) {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
-        save(task.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        val now = clock.instant()
+        occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).forEach {
+            saveOccurrence(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+        }
+        save(task.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
     }
 
     fun setDone(requester: User, taskId: ObjectId, done: Boolean): StableTask {
         val task = stableTask(requester, taskId)
-        if (requester.id !in task.assigneeUserIds) accessService.requirePermission(requester, Permission.TASK_EDIT)
+        requireMayTick(requester, task)
+        if (task.recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates of a series are ticked one by one")
         val now = clock.instant()
         return save(
             task.copy(
@@ -111,7 +129,7 @@ class TaskService(
     }
 
     fun sync(requester: User, since: Long, pageSize: Int): VersionSyncResponse<TaskResponse> {
-        val seesAll = Permission.TASK_VIEW in accessService.effectivePermissions(requester)
+        val seesAll = seesAll(requester)
         val watermark = versionCounterService.safeWatermark(SyncCollection.TASKS)
         val rows = taskRepository.findVersionPage(
             requester.stableId, since, watermark, Limit.of(pageSize + 1),
@@ -129,6 +147,18 @@ class TaskService(
     private fun save(task: StableTask): StableTask =
         versionCounterService.withVersion(SyncCollection.TASKS) { version -> taskRepository.save(task.copy(version = version)) }
 
+    internal fun saveOccurrence(occurrence: TaskOccurrence): TaskOccurrence =
+        versionCounterService.withVersion(SyncCollection.TASK_OCCURRENCES) { version ->
+            occurrenceRepository.save(occurrence.copy(version = version))
+        }
+
+    /** Assignees tick their task; everyone else needs TASK_EDIT. */
+    internal fun requireMayTick(requester: User, task: StableTask) {
+        if (requester.id !in task.assigneeUserIds) accessService.requirePermission(requester, Permission.TASK_EDIT)
+    }
+
+    internal fun seesAll(requester: User) = Permission.TASK_VIEW in accessService.effectivePermissions(requester)
+
     private fun requireAssignees(requester: User, assigneeUserIds: List<ObjectId>) {
         val valid = assigneeUserIds.isNotEmpty() && assigneeUserIds.all { id ->
             userRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
@@ -136,14 +166,14 @@ class TaskService(
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown or missing assignee")
     }
 
-    private fun requireHorses(requester: User, horseIds: List<ObjectId>) {
+    internal fun requireHorses(requester: User, horseIds: List<ObjectId>) {
         val valid = horseIds.all { id ->
             horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
     }
 
-    private fun stableTask(requester: User, taskId: ObjectId): StableTask =
+    internal fun stableTask(requester: User, taskId: ObjectId): StableTask =
         taskRepository.findById(taskId)?.takeIf { it.stableId == requester.stableId && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found")
 }

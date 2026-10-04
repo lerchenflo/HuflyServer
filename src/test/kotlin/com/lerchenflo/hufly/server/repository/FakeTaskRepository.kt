@@ -19,6 +19,8 @@ class FakeTaskRepository : TaskRepository {
     override fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): StableTask? =
         tasks.firstOrNull { it.stableId == stableId && it.clientId == clientId }
 
+    override fun findByIdIn(ids: Collection<ObjectId>): List<StableTask> = tasks.filter { it.id in ids }
+
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<StableTask> =
         tasks.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }

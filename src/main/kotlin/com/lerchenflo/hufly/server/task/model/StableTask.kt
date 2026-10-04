@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task.model
 
+import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -19,6 +20,8 @@ data class StableTask(
     val assigneeUserIds: List<ObjectId>,
     /** Optional horses the chore is about (HOR-6). */
     val horseIds: List<ObjectId>,
+    /** Null for a single task; else [dueAt] is the first date (TSK-5) and dates are ticked one by one. */
+    val recurrence: Recurrence? = null,
     val createdByUserId: ObjectId,
     val doneByUserId: ObjectId?,
     val doneAt: Instant?,
