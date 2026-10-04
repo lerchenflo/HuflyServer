@@ -57,5 +57,5 @@ New feature: package `<feature>/` with `Controller`, `Service`, optional `Lookup
 
 - Tests: `./gradlew test`. Mongo integration tests (`repository/mongo/`, Testcontainers) run when Docker is up and skip otherwise. Version-sync queries need one there: derived queries with two conditions on `version` fail in real Mongo.
 - Docker CLI lives in `~/.docker/bin` (not on PATH): `export PATH="$HOME/.docker/bin:$PATH"`.
-- Run locally: `cp .env.example .env`, fill in, `docker compose up --build -d`. Server on :8080, mongo-express (no auth, local only) on :8081.
+- Run locally: `cp .env.example .env` (works as is; test admin `admin@hufly.test` / `hufly-admin-2026` in stable "Teststall", created on first start), `docker compose up --build -d`. Server on :8080, mongo-express (no auth, local only) on :8081.
 - `BOOTSTRAP_*` in `.env` creates a first stable and admin at startup if the email is unknown (`stable/StableBootstrap`), until the onboarding website exists.
