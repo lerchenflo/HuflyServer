@@ -74,21 +74,21 @@ class PaddockServiceTest {
     // Paddocks
 
     @Test
-    fun `planner creates, edits and soft deletes a paddock`() {
-        val paddock = service.createPaddock(planner, "Große Koppel", "Hinter dem Stall")
+    fun `admin creates, edits and soft deletes a paddock`() {
+        val paddock = service.createPaddock(admin, "Große Koppel", "Hinter dem Stall")
         assertEquals(STABLE_ID, paddock.stableId)
 
-        service.updatePaddock(planner, paddock.id, "Kleine Koppel", "")
+        service.updatePaddock(admin, paddock.id, "Kleine Koppel", "")
         assertEquals("Kleine Koppel", paddockRepository.findById(paddock.id)!!.name)
 
-        service.deletePaddock(planner, paddock.id)
+        service.deletePaddock(admin, paddock.id)
         assertTrue(paddockRepository.findById(paddock.id)!!.deleted)
         assertEquals(clock.instant(), paddockRepository.findById(paddock.id)!!.updatedAt)
     }
 
     @Test
     fun `every write needs PADDOCK_PLAN`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val group = service.createGroup(planner, "Wallache", listOf(blitz.id))
 
         assertStatus(HttpStatus.FORBIDDEN) { service.createPaddock(rider, "X", "") }
@@ -99,6 +99,20 @@ class PaddockServiceTest {
         assertStatus(HttpStatus.FORBIDDEN) { service.deleteGroup(rider, group.id) }
         assertStatus(HttpStatus.FORBIDDEN) { service.createConflict(rider, blitz.id, donner.id, "") }
         assertStatus(HttpStatus.FORBIDDEN) { service.createAssignment(rider, paddock.id, emptyList(), listOf(blitz.id), start, null, "") }
+    }
+
+    @Test
+    fun `paddocks themselves are admin-only, PADDOCK_PLAN still assigns horses to them`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+
+        assertStatus(HttpStatus.FORBIDDEN) { service.createPaddock(planner, "X", "") }
+        assertStatus(HttpStatus.FORBIDDEN) { service.updatePaddock(planner, paddock.id, "X", "") }
+        assertStatus(HttpStatus.FORBIDDEN) { service.deletePaddock(planner, paddock.id) }
+        assertStatus(HttpStatus.FORBIDDEN) { service.updatePaddock(planner, ObjectId.get(), "X", "") }
+        assertEquals(paddock, paddockRepository.findById(paddock.id))
+        assertEquals(1, paddockRepository.paddocks.size)
+
+        service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, null, "")
     }
 
     // Groups
@@ -155,7 +169,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment resolves group horses plus single horses at save time`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val group = service.createGroup(planner, "Wallache", listOf(blitz.id, donner.id))
 
         val assignment = service.createAssignment(planner, paddock.id, listOf(group.id), listOf(wolke.id, blitz.id), start, null, "")
@@ -170,7 +184,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment allows an open end but not an end before the start`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
 
         service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, null, "")
         assertStatus(HttpStatus.BAD_REQUEST) {
@@ -180,7 +194,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment needs own paddock, groups and horses and at least one horse`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val foreignPaddock = paddockRepository.save(paddock.copy(id = ObjectId.get(), stableId = OTHER_STABLE_ID))
 
         assertStatus(HttpStatus.BAD_REQUEST) { service.createAssignment(planner, foreignPaddock.id, emptyList(), listOf(blitz.id), start, null, "") }
@@ -191,7 +205,7 @@ class PaddockServiceTest {
 
     @Test
     fun `conflicting horses can still share a paddock`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         service.createConflict(planner, blitz.id, donner.id, "Beißt")
 
         service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id, donner.id), start, null, "Nur kurz")
@@ -199,7 +213,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment edits and deletes take new versions and sync to everyone`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, null, "")
 
         service.updateAssignment(planner, assignment.id, paddock.id, emptyList(), listOf(donner.id), start, start.plusSeconds(3600), "")
@@ -213,12 +227,12 @@ class PaddockServiceTest {
 
     @Test
     fun `foreign or deleted records are not found`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
-        service.deletePaddock(planner, paddock.id)
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        service.deletePaddock(admin, paddock.id)
         val group = service.createGroup(planner, "G", emptyList())
         service.deleteGroup(planner, group.id)
 
-        assertStatus(HttpStatus.NOT_FOUND) { service.updatePaddock(planner, paddock.id, "X", "") }
+        assertStatus(HttpStatus.NOT_FOUND) { service.updatePaddock(admin, paddock.id, "X", "") }
         assertStatus(HttpStatus.NOT_FOUND) { service.updateGroup(planner, group.id, "X", emptyList()) }
         assertStatus(HttpStatus.NOT_FOUND) { service.deleteConflict(planner, ObjectId.get()) }
         assertStatus(HttpStatus.NOT_FOUND) { service.deleteAssignment(planner, ObjectId.get()) }
@@ -228,8 +242,8 @@ class PaddockServiceTest {
 
     @Test
     fun `retried paddock, group, conflict and assignment creates answer the first ones`() {
-        val paddock = service.createPaddock(planner, "Koppel", "", clientId = "p1")
-        assertEquals(paddock, service.createPaddock(planner, "Koppel", "", clientId = "p1"))
+        val paddock = service.createPaddock(admin, "Koppel", "", clientId = "p1")
+        assertEquals(paddock, service.createPaddock(admin, "Koppel", "", clientId = "p1"))
 
         val group = service.createGroup(planner, "Wallache", listOf(blitz.id), clientId = "g1")
         assertEquals(group, service.createGroup(planner, "Wallache", listOf(blitz.id), clientId = "g1"))
@@ -255,15 +269,15 @@ class PaddockServiceTest {
     @Test
     fun `deleting a paddock drops future assignments, ends running ones and keeps the past`() {
         val now = clock.instant()
-        val paddock = service.createPaddock(planner, "Koppel", "")
-        val other = service.createPaddock(planner, "Andere", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val other = service.createPaddock(admin, "Andere", "")
         val past = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(7200), now.minusSeconds(3600), "")
         val running = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(60), null, "")
         val runningUntilLater = service.createAssignment(planner, paddock.id, emptyList(), listOf(donner.id), now.minusSeconds(60), now.plusSeconds(600), "")
         val future = service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
         val elsewhere = service.createAssignment(planner, other.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
 
-        service.deletePaddock(planner, paddock.id)
+        service.deletePaddock(admin, paddock.id)
 
         fun stored(id: ObjectId) = assignmentRepository.findById(id)!!
         assertEquals(past, stored(past.id))
@@ -278,7 +292,7 @@ class PaddockServiceTest {
 
     @Test
     fun `deleted groups are ignored in assignments, unknown ones still answer 400`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val live = service.createGroup(planner, "Wallache", listOf(blitz.id))
         val gone = service.createGroup(planner, "Stuten", listOf(donner.id))
         service.deleteGroup(planner, gone.id)
@@ -295,7 +309,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment keeps the individually picked horses`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val group = service.createGroup(planner, "Wallache", listOf(blitz.id, donner.id))
 
         val assignment = service.createAssignment(planner, paddock.id, listOf(group.id), listOf(wolke.id, blitz.id, wolke.id), start, null, "")
@@ -309,7 +323,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignment and conflict errors carry machine readable codes`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
 
         assertCode("UNKNOWN_PADDOCK") { service.createAssignment(planner, ObjectId.get(), emptyList(), listOf(blitz.id), start, null, "") }
         assertCode("UNKNOWN_HORSE") { service.createAssignment(planner, paddock.id, emptyList(), listOf(foreignHorse.id), start, null, "") }
@@ -330,7 +344,7 @@ class PaddockServiceTest {
 
     @Test
     fun `assignments skip deleted horses, unknown ones still answer 400`() {
-        val paddock = service.createPaddock(planner, "Koppel", "")
+        val paddock = service.createPaddock(admin, "Koppel", "")
         val gone = horseRepository.save(testHorse(deleted = true))
 
         val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id, gone.id), start, null, "")

@@ -28,7 +28,10 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Instant
 
-/** Every write needs PADDOCK_PLAN; every member reads. Conflicts never block an assignment. */
+/**
+ * Paddocks themselves are managed by the admin only; every other write needs PADDOCK_PLAN; every member reads.
+ * Conflicts never block an assignment.
+ */
 @Service
 class PaddockService(
     private val paddockRepository: PaddockRepository,
@@ -43,7 +46,7 @@ class PaddockService(
     // Paddocks
 
     fun createPaddock(requester: User, name: String, description: String, clientId: String? = null): Paddock {
-        requirePlanner(requester)
+        accessService.requireAdmin(requester)
         return idempotentCreate(clientId, { paddockRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             paddockRepository.save(
                     Paddock(
@@ -55,14 +58,14 @@ class PaddockService(
     }
 
     fun updatePaddock(requester: User, paddockId: ObjectId, name: String, description: String): Paddock {
-        requirePlanner(requester)
+        accessService.requireAdmin(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
         return paddockRepository.save(paddock.copy(name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
     /** Future assignments on the paddock go, running ones end now, past ones stay as history. */
     fun deletePaddock(requester: User, paddockId: ObjectId) {
-        requirePlanner(requester)
+        accessService.requireAdmin(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
         val now = clock.instant()
         paddockRepository.save(paddock.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
