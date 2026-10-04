@@ -165,6 +165,9 @@ class EventService(
     fun respond(requester: User, invitationId: ObjectId, accepted: Boolean): EventInvitation {
         val invitation = liveInvitation(requester, invitationId)
         if (invitation.userId != requester.id) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not your invitation")
+        if (invitation.occurrenceStartAt == null && eventRepository.findById(invitation.eventId)?.recurrence != null) {
+            throw badRequest("Answer the dates of a series one by one")
+        }
         val now = clock.instant()
         return saveInvitation(
             invitation.copy(

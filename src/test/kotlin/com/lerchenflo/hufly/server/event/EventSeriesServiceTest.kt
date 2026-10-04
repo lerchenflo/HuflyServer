@@ -218,6 +218,26 @@ class EventSeriesServiceTest {
     }
 
     @Test
+    fun `a series invitation is answered per date only`() {
+        val event = series()
+        val invitation = invitationOf(event, anna)
+        val dateAnswer = service.answer(anna, invitation.id, second, accepted = true)
+
+        assertStatus(HttpStatus.BAD_REQUEST) { eventService.respond(anna, invitation.id, false) }
+
+        assertEquals(invitation, invitationOf(event, anna))
+        assertEquals(listOf(dateAnswer), answerRepository.answers)
+    }
+
+    @Test
+    fun `once the series becomes a single event its invitations are answered as a whole again`() {
+        val event = series()
+        eventService.updateEvent(teacher, event.id, "Springstunde", "", first, first.plusSeconds(3600), listOf(blitz.id))
+
+        assertEquals(InvitationStatus.ACCEPTED, eventService.respond(anna, invitationOf(event, anna).id, true).status)
+    }
+
+    @Test
     fun `another invitee's answer reaches the organiser`() {
         val event = series()
 

@@ -22,16 +22,6 @@ Client: since 2026-10-04 (schema 17) one date of a task series can name its own 
 - `GET /taskoccurrences/sync` without TASK_VIEW: dates of every task visible by the rule above (as today: all dates of visible series; a replaced series assignee still gets the date row and hides it client-side).
 - When a PUT changes a date's `assigneeUserIds` so that a user newly sees or no longer sees the series (stand-in not otherwise assigned), apply the same handling as the series assignee change in `TaskService` (line ~99: new viewers must pull the task and its older dates, removed ones get them as deleted).
 
-## Event series: answers per date only (no series-wide answer)
-
-Client: since 2026-10-04 a series invitation is answered only per date (`PUT /eventinvitations/{invitationId}/occurrences/{occurrenceStartAt}/answer`, unchanged). The app no longer offers "Allen Terminen der Serie zusagen" and ignores the series invitation's own status: a date without its own answer is open (PENDING) for that invitee. Domain-model doc: change the EventOccurrenceAnswer note ("Wins over the invitation's own status ... default for every other date") to "The only answer a series invitation has for that date; a date without one is open. The series invitation itself stays PENDING."
-
-### `POST /eventinvitations/{invitationId}/answer`
-- Reject with 400 when the invitation has no `occurrenceStartAt` and its event has a `recurrence` (an invitation to the whole series), message "Answer the dates of a series one by one". Unchanged for invitations to a non-recurring event and for invitations to a single date (`occurrenceStartAt` set). Auth unchanged (only the invitee, else 403).
-- Existing data: series invitations answered before keep their stored status; no migration needed (the client ignores it).
-- If an event's `recurrence` is removed (the series becomes a single event), its invitations are answered with this endpoint again, as today.
-- Test the client relies on: answering a whole-series invitation returns 400 and leaves the invitation and its per-date answers untouched.
-
 ## Meal times per stable (admin setting)
 
 User decision 2026-10-04: the start of each meal slot is a per-stable setting of the admin. Defaults Morgens 06:00, Mittags 12:00, Abends 18:00, Nachts 22:00. The night slot runs over midnight until the morning one starts. Client (since 2026-10-04): stores the times locally (offline first), the admin edits them in Stall -> "Fütterungszeiten", the edit is queued and pushed; "Heute" picks the current feeding from them. Until the server ships this, the client treats 404 on both endpoints as "not supported yet": everyone sees the defaults (or the admin's local edit, which stays queued), no error is shown.

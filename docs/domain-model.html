@@ -683,7 +683,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "evoccans",
    "kind": "class",
    "name": "EventOccurrenceAnswer",
-   "note": "An invitee's answer for one date of a series invitation, unique per (invitationId, occurrenceStartAt). Wins over the invitation's own status for that date; the invitation's status is the default for every other date. Version sync, visibility like the invitations.",
+   "note": "An invitee's answer for one date of a series invitation, unique per (invitationId, occurrenceStartAt). The only answer a series invitation has for that date; a date without one is open. The series invitation itself stays PENDING (answering it as a whole answers 400). Version sync, visibility like the invitations.",
    "pkg": "event",
    "x": 700,
    "y": 820
