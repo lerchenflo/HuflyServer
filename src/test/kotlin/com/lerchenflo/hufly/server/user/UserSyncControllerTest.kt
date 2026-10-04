@@ -132,6 +132,17 @@ class UserSyncControllerTest {
             jsonPath("$.updatedEntries[0].type") { value("USER_ROLE") }
             jsonPath("$.updatedEntries[0].permissions[0]") { value("HORSE_EDIT") }
             jsonPath("$.updatedEntries[0].color") { value("#888888") }
+            jsonPath("$.updatedEntries[0].defaultIntervalDays") { value(null) }
+        }
+    }
+
+    @Test
+    fun `tag sync carries the default interval of ACTIVITY tags`() {
+        tagRepository.save(testTag(type = TagType.ACTIVITY).copy(defaultIntervalDays = 42))
+
+        sync("/tags/sync", "[]").andExpect {
+            status { isOk() }
+            jsonPath("$.updatedEntries[0].defaultIntervalDays") { value(42) }
         }
     }
 

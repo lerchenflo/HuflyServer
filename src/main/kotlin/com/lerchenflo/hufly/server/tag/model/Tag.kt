@@ -36,6 +36,8 @@ data class Tag(
     val color: String,
     /** Only meaningful for [TagType.USER_ROLE]. */
     val permissions: Set<Permission>,
+    /** Only for [TagType.ACTIVITY]: suggests a horse log entry's next due date. */
+    val defaultIntervalDays: Int? = null,
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,

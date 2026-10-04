@@ -293,6 +293,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "type: TagType",
     "color: String",
     "permissions: Set\u003cPermission>",
+    "defaultIntervalDays: Int?",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
     "deleted: Boolean"
@@ -300,7 +301,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "tag",
    "kind": "class",
    "name": "Tag",
-   "note": "Created and assigned by the admin only. One collection for every kind of tag; permissions is only used when type = USER_ROLE. A user's rights = union of the permissions of all their USER_ROLE tags. The admin ignores tags and can do everything.",
+   "note": "Created and assigned by the admin only. One collection for every kind of tag; permissions is only used when type = USER_ROLE; defaultIntervalDays (1..3650) only when type = ACTIVITY, where it suggests the next due date of a horse log entry. A user's rights = union of the permissions of all their USER_ROLE tags. The admin ignores tags and can do everything.",
    "pkg": "tag",
    "x": 29,
    "y": 542

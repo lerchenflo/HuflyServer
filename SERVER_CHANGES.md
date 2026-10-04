@@ -16,20 +16,6 @@ Client: since 2026-10-04 the app skips a hint whose `originSessionId` equals the
 - Suggested shape: a request-scoped holder where the endpoint registers the id of the document it answers with; `ChangeListener.onAfterSave` sets `originSessionId = currentSessionId()` only when the saved document's id is registered. Hints are still sent to every connected user of the stable, including the originating session (the client filters).
 - Auth/errors: none new. Test: a PUT by session A sends A's hint with `originSessionId = A` to all users; a cascade save of the same request sends `originSessionId` null.
 
-## Tags: optional `defaultIntervalDays` on ACTIVITY tags
-
-Client: since 2026-10-04 an ACTIVITY tag may carry a default interval in days (farrier 42, vaccination 182). The app uses it to suggest a horse log entry's `nextDueAt` (done date + interval) and for one-tap "Erledigt". The client already sends and reads the field and tolerates its absence.
-
-- Model `Tag`: new field `defaultIntervalDays: Int? = null` (Mongo, nullable; existing documents read as null, no migration).
-- `TagResponse` (all tag answers, including `POST /tags/sync` pages): add `"defaultIntervalDays": 42` or `null`.
-- `POST /tags` (`CreateTagRequest`) and `PUT /tags/{id}` (`UpdateTagRequest`): new optional field `"defaultIntervalDays": Int?`. Absent or null = no interval. PUT replaces it like the other fields (null clears it).
-  Example PUT body: `{"name":"Hufschmied","color":"#8d6e63","permissions":[],"defaultIntervalDays":42}`
-- Validation: when not null it must be within 1..3650, else 400 (like other validation errors). For tags whose type is not ACTIVITY the value is ignored and stored as null (no error).
-- Auth: unchanged (admin only for create/update; every stable member reads tags via sync).
-- Changing the field bumps `updatedAt` like any tag edit, so other devices pull it.
-- Docs: add the field to the Tag entity in `docs/domain-model.html`.
-- Tests: create ACTIVITY tag with 42 -> answer carries 42; update to null clears; 0 and 3651 -> 400; FOOD tag with 42 -> stored and answered as null; sync page includes the field.
-
 ## Recurring events and recurring tasks (series, per-date changes, per-date answers and ticks)
 
 Client: since 2026-10-04 the app creates series offline and expands their dates itself. Until the server ships this, a series reaches the server as its first date only (the unknown `recurrence` field is ignored) and every per-date write is rejected (404) and dropped by the client, so nothing breaks, but series do not sync. Domain-model doc: please add the `recurrence` object to Event and StableTask and the three new entities below (EventOccurrence, EventOccurrenceAnswer, TaskOccurrence) to `docs/domain-model.html` and replace the "Recurring ... deferred" notes. Requirement: events and tasks of a stable can repeat (weekly lessons, daily chores).

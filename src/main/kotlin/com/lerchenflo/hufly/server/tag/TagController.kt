@@ -14,6 +14,8 @@ import com.lerchenflo.hufly.server.tag.model.TagResponse
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.tag.model.toTagResponse
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
@@ -39,6 +41,7 @@ class TagController(
         val type: TagType,
         @field:Pattern(regexp = COLOR_PATTERN) val color: String,
         val permissions: Set<Permission> = emptySet(),
+        @field:Min(1) @field:Max(MAX_INTERVAL_DAYS) val defaultIntervalDays: Int? = null,
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     )
 
@@ -46,6 +49,7 @@ class TagController(
         @field:NotBlank @field:Size(max = 50) val name: String,
         @field:Pattern(regexp = COLOR_PATTERN) val color: String,
         val permissions: Set<Permission> = emptySet(),
+        @field:Min(1) @field:Max(MAX_INTERVAL_DAYS) val defaultIntervalDays: Int? = null,
     )
 
     @PostMapping("/sync")
@@ -65,13 +69,13 @@ class TagController(
     @PostMapping
     fun createTag(@Valid @RequestBody request: CreateTagRequest): TagResponse {
         val requester = accessService.requester(requireAuth())
-        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions, request.clientId).toTagResponse()
+        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions, request.clientId, request.defaultIntervalDays).toTagResponse()
     }
 
     @PutMapping("/{tagId}")
     fun updateTag(@PathVariable tagId: String, @Valid @RequestBody request: UpdateTagRequest): TagResponse {
         val requester = accessService.requester(requireAuth())
-        return tagService.updateTag(requester, parseObjectId(tagId), request.name, request.color, request.permissions).toTagResponse()
+        return tagService.updateTag(requester, parseObjectId(tagId), request.name, request.color, request.permissions, request.defaultIntervalDays).toTagResponse()
     }
 
     @DeleteMapping("/{tagId}")
@@ -81,4 +85,5 @@ class TagController(
     }
 }
 
+private const val MAX_INTERVAL_DAYS = 3650L
 private const val COLOR_PATTERN = "^#[0-9A-Fa-f]{6}$"

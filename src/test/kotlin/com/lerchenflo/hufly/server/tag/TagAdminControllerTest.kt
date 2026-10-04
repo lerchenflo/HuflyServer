@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertNull
 
 /** TAG-2: HTTP mapping and validation. Business rules live in TagServiceTest. */
 @SpringBootTest
@@ -92,5 +94,68 @@ class TagAdminControllerTest {
     @Test
     fun `delete tag with a malformed id answers 400`() {
         call(HttpMethod.DELETE, "/tags/nope").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `an ACTIVITY tag keeps its default interval`() {
+        call(HttpMethod.POST, "/tags", """{"name":"Hufschmied","type":"ACTIVITY","color":"#8d6e63","defaultIntervalDays":42}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(42) }
+        }
+    }
+
+    @Test
+    fun `a tag without a default interval answers null`() {
+        call(HttpMethod.POST, "/tags", """{"name":"Hafer","type":"FOOD","color":"#8d6e63"}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(null) }
+        }
+    }
+
+    @Test
+    fun `editing a tag with a null default interval clears it`() {
+        val tag = tagRepository.save(testTag(type = TagType.ACTIVITY).copy(defaultIntervalDays = 42))
+
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Hufschmied","color":"#8d6e63","permissions":[],"defaultIntervalDays":null}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(null) }
+        }
+        assertNull(tagRepository.findById(tag.id)?.defaultIntervalDays)
+    }
+
+    @Test
+    fun `editing an ACTIVITY tag sets its default interval`() {
+        val tag = tagRepository.save(testTag(type = TagType.ACTIVITY))
+
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Impfung","color":"#8d6e63","permissions":[],"defaultIntervalDays":182}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(182) }
+        }
+    }
+
+    @Test
+    fun `a default interval outside 1 to 3650 days answers 400`() {
+        val tag = tagRepository.save(testTag(type = TagType.ACTIVITY))
+        for (days in listOf(0, 3651)) {
+            call(HttpMethod.POST, "/tags", """{"name":"X","type":"ACTIVITY","color":"#8d6e63","defaultIntervalDays":$days}""")
+                .andExpect { status { isBadRequest() } }
+            call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"X","color":"#8d6e63","permissions":[],"defaultIntervalDays":$days}""")
+                .andExpect { status { isBadRequest() } }
+        }
+    }
+
+    @Test
+    fun `tags other than ACTIVITY store no default interval`() {
+        val food = tagRepository.save(testTag(type = TagType.FOOD))
+
+        call(HttpMethod.POST, "/tags", """{"name":"Hafer","type":"FOOD","color":"#8d6e63","defaultIntervalDays":42}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(null) }
+        }
+        call(HttpMethod.PUT, "/tags/${food.id.toHexString()}", """{"name":"Heu","color":"#8d6e63","permissions":[],"defaultIntervalDays":42}""").andExpect {
+            status { isOk() }
+            jsonPath("$.defaultIntervalDays") { value(null) }
+        }
+        assertNull(tagRepository.findById(food.id)?.defaultIntervalDays)
     }
 }
