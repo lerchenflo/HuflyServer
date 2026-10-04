@@ -9,6 +9,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry
 import org.springframework.messaging.simp.stomp.StompCommand
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor
 import org.springframework.messaging.support.ChannelInterceptor
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
@@ -22,12 +23,21 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 class StompConfig : WebSocketMessageBrokerConfigurer {
 
+    // iOS clients get no WebSocket pings, so STOMP heart-beats are how they notice a dead socket.
+    private val heartbeatScheduler = ThreadPoolTaskScheduler().apply {
+        setPoolSize(1)
+        setThreadNamePrefix("ws-heartbeat-")
+        initialize()
+    }
+
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
     }
 
     override fun configureMessageBroker(registry: MessageBrokerRegistry) {
         registry.enableSimpleBroker("/queue")
+            .setHeartbeatValue(longArrayOf(HEARTBEAT_MILLIS, HEARTBEAT_MILLIS))
+            .setTaskScheduler(heartbeatScheduler)
         registry.setUserDestinationPrefix("/user")
     }
 
@@ -50,3 +60,4 @@ class StompConfig : WebSocketMessageBrokerConfigurer {
 }
 
 const val CHANGES_DESTINATION = "/user/queue/changes"
+private const val HEARTBEAT_MILLIS = 10_000L

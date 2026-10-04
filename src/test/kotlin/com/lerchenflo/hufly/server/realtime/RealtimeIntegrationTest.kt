@@ -25,7 +25,10 @@ import org.springframework.web.socket.messaging.WebSocketStompClient
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import java.lang.reflect.Type
+import java.net.URI
+import java.util.concurrent.CompletableFuture
 import java.time.Instant
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -107,6 +110,26 @@ class RealtimeIntegrationTest {
 
         assertEquals("""{"type":"changed","collection":"usersettings"}""", anna.next())
         assertTrue(ben.nothing())
+    }
+
+    @Test
+    fun `the broker agrees to heart-beats a client asks for`() {
+        val connected = CompletableFuture<StompHeaders>()
+        val client = WebSocketStompClient(StandardWebSocketClient()).apply {
+            taskScheduler = ThreadPoolTaskScheduler().apply { initialize() }
+        }
+        val handshake = WebSocketHttpHeaders().apply {
+            setBearerAuth(jwtService.generateAccessToken(userRepository.save(testUser()).id))
+        }
+        val connect = StompHeaders().apply { heartbeat = longArrayOf(10000, 10000) }
+
+        client.connectAsync(URI("ws://localhost:$port/ws"), handshake, connect, object : StompSessionHandlerAdapter() {
+            override fun afterConnected(session: StompSession, connectedHeaders: StompHeaders) {
+                connected.complete(connectedHeaders)
+            }
+        })
+
+        assertEquals(listOf(10000L, 10000L), connected.get(5, TimeUnit.SECONDS).heartbeat?.toList())
     }
 
     @Test
