@@ -40,8 +40,8 @@ class TaskController(
     data class TaskRequest(
         @field:NotBlank @field:Size(max = 200) val title: String,
         @field:Size(max = 5000) val comment: String = "",
-        /** Epoch milliseconds, years 1970 to 2999. */
-        @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val dueAt: Long,
+        /** Epoch milliseconds, years 1970 to 2999; null for an undated task. */
+        @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val dueAt: Long?,
         @field:Size(max = 50) val assigneeUserIds: List<String>,
         @field:Size(max = 50) val horseIds: List<String> = emptyList(),
         /** Only read on create. */
@@ -68,9 +68,10 @@ class TaskController(
     @PostMapping
     fun createTask(@Valid @RequestBody request: TaskRequest): TaskResponse {
         val requester = accessService.requester(requireAuth())
+        val dueAt = request.dueAt?.let(Instant::ofEpochMilli)
         return taskService.createTask(
-            requester, request.title, request.comment, Instant.ofEpochMilli(request.dueAt), request.assigneeUserIds.map(::parseObjectId),
-            request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
+            requester, request.title, request.comment, dueAt, request.assigneeUserIds.map(::parseObjectId),
+            request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
         ).toTaskResponse()
     }
@@ -78,11 +79,12 @@ class TaskController(
     @PutMapping("/{taskId}")
     fun updateTask(@PathVariable taskId: String, @Valid @RequestBody request: TaskRequest): TaskResponse {
         val requester = accessService.requester(requireAuth())
+        val dueAt = request.dueAt?.let(Instant::ofEpochMilli)
         return taskService.updateTask(
-            requester, parseObjectId(taskId), request.title, request.comment, Instant.ofEpochMilli(request.dueAt),
+            requester, parseObjectId(taskId), request.title, request.comment, dueAt,
             request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId),
-            request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
+            request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
         ).toTaskResponse()
     }

@@ -16,7 +16,8 @@ data class StableTask(
     val stableId: ObjectId,
     val title: String,
     val comment: String,
-    val dueAt: Instant,
+    /** Null for an undated task ("Ohne Termin"), open until ticked; never for a series. */
+    val dueAt: Instant?,
     val assigneeUserIds: List<ObjectId>,
     /** Optional horses the chore is about (HOR-6). */
     val horseIds: List<ObjectId>,

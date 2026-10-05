@@ -261,4 +261,29 @@ class TaskSeriesServiceTest {
 
         assertEquals(listOf(task.id.toHexString()), taskService.sync(ben, before, 100).deletedEntries)
     }
+
+    @Test
+    fun `an undated task stays undated, needs no date for an update and has no occurrences`() {
+        val task = taskService.createTask(planner, "Sattelkammer", "", null, listOf(anna.id), emptyList())
+        assertNull(taskRepository.findById(task.id)!!.dueAt)
+
+        val dated = series(recurrence = null)
+        taskService.updateTask(planner, dated.id, "Misten", "", null, listOf(anna.id), emptyList())
+        assertNull(taskRepository.findById(dated.id)!!.dueAt)
+
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(planner, task.id, first, change()) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.setDone(anna, task.id, first, true) }
+        assertEquals(anna.id, taskService.setDone(anna, task.id, true).doneByUserId)
+    }
+
+    @Test
+    fun `a repeating task needs a date`() {
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            taskService.createTask(planner, "Misten", "", null, listOf(anna.id), emptyList(), recurrence = daily)
+        }
+        val task = series()
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            taskService.updateTask(planner, task.id, "Misten", "", null, listOf(anna.id), emptyList(), recurrence = daily)
+        }
+    }
 }

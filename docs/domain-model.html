@@ -593,7 +593,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "stableId: ObjectId",
     "title: String",
     "comment: String",
-    "dueAt: Instant",
+    "dueAt: Instant?",
     "assigneeUserIds: List\u003cObjectId>",
     "horseIds: List\u003cObjectId>",
     "recurrence: Recurrence?",
@@ -609,7 +609,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "task",
    "kind": "class",
    "name": "StableTask",
-   "note": "Stable chore with title and instructions. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. With recurrence it is a series (TSK-5): dueAt is the first date, dates are ticked one by one via TaskOccurrence. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Stable chore with title and instructions. dueAt is null for an undated task (open until ticked), never for a series. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. With recurrence it is a series (TSK-5): dueAt is the first date, dates are ticked one by one via TaskOccurrence. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
    "pkg": "task",
    "x": 1180,
    "y": 420

@@ -43,7 +43,7 @@ class TaskService(
         requester: User,
         title: String,
         comment: String,
-        dueAt: Instant,
+        dueAt: Instant?,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         clientId: String? = null,
@@ -52,6 +52,7 @@ class TaskService(
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
+            requireDateIfRepeating(dueAt, recurrence)
             requireAssignees(requester, assigneeUserIds)
             requireHorses(requester, horseIds)
             requireCategory(requester, categoryTagId)
@@ -81,7 +82,7 @@ class TaskService(
         taskId: ObjectId,
         title: String,
         comment: String,
-        dueAt: Instant,
+        dueAt: Instant?,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
@@ -89,6 +90,7 @@ class TaskService(
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
+        requireDateIfRepeating(dueAt, recurrence)
         requireAssignees(requester, assigneeUserIds)
         requireHorses(requester, horseIds)
         requireCategory(requester, categoryTagId)
@@ -193,6 +195,10 @@ class TaskService(
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
     }
 
+    private fun requireDateIfRepeating(dueAt: Instant?, recurrence: Recurrence?) {
+        if (dueAt == null && recurrence != null) throw repeatingTaskNeedsDate()
+    }
+
     private fun requireCategory(requester: User, categoryTagId: ObjectId?) {
         if (categoryTagId == null) return
         val valid = tagRepository.findById(categoryTagId)
@@ -204,3 +210,5 @@ class TaskService(
         taskRepository.findById(taskId)?.takeIf { it.stableId == requester.stableId && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found")
 }
+
+internal fun repeatingTaskNeedsDate() = ResponseStatusException(HttpStatus.BAD_REQUEST, "A repeating task needs a date")

@@ -148,4 +148,21 @@ class TaskSeriesControllerTest {
         call(HttpMethod.PUT, "/tasks/$taskId/occurrences/$second", body.replace(admin.id.toHexString(), "nope"))
             .andExpect { status { isBadRequest() } }
     }
+
+    @Test
+    fun `an undated task answers dueAt null and a repeating one without a date answers 400`() {
+        val undated = """{"title":"Sattelkammer","comment":"","dueAt":null,"assigneeUserIds":["${anna.id.toHexString()}"],"horseIds":[]}"""
+        call(HttpMethod.POST, "/tasks", undated).andExpect {
+            status { isOk() }
+            jsonPath("$.dueAt") { value(null) }
+        }
+        call(HttpMethod.POST, "/tasks", taskJson().replace(""""dueAt":$first""", """"dueAt":null""")).andExpect {
+            status { isBadRequest() }
+        }
+        val id = createSeries()
+        call(HttpMethod.PUT, "/tasks/$id", taskJson(recurrence = null).replace(""""dueAt":$first""", """"dueAt":null""")).andExpect {
+            status { isOk() }
+            jsonPath("$.dueAt") { value(null) }
+        }
+    }
 }

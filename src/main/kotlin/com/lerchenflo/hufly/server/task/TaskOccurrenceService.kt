@@ -100,7 +100,7 @@ class TaskOccurrenceService(
 
     private fun seriesTask(requester: User, taskId: ObjectId, occurrenceDueAt: Instant): StableTask {
         val task = taskService.stableTask(requester, taskId)
-        task.recurrence.requireOccurrence(task.dueAt, occurrenceDueAt)
+        task.recurrence.requireOccurrence(task.dueAt ?: throw badRequest("Not a series"), occurrenceDueAt)
         return task
     }
 
