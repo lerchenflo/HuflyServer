@@ -23,7 +23,7 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 ## From the client (2026-10-05)
 - [x] Stable notes ("Aushänge") with the new `NOTE_WRITE` permission, read marks and a read list only author and admin see (2026-10-05, `note/`).
 - [ ] Notes: a `PUT /notes/{id}` saves the whole document, so a read mark landing between its load and save is lost (the reader's next mark restores it). Make the edit an atomic `$set` of the edited fields if it ever matters.
-- [ ] Coming next from the client (spec follows in `SERVER_CHANGES.md`): member onboarding - a flag on users created by the admin that forces a new password at the first login.
+- [x] (2026-10-05) Forced own password: `mustChangePassword` on users, set by admin create/reset, cleared by `POST /users/me/password`, sent in `GET /users/me`. Spec: `SERVER_CHANGES.md` → "Forced own password". The client is built; older servers simply never ask.
 
 ## Push notifications (next big step, user 2026-10-05)
 - [ ] Send push notifications always, also while the app holds a STOMP connection (unlike SchneaggchatV3server, which only pushes without a socket). The client decides what to show in the foreground.

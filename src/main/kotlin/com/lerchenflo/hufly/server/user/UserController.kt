@@ -75,6 +75,7 @@ class UserController(
             isAdmin = accessService.isAdmin(requester),
             stable = stableLookupService.getById(requester.stableId).toStableResponse(),
             permissions = accessService.effectivePermissions(requester),
+            mustChangePassword = requester.mustChangePassword,
         )
     }
 

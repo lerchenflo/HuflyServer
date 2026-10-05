@@ -21,4 +21,6 @@ data class User(
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
+    /** Set while the password is one the admin generated; only the user sees it (`GET /users/me`). */
+    val mustChangePassword: Boolean = false,
 )

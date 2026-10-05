@@ -124,4 +124,19 @@ class UserControllerTest {
         }
         mockMvc.get(path) { header("Authorization", auth) }.andExpect { status { isNotFound() } }
     }
+
+    @Test
+    fun `me tells the user to choose an own password, the user object never does`() {
+        getMe(rider.id).andExpect {
+            jsonPath("$.mustChangePassword") { value(false) }
+            jsonPath("$.user.mustChangePassword") { doesNotExist() }
+        }
+        userRepository.save(rider.copy(mustChangePassword = true))
+
+        getMe(rider.id).andExpect {
+            status { isOk() }
+            jsonPath("$.mustChangePassword") { value(true) }
+            jsonPath("$.user.mustChangePassword") { doesNotExist() }
+        }
+    }
 }

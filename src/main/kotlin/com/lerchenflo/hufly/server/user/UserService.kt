@@ -55,6 +55,7 @@ class UserService(
                 createdAt = now,
                 updatedAt = now,
                 updatedBy = requester.id,
+                mustChangePassword = true,
             )
         )
         return CreatedUser(user, password)
@@ -130,7 +131,7 @@ class UserService(
         accessService.requireAdmin(requester)
         val target = stableMember(requester, userId)
         val password = generatePassword()
-        userRepository.save(target.copy(hashedPassword = hashEncoder.encode(password)))
+        userRepository.save(target.copy(hashedPassword = hashEncoder.encode(password), mustChangePassword = true))
         refreshTokenRepository.deleteByUserId(target.id)
         return password
     }
@@ -154,7 +155,7 @@ class UserService(
         if (!hashEncoder.matches(oldPassword, requester.hashedPassword)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Old password is wrong")
         }
-        userRepository.save(requester.copy(hashedPassword = hashEncoder.encode(newPassword)))
+        userRepository.save(requester.copy(hashedPassword = hashEncoder.encode(newPassword), mustChangePassword = false))
         if (currentSessionId != null) {
             refreshTokenRepository.deleteByUserIdAndIdNot(requester.id, currentSessionId)
         } else {

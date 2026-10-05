@@ -296,4 +296,17 @@ class UserServiceTest {
         assertStatus(HttpStatus.NOT_FOUND) { userService.deletePicture(admin, foreigner.id) }
         assertTrue(pictureStore.pictures.isEmpty())
     }
+
+    @Test
+    fun `admin-generated passwords ask for an own one until the user changes it`() {
+        val created = userService.createUser(admin, "new@hufly.test", "Neu", null, emptyList())
+        assertTrue(stored(created.user.id).mustChangePassword)
+
+        userService.changePassword(stored(created.user.id), created.generatedPassword, "MyOwnSecret1", null)
+        assertEquals(false, stored(created.user.id).mustChangePassword)
+
+        userService.resetPassword(admin, created.user.id)
+        assertTrue(stored(created.user.id).mustChangePassword)
+        assertEquals(false, stored(rider.id).mustChangePassword)
+    }
 }
