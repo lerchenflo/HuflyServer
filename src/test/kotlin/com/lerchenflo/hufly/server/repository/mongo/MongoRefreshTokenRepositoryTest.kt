@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.repository.mongo
 
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -98,5 +99,27 @@ class MongoRefreshTokenRepositoryTest {
         assertEquals(1, repository.deleteByUserIdAndDeviceId(anna, "install-1"))
         assertEquals(1, repository.deleteByUserIdAndIdNot(anna, phone.id))
         assertEquals(listOf(phone.id), repository.findByUserId(anna).map { it.id })
+    }
+
+    @Test
+    fun `push tokens are set, survive a rotation, move between sessions and are cleared`() {
+        val phone = repository.save(session("push-a"))
+        val other = repository.save(session("push-b"))
+
+        assertEquals(1, repository.setPushToken(phone.id, "tok", PushPlatform.IOS))
+        repository.rotate("push-a", "push-a2", "enc", Instant.parse("2027-01-01T00:00:00Z"), Instant.parse("2026-10-05T00:00:00Z"))
+        assertEquals("tok" to PushPlatform.IOS, repository.findById(phone.id)!!.let { it.pushToken to it.pushPlatform })
+        assertEquals(listOf(phone.id), repository.findByUserIdAndPushTokenNotNull(phone.userId).map { it.id })
+
+        assertEquals(1, repository.clearPushTokenElsewhere("tok", other.id))
+        repository.setPushToken(other.id, "tok", PushPlatform.ANDROID)
+        assertNull(repository.findById(phone.id)!!.pushToken)
+        assertEquals(0, repository.clearPushTokenElsewhere("tok", other.id))
+
+        assertEquals(1, repository.clearPushToken("tok"))
+        assertNull(repository.findById(other.id)!!.pushPlatform)
+        repository.setPushToken(phone.id, "tok2", PushPlatform.ANDROID)
+        assertEquals(1, repository.clearPushTokenOfSession(phone.id))
+        assertEquals(emptyList(), repository.findByUserIdAndPushTokenNotNull(phone.userId))
     }
 }

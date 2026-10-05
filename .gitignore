@@ -25,3 +25,6 @@ out/
 mongodb_data
 pictures_data
 data/
+# FCM service account JSON and APNs .p8 key, mounted into the server container
+push-secrets/*
+!push-secrets/.gitkeep

@@ -438,12 +438,14 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "userId: ObjectId",
     "hashedToken: String",
     "expiresAt: Instant",
-    "createdAt: Instant"
+    "createdAt: Instant",
+    "pushToken: String?",
+    "pushPlatform: PushPlatform?"
    ],
    "id": "refresh",
    "kind": "class",
    "name": "RefreshToken",
-   "note": "Already implemented. One row per device session, SHA-256 hash only, rotated on every refresh. Not synced to clients.",
+   "note": "Already implemented. One row per device session, SHA-256 hash only, rotated on every refresh. Not synced to clients. Carries the install's push token (FCM for ANDROID, APNs for IOS), so ending the session ends its pushes; a token lives on one session only.",
    "pkg": "authentication",
    "x": 29,
    "y": 1010
@@ -745,6 +747,22 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "pkg": "note",
    "x": 1780,
    "y": 420
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "userId: ObjectId",
+    "title: String",
+    "body: String",
+    "createdAt: Instant"
+   ],
+   "id": "digest",
+   "kind": "class",
+   "name": "DigestItem",
+   "note": "A push held back for a user with the daily digest (user setting notificationDigest). Sent as one push once the user's notificationDigestTime has passed in their notificationTimeZone, then deleted. Not synced.",
+   "pkg": "notification",
+   "x": 29,
+   "y": 1300
   }
  ],
  "packages": [
@@ -758,6 +776,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   "event",
   "task",
   "note",
+  "notification",
   "authentication"
  ],
  "questions": [

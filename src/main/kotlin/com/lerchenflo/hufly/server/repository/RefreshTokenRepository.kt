@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.repository
 
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import org.bson.types.ObjectId
 import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.mongodb.repository.Update
@@ -26,4 +27,23 @@ interface RefreshTokenRepository : Repository<RefreshToken, ObjectId> {
     @Query("{ 'hashedToken': ?0 }")
     @Update("{ '\$set': { 'hashedToken': ?1, 'previousHashedToken': ?0, 'encryptedToken': ?2, 'expiresAt': ?3, 'lastUsedAt': ?4 } }")
     fun rotate(oldHash: String, newHash: String, encryptedToken: String, expiresAt: Instant, lastUsedAt: Instant): Long
+
+    fun findByUserIdAndPushTokenNotNull(userId: ObjectId): List<RefreshToken>
+
+    @Query("{ '_id': ?0 }")
+    @Update("{ '\$set': { 'pushToken': ?1, 'pushPlatform': ?2 } }")
+    fun setPushToken(sessionId: ObjectId, token: String, platform: PushPlatform): Long
+
+    /** An install that changed accounts must stop getting the old account's pushes. */
+    @Query("{ 'pushToken': ?0, '_id': { '\$ne': ?1 } }")
+    @Update("{ '\$unset': { 'pushToken': '', 'pushPlatform': '' } }")
+    fun clearPushTokenElsewhere(token: String, sessionId: ObjectId): Long
+
+    @Query("{ 'pushToken': ?0 }")
+    @Update("{ '\$unset': { 'pushToken': '', 'pushPlatform': '' } }")
+    fun clearPushToken(token: String): Long
+
+    @Query("{ '_id': ?0 }")
+    @Update("{ '\$unset': { 'pushToken': '', 'pushPlatform': '' } }")
+    fun clearPushTokenOfSession(sessionId: ObjectId): Long
 }

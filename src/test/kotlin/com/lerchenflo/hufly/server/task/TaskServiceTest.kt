@@ -19,6 +19,7 @@ import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.time.Duration
@@ -33,6 +34,9 @@ import kotlin.test.assertTrue
 /** TSK-1..TSK-4, BIZ-4 */
 class TaskServiceTest {
 
+    private val published = mutableListOf<Any>()
+    private fun announced() = published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.NotificationEvent>()
+
     private val clock = MutableClock()
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
@@ -43,6 +47,7 @@ class TaskServiceTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskService = TaskService(
         taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock,
+        ApplicationEventPublisher { published += it },
     )
 
     private val admin = testUser()
@@ -298,5 +303,20 @@ class TaskServiceTest {
                 taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList(), categoryTagId = id)
             }
         }
+    }
+
+    @Test
+    fun `creating and reassigning announce only the new assignees`() {
+        val task = create()
+        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id, viewer.id), emptyList())
+        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id, viewer.id), emptyList())
+
+        assertEquals(
+            listOf(
+                com.lerchenflo.hufly.server.core.notification.TaskAssigned(STABLE_ID, planner.id, task.id, listOf(anna.id, ben.id), null),
+                com.lerchenflo.hufly.server.core.notification.TaskAssigned(STABLE_ID, planner.id, task.id, listOf(viewer.id), null),
+            ),
+            announced(),
+        )
     }
 }

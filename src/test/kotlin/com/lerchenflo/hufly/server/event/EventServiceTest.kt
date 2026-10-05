@@ -23,6 +23,7 @@ import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.time.Duration
@@ -36,6 +37,9 @@ import kotlin.test.assertTrue
 /** EVT-1..EVT-8 */
 class EventServiceTest {
 
+    private val published = mutableListOf<Any>()
+    private fun announced() = published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.NotificationEvent>()
+
     private val clock = MutableClock()
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
@@ -47,7 +51,7 @@ class EventServiceTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val service = EventService(
         eventRepository, invitationRepository, FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        userRepository, horseRepository, accessService, versionCounterService, clock,
+        userRepository, horseRepository, accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
     )
 
     private val admin = testUser()
@@ -295,5 +299,27 @@ class EventServiceTest {
         val live = service.invite(teacher, event.id, listOf(anna.id))
 
         assertEquals(listOf(anna.id), live.map { it.userId })
+    }
+
+    // Push notifications
+
+    @Test
+    fun `creating and inviting announce only new invitees, answers only changes`() {
+        val event = lesson()
+        service.invite(teacher, event.id, listOf(anna.id, clara.id))
+        service.invite(teacher, event.id, listOf(anna.id))
+        service.respond(anna, invitationOf(event, anna).id, accepted = true)
+        service.respond(anna, invitationOf(event, anna).id, accepted = true)
+        service.respond(anna, invitationOf(event, anna).id, accepted = false)
+
+        assertEquals(
+            listOf(
+                com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, event.id, listOf(anna.id, ben.id), null),
+                com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, event.id, listOf(clara.id), null),
+                com.lerchenflo.hufly.server.core.notification.InvitationAnswered(STABLE_ID, anna.id, event.id, true, null),
+                com.lerchenflo.hufly.server.core.notification.InvitationAnswered(STABLE_ID, anna.id, event.id, false, null),
+            ),
+            announced(),
+        )
     }
 }

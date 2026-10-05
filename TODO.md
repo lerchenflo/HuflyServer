@@ -25,11 +25,11 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
 - [ ] Notes: a `PUT /notes/{id}` saves the whole document, so a read mark landing between its load and save is lost (the reader's next mark restores it). Make the edit an atomic `$set` of the edited fields if it ever matters.
 - [x] (2026-10-05) Forced own password: `mustChangePassword` on users, set by admin create/reset, cleared by `POST /users/me/password`, sent in `GET /users/me`. Spec: `SERVER_CHANGES.md` → "Forced own password". The client is built; older servers simply never ask.
 
-## Push notifications (next big step, user 2026-10-05)
-- [ ] Send push notifications always, also while the app holds a STOMP connection (unlike SchneaggchatV3server, which only pushes without a socket). The client decides what to show in the foreground.
-- [ ] Prepared: services publish `core/notification/NotificationEvent`s (so far `NotePosted`). Build a listener (`@TransactionalEventListener` not needed, no transactions; run async) that resolves recipients per stable and permission, skips the actor, and sends via FCM/APNs.
-- [ ] Still to publish: event invitation (and series date invite), answer to the organiser, task assigned (incl. stand-in for one date and rotation turn), task due, health due (horse log `nextDueAt`), a daily digest option. Triggers to confirm with the user (client TODO "Push notifications").
-- [ ] Device tokens: one per session (`RefreshToken` row, so logout and "end session" drop it), registered by the client; per-user mute settings in the synced user settings.
+## Push notifications (user 2026-10-05)
+- [x] Backend (2026-10-05, `notification/`): tokens per session, FCM + APNs senders (normal alerts, not time-sensitive), pushes for new notes, invitations (also to one date), answers to the organiser, new task assignees and stand-ins, mute and daily digest via user settings.
+- [ ] Configure for real: Firebase project + service account JSON, APNs key (.p8), team id, key id, bundle id (`.env`, `push-secrets/`). Until then both senders log "off" and drop pushes.
+- [ ] Not built (user chose instant + answers + digest): due reminders for tasks and horse care (needs a scheduler and a sent-once record), per-type muting.
+- [ ] Anyone who knows another install's push token could register it on their own session (the token moves). Tokens are not public, so accepted for now.
 
 ## Open decisions
 - [ ] Website content before going live: real contact address (`index.html` uses the placeholder `kontakt@hufly.app`), full Impressum (ECG § 5, MedienG § 25) and privacy policy (DSGVO), prices once the payment model is decided.

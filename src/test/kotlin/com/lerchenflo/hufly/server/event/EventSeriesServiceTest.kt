@@ -19,12 +19,14 @@ import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
+import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.time.Duration
@@ -39,6 +41,9 @@ import kotlin.test.assertTrue
 /** EVT-10: event series, changes to single dates, per-date answers and invitations to single dates. */
 class EventSeriesServiceTest {
 
+    private val published = mutableListOf<Any>()
+    private fun announced() = published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.NotificationEvent>()
+
     private val clock = MutableClock()
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
@@ -52,7 +57,7 @@ class EventSeriesServiceTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val eventService = EventService(
         eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository,
-        accessService, versionCounterService, clock,
+        accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
     )
     private val service = EventOccurrenceService(
         eventService, eventRepository, invitationRepository, occurrenceRepository, answerRepository, horseRepository,
@@ -339,5 +344,22 @@ class EventSeriesServiceTest {
 
         assertEquals(1, service.syncOccurrences(anna, 0, 100).updatedEntries.size)
         assertEquals(listOf(occurrence.id.toHexString()), service.syncOccurrences(ben, 0, 100).deletedEntries)
+    }
+
+    @Test
+    fun `inviting to one date and answering a date announce that date`() {
+        val event = series()
+        eventService.invite(teacher, event.id, listOf(clara.id), occurrenceStartAt = second)
+        val invitation = invitationOf(event, anna)
+        service.answer(anna, invitation.id, second, accepted = false)
+        service.answer(anna, invitation.id, second, accepted = false)
+
+        assertEquals(
+            listOf(
+                com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, event.id, listOf(clara.id), second),
+                com.lerchenflo.hufly.server.core.notification.InvitationAnswered(STABLE_ID, anna.id, event.id, false, second),
+            ),
+            announced().drop(1),
+        )
     }
 }

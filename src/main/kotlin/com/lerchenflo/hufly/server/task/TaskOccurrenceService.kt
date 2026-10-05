@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.task
 
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.notification.TaskAssigned
 import com.lerchenflo.hufly.server.core.recurrence.requireOccurrence
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
@@ -69,6 +70,8 @@ class TaskOccurrenceService(
         }
         // Stand-ins see the whole series, so a changed cover changes who sees it.
         if (saved.assigneeUserIds.orEmpty().toSet() != previousAssignees) taskService.restamp(task)
+        val standIns = saved.assigneeUserIds.orEmpty().distinct() - previousAssignees
+        if (standIns.isNotEmpty()) taskService.announce(TaskAssigned(task.stableId, requester.id, task.id, standIns, occurrenceDueAt))
         return saved
     }
 

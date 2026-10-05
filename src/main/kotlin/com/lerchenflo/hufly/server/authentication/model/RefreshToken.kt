@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.authentication.model
 
+import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.Indexed
@@ -35,6 +36,9 @@ data class RefreshToken(
     val deviceId: String? = null,
     /** Last refresh; null until the first one. */
     val lastUsedAt: Instant? = null,
+    /** FCM or APNs token of this install; one session per token, see `PushService.register`. */
+    @Indexed(sparse = true) val pushToken: String? = null,
+    val pushPlatform: PushPlatform? = null,
 )
 
 const val UNKNOWN_DEVICE_NAME = "Unbekanntes Gerät"

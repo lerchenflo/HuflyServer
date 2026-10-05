@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.repository
 
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import org.bson.types.ObjectId
 import java.time.Instant
 
@@ -67,5 +68,26 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         val before = tokens.size
         tokens.removeIf { it.expiresAt.isBefore(time) }
         return (before - tokens.size).toLong()
+    }
+
+    override fun findByUserIdAndPushTokenNotNull(userId: ObjectId): List<RefreshToken> =
+        tokens.filter { it.userId == userId && it.pushToken != null }
+
+    override fun setPushToken(sessionId: ObjectId, token: String, platform: PushPlatform): Long {
+        val row = findById(sessionId) ?: return 0
+        save(row.copy(pushToken = token, pushPlatform = platform))
+        return 1
+    }
+
+    override fun clearPushTokenElsewhere(token: String, sessionId: ObjectId): Long =
+        tokens.filter { it.pushToken == token && it.id != sessionId }.onEach { save(it.copy(pushToken = null, pushPlatform = null)) }.size.toLong()
+
+    override fun clearPushToken(token: String): Long =
+        tokens.filter { it.pushToken == token }.onEach { save(it.copy(pushToken = null, pushPlatform = null)) }.size.toLong()
+
+    override fun clearPushTokenOfSession(sessionId: ObjectId): Long {
+        val row = findById(sessionId) ?: return 0
+        save(row.copy(pushToken = null, pushPlatform = null))
+        return 1
     }
 }

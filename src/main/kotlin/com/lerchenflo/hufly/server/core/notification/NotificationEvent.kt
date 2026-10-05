@@ -1,10 +1,11 @@
 package com.lerchenflo.hufly.server.core.notification
 
 import org.bson.types.ObjectId
+import java.time.Instant
 
 /**
- * Something members should hear about, published through Spring's ApplicationEventPublisher. Nothing listens yet;
- * push notifications will (TODO.md): unlike SchneaggchatV3server they go out whether or not the app holds a socket.
+ * Something members should hear about, published through Spring's ApplicationEventPublisher and turned into pushes by
+ * `notification/NotificationService`. Unlike SchneaggchatV3server, pushes go out whether or not the app holds a socket.
  * Carries ids, not documents, so a listener reloads current data and applies the reader's permissions.
  */
 sealed interface NotificationEvent {
@@ -14,3 +15,30 @@ sealed interface NotificationEvent {
 }
 
 data class NotePosted(override val stableId: ObjectId, override val actorUserId: ObjectId, val noteId: ObjectId) : NotificationEvent
+
+/** [userIds] were just invited, to the whole event or only to the date [occurrenceStartAt] of a series. */
+data class EventInvited(
+    override val stableId: ObjectId,
+    override val actorUserId: ObjectId,
+    val eventId: ObjectId,
+    val userIds: List<ObjectId>,
+    val occurrenceStartAt: Instant?,
+) : NotificationEvent
+
+/** The invitee [actorUserId] changed their answer, for one date of a series when [occurrenceStartAt] is set. */
+data class InvitationAnswered(
+    override val stableId: ObjectId,
+    override val actorUserId: ObjectId,
+    val eventId: ObjectId,
+    val accepted: Boolean,
+    val occurrenceStartAt: Instant?,
+) : NotificationEvent
+
+/** [userIds] newly have the task, or only its date [occurrenceDueAt] as stand-ins. */
+data class TaskAssigned(
+    override val stableId: ObjectId,
+    override val actorUserId: ObjectId,
+    val taskId: ObjectId,
+    val userIds: List<ObjectId>,
+    val occurrenceDueAt: Instant?,
+) : NotificationEvent

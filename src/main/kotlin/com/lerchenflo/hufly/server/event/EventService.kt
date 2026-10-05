@@ -2,6 +2,9 @@ package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
+import com.lerchenflo.hufly.server.core.notification.EventInvited
+import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
+import com.lerchenflo.hufly.server.core.notification.NotificationEvent
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.recurrence.requireOccurrence
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
@@ -26,6 +29,7 @@ import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -51,6 +55,7 @@ class EventService(
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
+    private val events: ApplicationEventPublisher,
 ) {
     fun createEvent(
         requester: User,
@@ -87,6 +92,7 @@ class EventService(
                 )
             )
             invitees.forEach { saveInvitation(newInvitation(requester, event, it)) }
+            if (invitees.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, invitees, null))
             event
         }
     }
@@ -147,6 +153,7 @@ class EventService(
             requireInvitationCap(live.size + newUserIds.size)
             newUserIds.forEach { saveInvitation(newInvitation(requester, event, it, occurrenceStartAt)) }
             restamp(event)
+            announce(EventInvited(event.stableId, requester.id, event.id, newUserIds, occurrenceStartAt))
         }
         return invitationRepository.findByEventIdAndDeletedFalse(event.id)
     }
@@ -169,15 +176,16 @@ class EventService(
             throw badRequest("Answer the dates of a series one by one")
         }
         val now = clock.instant()
-        return saveInvitation(
-            invitation.copy(
-                status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED,
-                respondedAt = now,
-                updatedAt = now,
-                updatedBy = requester.id,
-            )
-        )
+        val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
+        val saved = saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
+        if (invitation.status != status) {
+            announce(InvitationAnswered(invitation.stableId, requester.id, invitation.eventId, accepted, invitation.occurrenceStartAt))
+        }
+        return saved
     }
+
+    /** Hands the change to the push notifications, see [NotificationEvent]. */
+    internal fun announce(event: NotificationEvent) = events.publishEvent(event)
 
     fun syncEvents(requester: User, since: Long, pageSize: Int): VersionSyncResponse<EventResponse> {
         val seesAll = seesAll(requester)

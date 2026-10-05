@@ -20,6 +20,7 @@ import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.time.Duration
@@ -34,6 +35,9 @@ import kotlin.test.assertTrue
 /** TSK-5: task series, changes to single dates and ticking single dates. */
 class TaskSeriesServiceTest {
 
+    private val published = mutableListOf<Any>()
+    private fun announced() = published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.NotificationEvent>()
+
     private val clock = MutableClock()
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
@@ -45,6 +49,7 @@ class TaskSeriesServiceTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskService = TaskService(
         taskRepository, occurrenceRepository, userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock,
+        ApplicationEventPublisher { published += it },
     )
     private val service = TaskOccurrenceService(
         taskService, taskRepository, occurrenceRepository, horseRepository, accessService, versionCounterService, clock,
@@ -317,5 +322,17 @@ class TaskSeriesServiceTest {
         assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third, false) }
         assertEquals(ben.id, service.setDone(ben, task.id, third, true).doneByUserId)
         assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third.plus(Duration.ofDays(1)), true) }
+    }
+
+    @Test
+    fun `a stand-in for one date is announced once`() {
+        val task = series()
+        service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id)))
+        service.putOccurrence(planner, task.id, second, change(assigneeUserIds = listOf(ben.id), comment = "Mehr Heu"))
+
+        assertEquals(
+            com.lerchenflo.hufly.server.core.notification.TaskAssigned(com.lerchenflo.hufly.server.testdata.STABLE_ID, planner.id, task.id, listOf(ben.id), second),
+            announced().drop(1).single(),
+        )
     }
 }

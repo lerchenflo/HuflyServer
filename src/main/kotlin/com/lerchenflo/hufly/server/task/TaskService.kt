@@ -2,6 +2,8 @@ package com.lerchenflo.hufly.server.task
 
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
+import com.lerchenflo.hufly.server.core.notification.NotificationEvent
+import com.lerchenflo.hufly.server.core.notification.TaskAssigned
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
@@ -20,6 +22,7 @@ import com.lerchenflo.hufly.server.task.model.TaskResponse
 import com.lerchenflo.hufly.server.task.model.toTaskResponse
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -38,6 +41,7 @@ class TaskService(
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
+    private val events: ApplicationEventPublisher,
 ) {
     fun createTask(
         requester: User,
@@ -75,7 +79,7 @@ class TaskService(
                     updatedBy = requester.id,
                     clientId = clientId,
                 )
-            )
+            ).also { announce(TaskAssigned(it.stableId, requester.id, it.id, it.assigneeUserIds.distinct(), null)) }
         }
     }
 
@@ -111,6 +115,8 @@ class TaskService(
                 updatedBy = requester.id,
             )
         )
+        val added = saved.assigneeUserIds.distinct() - task.assigneeUserIds.toSet()
+        if (added.isNotEmpty()) announce(TaskAssigned(saved.stableId, requester.id, saved.id, added, null))
         // Visibility of dates follows the assignees: new ones must pull older dates, removed ones get them as deleted.
         if (saved.assigneeUserIds.toSet() != task.assigneeUserIds.toSet()) {
             occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).forEach { saveOccurrence(it) }
@@ -142,6 +148,9 @@ class TaskService(
             )
         )
     }
+
+    /** Hands the change to the push notifications, see [NotificationEvent]. */
+    internal fun announce(event: NotificationEvent) = events.publishEvent(event)
 
     fun sync(requester: User, since: Long, pageSize: Int): VersionSyncResponse<TaskResponse> {
         val seesAll = seesAll(requester)

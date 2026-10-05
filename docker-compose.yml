@@ -54,8 +54,15 @@ services:
       OPERATOR_USERNAME: ${OPERATOR_USERNAME:-}
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
       PICTURES_DIR: /app/pictures
+      FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-}
+      APNS_KEY_FILE: ${APNS_KEY_FILE:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_PRODUCTION: ${APNS_PRODUCTION:-false}
     volumes:
       - pictures_data:/app/pictures
+      - ./push-secrets:/app/push-secrets:ro
     networks:
       - spring-mongo-network
 

@@ -65,6 +65,9 @@ class FakeRepositoryConfig {
     fun fakeNoteRepository() = FakeNoteRepository()
 
     @Bean @Primary
+    fun fakeDigestItemRepository() = FakeDigestItemRepository()
+
+    @Bean @Primary
     fun fakeVersionCounterStore() = com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()
 
     @Bean @Primary

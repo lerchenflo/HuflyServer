@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
 import com.lerchenflo.hufly.server.core.recurrence.requireOccurrence
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
@@ -90,7 +91,9 @@ class EventOccurrenceService(
         if (occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)?.let { it.cancelled && !it.deleted } == true) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
         }
-        return retryOnDuplicate {
+        val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
+        val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
+        val saved = retryOnDuplicate {
             val existing = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)
             val now = clock.instant()
             eventService.saveAnswer(
@@ -101,13 +104,15 @@ class EventOccurrenceService(
                     invitationId = invitation.id,
                     userId = invitation.userId,
                     occurrenceStartAt = occurrenceStartAt,
-                    status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED,
+                    status = status,
                     respondedAt = now,
                     updatedAt = now,
                     updatedBy = requester.id,
                 )
             )
         }
+        if (before != status) eventService.announce(InvitationAnswered(invitation.stableId, requester.id, event.id, accepted, occurrenceStartAt))
+        return saved
     }
 
     fun syncOccurrences(requester: User, since: Long, pageSize: Int): VersionSyncResponse<EventOccurrenceResponse> {
