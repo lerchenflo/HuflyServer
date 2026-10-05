@@ -8,6 +8,7 @@ data class TagResponse(
     val color: String,
     val permissions: Set<Permission>,
     val defaultIntervalDays: Int?,
+    val icon: String?,
     val updatedAt: Long,
     val updatedBy: String,
 )
@@ -20,6 +21,7 @@ fun Tag.toTagResponse() = TagResponse(
     color = color,
     permissions = permissions,
     defaultIntervalDays = defaultIntervalDays,
+    icon = icon,
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
 )

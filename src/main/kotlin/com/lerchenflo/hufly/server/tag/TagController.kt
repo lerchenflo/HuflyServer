@@ -43,6 +43,7 @@ class TagController(
         val permissions: Set<Permission> = emptySet(),
         @field:Min(1) @field:Max(MAX_INTERVAL_DAYS) val defaultIntervalDays: Int? = null,
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
+        @field:Pattern(regexp = ICON_PATTERN, message = "Invalid tag icon") val icon: String? = null,
     )
 
     data class UpdateTagRequest(
@@ -50,6 +51,8 @@ class TagController(
         @field:Pattern(regexp = COLOR_PATTERN) val color: String,
         val permissions: Set<Permission> = emptySet(),
         @field:Min(1) @field:Max(MAX_INTERVAL_DAYS) val defaultIntervalDays: Int? = null,
+        /** Null clears the icon. */
+        @field:Pattern(regexp = ICON_PATTERN, message = "Invalid tag icon") val icon: String? = null,
     )
 
     @PostMapping("/sync")
@@ -69,13 +72,13 @@ class TagController(
     @PostMapping
     fun createTag(@Valid @RequestBody request: CreateTagRequest): TagResponse {
         val requester = accessService.requester(requireAuth())
-        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions, request.clientId, request.defaultIntervalDays).toTagResponse()
+        return tagService.createTag(requester, request.name, request.type, request.color, request.permissions, request.clientId, request.defaultIntervalDays, request.icon).toTagResponse()
     }
 
     @PutMapping("/{tagId}")
     fun updateTag(@PathVariable tagId: String, @Valid @RequestBody request: UpdateTagRequest): TagResponse {
         val requester = accessService.requester(requireAuth())
-        return tagService.updateTag(requester, parseObjectId(tagId), request.name, request.color, request.permissions, request.defaultIntervalDays).toTagResponse()
+        return tagService.updateTag(requester, parseObjectId(tagId), request.name, request.color, request.permissions, request.defaultIntervalDays, request.icon).toTagResponse()
     }
 
     @DeleteMapping("/{tagId}")
@@ -87,3 +90,4 @@ class TagController(
 
 private const val MAX_INTERVAL_DAYS = 3650L
 private const val COLOR_PATTERN = "^#[0-9A-Fa-f]{6}$"
+private const val ICON_PATTERN = "^[a-z_]{1,40}$"

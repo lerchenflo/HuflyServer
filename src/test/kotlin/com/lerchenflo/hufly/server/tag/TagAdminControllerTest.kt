@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /** TAG-2: HTTP mapping and validation. Business rules live in TagServiceTest. */
@@ -157,5 +158,34 @@ class TagAdminControllerTest {
             jsonPath("$.defaultIntervalDays") { value(null) }
         }
         assertNull(tagRepository.findById(food.id)?.defaultIntervalDays)
+    }
+
+    @Test
+    fun `a tag stores its icon and an edit without one clears it`() {
+        call(HttpMethod.POST, "/tags", """{"name":"Heu","type":"FOOD","color":"#8bc34a","permissions":[],"icon":"hay"}""").andExpect {
+            status { isOk() }
+            jsonPath("$.icon") { value("hay") }
+        }
+        val tag = tagRepository.tags.single()
+        assertEquals("hay", tag.icon)
+
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Heu","color":"#8bc34a","permissions":[]}""").andExpect {
+            status { isOk() }
+            jsonPath("$.icon") { value(null) }
+        }
+        assertNull(tagRepository.findById(tag.id)!!.icon)
+    }
+
+    @Test
+    fun `an icon outside 1 to 40 lowercase letters or underscores answers 400`() {
+        listOf("\"\"", "\"Hay\"", "\"hay-1\"", "\"${"a".repeat(41)}\"").forEach { icon ->
+            call(HttpMethod.POST, "/tags", """{"name":"Heu","type":"FOOD","color":"#8bc34a","permissions":[],"icon":$icon}""")
+                .andExpect { status { isBadRequest() } }
+        }
+        val tag = tagRepository.save(testTag())
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Heu","color":"#8bc34a","permissions":[],"icon":"Hay"}""")
+            .andExpect { status { isBadRequest() } }
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Heu","color":"#8bc34a","permissions":[],"icon":"riding_hat"}""")
+            .andExpect { status { isOk() } }
     }
 }

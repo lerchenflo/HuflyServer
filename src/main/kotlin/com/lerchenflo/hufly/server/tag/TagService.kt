@@ -28,6 +28,7 @@ class TagService(
         permissions: Set<Permission>,
         clientId: String? = null,
         defaultIntervalDays: Int? = null,
+        icon: String? = null,
     ): Tag {
         accessService.requireAdmin(requester)
         return idempotentCreate(clientId, { tagRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -40,6 +41,7 @@ class TagService(
                     color = color,
                     permissions = permissions,
                     defaultIntervalDays = defaultIntervalDays.takeIf { type == TagType.ACTIVITY },
+                    icon = icon,
                     updatedAt = clock.instant(),
                     updatedBy = requester.id,
                     clientId = clientId,
@@ -55,6 +57,7 @@ class TagService(
         color: String,
         permissions: Set<Permission>,
         defaultIntervalDays: Int? = null,
+        icon: String? = null,
     ): Tag {
         accessService.requireAdmin(requester)
         val tag = stableTag(requester, tagId)
@@ -65,6 +68,7 @@ class TagService(
                 color = color,
                 permissions = permissions,
                 defaultIntervalDays = defaultIntervalDays.takeIf { tag.type == TagType.ACTIVITY },
+                icon = icon,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )

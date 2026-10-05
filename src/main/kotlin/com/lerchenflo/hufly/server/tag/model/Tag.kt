@@ -38,6 +38,8 @@ data class Tag(
     val permissions: Set<Permission>,
     /** Only for [TagType.ACTIVITY]: suggests a horse log entry's next due date. */
     val defaultIntervalDays: Int? = null,
+    /** Icon key the client draws; never interpreted here, null means the client's default. */
+    val icon: String? = null,
     val updatedAt: Instant,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
