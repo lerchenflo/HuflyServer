@@ -8,10 +8,12 @@ import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.versionSync
 import com.lerchenflo.hufly.server.repository.HorseRepository
+import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.task.model.TaskResponse
@@ -32,6 +34,7 @@ class TaskService(
     private val occurrenceRepository: TaskOccurrenceRepository,
     private val userRepository: UserRepository,
     private val horseRepository: HorseRepository,
+    private val tagRepository: TagRepository,
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
@@ -45,11 +48,13 @@ class TaskService(
         horseIds: List<ObjectId>,
         clientId: String? = null,
         recurrence: Recurrence? = null,
+        categoryTagId: ObjectId? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             requireAssignees(requester, assigneeUserIds)
             requireHorses(requester, horseIds)
+            requireCategory(requester, categoryTagId)
             save(
                 StableTask(
                     stableId = requester.stableId,
@@ -59,6 +64,7 @@ class TaskService(
                     assigneeUserIds = assigneeUserIds,
                     horseIds = horseIds,
                     recurrence = recurrence,
+                    categoryTagId = categoryTagId,
                     createdByUserId = requester.id,
                     doneByUserId = null,
                     doneAt = null,
@@ -79,11 +85,13 @@ class TaskService(
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
+        categoryTagId: ObjectId? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
         requireAssignees(requester, assigneeUserIds)
         requireHorses(requester, horseIds)
+        requireCategory(requester, categoryTagId)
         val saved = save(
             task.copy(
                 title = title,
@@ -92,6 +100,7 @@ class TaskService(
                 assigneeUserIds = assigneeUserIds,
                 horseIds = horseIds,
                 recurrence = recurrence,
+                categoryTagId = categoryTagId,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -182,6 +191,13 @@ class TaskService(
             horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
+    }
+
+    private fun requireCategory(requester: User, categoryTagId: ObjectId?) {
+        if (categoryTagId == null) return
+        val valid = tagRepository.findById(categoryTagId)
+            ?.let { it.stableId == requester.stableId && !it.deleted && it.type == TagType.TASK_CATEGORY } == true
+        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown task category")
     }
 
     internal fun stableTask(requester: User, taskId: ObjectId): StableTask =

@@ -6,7 +6,9 @@ import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.testStable
+import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -149,5 +151,24 @@ class TaskControllerTest {
     @Test
     fun `task routes with a malformed id answer 400`() {
         call(HttpMethod.DELETE, "/tasks/nope").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `a task carries its category, a PUT without it clears it and a malformed id answers 400`() {
+        val feeding = testTag(type = TagType.TASK_CATEGORY)
+        tagRepository.save(feeding)
+        val withCategory = taskJson().dropLast(1) + ""","categoryTagId":"${feeding.id.toHexString()}"}"""
+
+        val body = call(HttpMethod.POST, "/tasks", withCategory).andExpect {
+            status { isOk() }
+            jsonPath("$.categoryTagId") { value(feeding.id.toHexString()) }
+        }.andReturn().response.contentAsString
+        val id = objectMapper.readTree(body)["id"].asString()
+
+        call(HttpMethod.PUT, "/tasks/$id", taskJson()).andExpect {
+            status { isOk() }
+            jsonPath("$.categoryTagId") { value(null) }
+        }
+        call(HttpMethod.POST, "/tasks", taskJson().dropLast(1) + ""","categoryTagId":"nope"}""").andExpect { status { isBadRequest() } }
     }
 }

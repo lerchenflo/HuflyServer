@@ -311,12 +311,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "fields": [
     "USER_ROLE",
     "FOOD",
-    "ACTIVITY"
+    "ACTIVITY",
+    "TASK_CATEGORY"
    ],
    "id": "tagtype",
    "kind": "enum",
    "name": "TagType",
-   "note": "USER_ROLE: role of a user (e.g. Reitlehrer), carries permissions. FOOD: food item (e.g. Heu, Hafer), used in food plans. ACTIVITY: something done with a horse (e.g. Springen, Impfung, Hufschmied), used in the horse log. Only USER_ROLE uses permissions.",
+   "note": "USER_ROLE: role of a user (e.g. Reitlehrer), carries permissions. FOOD: food item (e.g. Heu, Hafer), used in food plans. ACTIVITY: something done with a horse (e.g. Springen, Impfung, Hufschmied), used in the horse log. TASK_CATEGORY: groups tasks (e.g. Füttern) so users can hide them in their calendar (client setting). Only USER_ROLE uses permissions.",
    "pkg": "tag",
    "x": 42,
    "y": 856
@@ -595,6 +596,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "assigneeUserIds: List\u003cObjectId>",
     "horseIds: List\u003cObjectId>",
     "recurrence: Recurrence?",
+    "categoryTagId: ObjectId?",
     "createdByUserId: ObjectId",
     "doneByUserId: ObjectId?",
     "doneAt: Instant?",
@@ -950,6 +952,15 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "",
    "to": "horse",
    "toCard": "1"
+  },
+  {
+   "from": "task",
+   "fromCard": "*",
+   "id": "r_task_category",
+   "kind": "assoc",
+   "label": "category (TASK_CATEGORY)",
+   "to": "tag",
+   "toCard": "0..1"
   },
   {
    "from": "log",

@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
-enum class TagType { USER_ROLE, FOOD, ACTIVITY }
+enum class TagType { USER_ROLE, FOOD, ACTIVITY, TASK_CATEGORY }
 
 /**
  * Grantable through USER_ROLE tags. An EDIT permission includes its VIEW permission ([impliedView]).

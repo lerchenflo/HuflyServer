@@ -22,6 +22,8 @@ data class StableTask(
     val horseIds: List<ObjectId>,
     /** Null for a single task; else [dueAt] is the first date (TSK-5) and dates are ticked one by one. */
     val recurrence: Recurrence? = null,
+    /** A [com.lerchenflo.hufly.server.tag.model.TagType.TASK_CATEGORY] tag; may dangle after the tag is deleted. */
+    val categoryTagId: ObjectId? = null,
     val createdByUserId: ObjectId,
     val doneByUserId: ObjectId?,
     val doneAt: Instant?,

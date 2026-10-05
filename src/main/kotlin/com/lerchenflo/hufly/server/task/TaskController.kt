@@ -48,6 +48,8 @@ class TaskController(
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
         /** Null makes it a single task, also on update. */
         val recurrence: RecurrenceRequest? = null,
+        /** Null clears the category, also on update. */
+        val categoryTagId: String? = null,
     )
 
     data class DoneRequest(val done: Boolean)
@@ -69,6 +71,7 @@ class TaskController(
         return taskService.createTask(
             requester, request.title, request.comment, Instant.ofEpochMilli(request.dueAt), request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
+            request.categoryTagId?.let(::parseObjectId),
         ).toTaskResponse()
     }
 
@@ -80,6 +83,7 @@ class TaskController(
             request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId),
             request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.dueAt)),
+            request.categoryTagId?.let(::parseObjectId),
         ).toTaskResponse()
     }
 

@@ -11,6 +11,7 @@ import com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
@@ -41,7 +42,7 @@ class TaskServiceTest {
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskService = TaskService(
-        taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, accessService, versionCounterService, clock,
+        taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock,
     )
 
     private val admin = testUser()
@@ -265,5 +266,37 @@ class TaskServiceTest {
 
         assertEquals(first, taskService.createTask(planner, "Misten", "", due, listOf(anna.id), emptyList(), clientId = "c1"))
         assertEquals(1, taskRepository.tasks.size)
+    }
+
+    private val feeding = testTag(type = TagType.TASK_CATEGORY)
+
+    private fun createInCategory(categoryTagId: ObjectId?) =
+        taskService.createTask(planner, "Abendfutter", "", due, listOf(anna.id), emptyList(), categoryTagId = categoryTagId)
+
+    @Test
+    fun `a task stores its category and an update without one clears it`() {
+        tagRepository.save(feeding)
+        val task = createInCategory(feeding.id)
+        assertEquals(feeding.id, stored(task.id).categoryTagId)
+
+        taskService.updateTask(planner, task.id, "Abendfutter", "", due, listOf(anna.id), emptyList())
+
+        assertNull(stored(task.id).categoryTagId)
+    }
+
+    @Test
+    fun `a category must be a live TASK_CATEGORY tag of the own stable`() {
+        val roleTag = testTag(type = TagType.USER_ROLE)
+        val foreign = testTag(stableId = OTHER_STABLE_ID, type = TagType.TASK_CATEGORY)
+        val deleted = testTag(type = TagType.TASK_CATEGORY, deleted = true)
+        listOf(roleTag, foreign, deleted).forEach { tagRepository.save(it) }
+        val task = create()
+
+        listOf(roleTag.id, foreign.id, deleted.id, ObjectId.get()).forEach { id ->
+            assertStatus(HttpStatus.BAD_REQUEST) { createInCategory(id) }
+            assertStatus(HttpStatus.BAD_REQUEST) {
+                taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList(), categoryTagId = id)
+            }
+        }
     }
 }

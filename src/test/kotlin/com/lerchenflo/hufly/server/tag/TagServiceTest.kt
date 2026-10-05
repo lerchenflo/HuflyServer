@@ -126,4 +126,16 @@ class TagServiceTest {
         assertEquals(first, tagService.createTag(admin, "Heu", TagType.FOOD, "#00AA00", emptySet(), clientId = "t1"))
         assertEquals(1, tagRepository.tags.size)
     }
+
+    @Test
+    fun `admin creates a task category without permissions or interval`() {
+        val tag = tagService.createTag(admin, "Füttern", TagType.TASK_CATEGORY, "#00AA00", emptySet(), defaultIntervalDays = 7)
+
+        val stored = tagRepository.findById(tag.id)!!
+        assertEquals(TagType.TASK_CATEGORY, stored.type)
+        assertEquals(null, stored.defaultIntervalDays)
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            tagService.createTag(admin, "X", TagType.TASK_CATEGORY, "#000000", setOf(Permission.TASK_EDIT))
+        }
+    }
 }
