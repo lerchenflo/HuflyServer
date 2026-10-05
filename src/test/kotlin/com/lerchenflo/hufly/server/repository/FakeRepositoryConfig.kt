@@ -62,6 +62,9 @@ class FakeRepositoryConfig {
     fun fakeTaskOccurrenceRepository() = FakeTaskOccurrenceRepository()
 
     @Bean @Primary
+    fun fakeNoteRepository() = FakeNoteRepository()
+
+    @Bean @Primary
     fun fakeVersionCounterStore() = com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()
 
     @Bean @Primary

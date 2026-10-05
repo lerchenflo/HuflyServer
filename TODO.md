@@ -1,6 +1,6 @@
 # TODO
 
-Client-side product TODOs live in the Hufly app repo (`../hufly/TODO.md`). Requirements: `../hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
+Client-side product TODOs live in the Hufly app repo (`../Hufly/TODO.md`). Requirements: `../Hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
 - [x] TODO: Get the App icon from the client and use it for the website. also use the app icons colors. (2026-10-03: logo, favicon and apple-touch-icon from the client's `app_icon.xml`; colours from `HuflyColors.kt`, which is generated from the icon)
 - [x] TODO: Implement smooth scrolling for the website (2026-10-03: CSS `scroll-behavior: smooth`, off with reduced motion; anchors clear the sticky header)
@@ -19,6 +19,17 @@ Status 2026-10-02: every domain-model entity has endpoints and sync, 256 green t
    - Losing a whole permission (e.g. EVENT_VIEW) only affects rows that change later; the client also drops local data based on `/users/me` permissions.
    - **IdTimeStamp sync** (already built in `core/sync`) for small collections: users, tags, horses, food plans, paddocks, horse groups, horse conflicts. Model: `docs/domain-model.html` (complete as of 2026-10-02).
 4. Run the `schneaggchat-security-check` skill after each new endpoint group. Every version-sync repository gets a Testcontainers test in `repository/mongo/`.
+
+## From the client (2026-10-05)
+- [x] Stable notes ("Aushänge") with the new `NOTE_WRITE` permission, read marks and a read list only author and admin see (2026-10-05, `note/`).
+- [ ] Notes: a `PUT /notes/{id}` saves the whole document, so a read mark landing between its load and save is lost (the reader's next mark restores it). Make the edit an atomic `$set` of the edited fields if it ever matters.
+- [ ] Coming next from the client (spec follows in `SERVER_CHANGES.md`): member onboarding - a flag on users created by the admin that forces a new password at the first login.
+
+## Push notifications (next big step, user 2026-10-05)
+- [ ] Send push notifications always, also while the app holds a STOMP connection (unlike SchneaggchatV3server, which only pushes without a socket). The client decides what to show in the foreground.
+- [ ] Prepared: services publish `core/notification/NotificationEvent`s (so far `NotePosted`). Build a listener (`@TransactionalEventListener` not needed, no transactions; run async) that resolves recipients per stable and permission, skips the actor, and sends via FCM/APNs.
+- [ ] Still to publish: event invitation (and series date invite), answer to the organiser, task assigned (incl. stand-in for one date and rotation turn), task due, health due (horse log `nextDueAt`), a daily digest option. Triggers to confirm with the user (client TODO "Push notifications").
+- [ ] Device tokens: one per session (`RefreshToken` row, so logout and "end session" drop it), registered by the client; per-user mute settings in the synced user settings.
 
 ## Open decisions
 - [ ] Website content before going live: real contact address (`index.html` uses the placeholder `kontakt@hufly.app`), full Impressum (ECG § 5, MedienG § 25) and privacy policy (DSGVO), prices once the payment model is decided.

@@ -7,6 +7,7 @@ import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.horselog.model.HorseLogEntry
+import com.lerchenflo.hufly.server.note.model.StableNote
 import com.lerchenflo.hufly.server.paddock.model.HorseConflict
 import com.lerchenflo.hufly.server.paddock.model.HorseGroup
 import com.lerchenflo.hufly.server.paddock.model.Paddock
@@ -50,6 +51,7 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is EventOccurrence -> Triple(HintTarget.Stable(saved.stableId), "eventoccurrences", saved.id)
             is EventOccurrenceAnswer -> Triple(HintTarget.Stable(saved.stableId), "eventoccurrenceanswers", saved.id)
             is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
+            is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
             else -> return
         }
         queueOrSend(notifier, target, collection, id)

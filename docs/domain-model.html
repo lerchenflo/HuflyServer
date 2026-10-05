@@ -334,7 +334,8 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "EVENT_VIEW",
     "EVENT_EDIT",
     "TASK_VIEW",
-    "TASK_EDIT"
+    "TASK_EDIT",
+    "NOTE_WRITE"
    ],
    "id": "perm",
    "kind": "enum",
@@ -719,6 +720,30 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "pkg": "task",
    "x": 1480,
    "y": 420
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "stableId: ObjectId",
+    "title: String",
+    "body: String",
+    "pinned: Boolean",
+    "visibleUntil: LocalDate?",
+    "createdByUserId: ObjectId",
+    "createdAt: Instant",
+    "readByUserIds: List\u003cObjectId>",
+    "updatedAt: Instant",
+    "updatedBy: ObjectId",
+    "deleted: Boolean",
+    "version: Long"
+   ],
+   "id": "note",
+   "kind": "class",
+   "name": "StableNote",
+   "note": "Stable notice ('Aushang'), shown on the client's Heute screen. NOTE_WRITE posts, edits and deletes any note of the stable; every member reads and marks read (atomic $addToSet, bumps version, not updatedAt). readByUserIds goes in full only to the author and the admin, everyone else gets at most their own id. visibleUntil (inclusive) is informational, nothing expires on the server. Posting publishes NotePosted for the coming push notifications. Version sync.",
+   "pkg": "note",
+   "x": 1780,
+   "y": 420
   }
  ],
  "packages": [
@@ -731,6 +756,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   "paddock",
   "event",
   "task",
+  "note",
   "authentication"
  ],
  "questions": [
@@ -954,6 +980,24 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "",
    "to": "horse",
    "toCard": "1"
+  },
+  {
+   "from": "note",
+   "fromCard": "*",
+   "id": "r_note_author",
+   "kind": "assoc",
+   "label": "written by",
+   "to": "user",
+   "toCard": "1"
+  },
+  {
+   "from": "note",
+   "fromCard": "*",
+   "id": "r_note_readers",
+   "kind": "assoc",
+   "label": "read by",
+   "to": "user",
+   "toCard": "*"
   },
   {
    "from": "task",

@@ -76,6 +76,8 @@ class RealtimeIntegrationTest {
     @Autowired lateinit var eventOccurrenceRepository: EventOccurrenceRepository
     @Autowired lateinit var answerRepository: EventOccurrenceAnswerRepository
     @Autowired lateinit var taskOccurrenceRepository: TaskOccurrenceRepository
+    @Autowired lateinit var noteRepository: com.lerchenflo.hufly.server.repository.NoteRepository
+    @Autowired lateinit var noteService: com.lerchenflo.hufly.server.note.NoteService
 
     private class Inbox : StompFrameHandler {
         val messages = LinkedBlockingQueue<String>()
@@ -138,6 +140,23 @@ class RealtimeIntegrationTest {
         assertEquals(hint("eventoccurrences"), inbox.next())
         assertEquals(hint("eventoccurrenceanswers"), inbox.next())
         assertEquals(hint("taskoccurrences"), inbox.next())
+    }
+
+    @Test
+    fun `notes and their atomic read marks send hints under the collection name note`() {
+        val stableId = ObjectId.get()
+        val reader = userRepository.save(testUser(stableId = stableId))
+        val inbox = subscribe(connect(reader.id))
+        val at = Instant.parse("2026-10-05T08:00:00Z")
+        val note = noteRepository.save(
+            com.lerchenflo.hufly.server.note.model.StableNote(stableId = stableId, title = "Hufschmied", body = "", pinned = false,
+                visibleUntil = null, createdByUserId = ObjectId.get(), createdAt = at, updatedAt = at, updatedBy = ObjectId.get())
+        )
+        assertEquals(hint("note"), inbox.next())
+
+        noteService.markRead(reader, note.id)
+
+        assertEquals(hint("note"), inbox.next())
     }
 
     @Test

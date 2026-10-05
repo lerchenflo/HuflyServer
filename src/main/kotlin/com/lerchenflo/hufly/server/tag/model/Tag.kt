@@ -24,6 +24,7 @@ enum class Permission(val impliedView: Permission? = null) {
     EVENT_EDIT(impliedView = EVENT_VIEW),
     TASK_VIEW,
     TASK_EDIT(impliedView = TASK_VIEW),
+    NOTE_WRITE,
 }
 
 @Document("tags")
