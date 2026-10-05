@@ -2,9 +2,6 @@
 
 Open work only; finished items live in git history. Client-side product TODOs live in the Hufly app repo (`../Hufly/TODO.md`). Requirements: `../Hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
-## Notes
-- [ ] A `PUT /notes/{id}` saves the whole document, so a read mark landing between its load and save is lost (the reader's next mark restores it). Make the edit an atomic `$set` of the edited fields if it ever matters.
-
 ## Push notifications
 - [ ] Configure for real: Firebase project + service account JSON, APNs key (.p8), team id, key id, bundle id (`.env`, `push-secrets/`). Until then both senders log "off" and drop pushes.
 - [ ] Not built (user chose instant + answers + digest): due reminders for tasks and horse care (needs a scheduler and a sent-once record), per-type muting.

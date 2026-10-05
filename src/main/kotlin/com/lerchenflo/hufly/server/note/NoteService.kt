@@ -59,16 +59,11 @@ class NoteService(
     fun updateNote(requester: User, noteId: ObjectId, data: NoteData): StableNote {
         accessService.requirePermission(requester, Permission.NOTE_WRITE)
         val note = stableNote(requester, noteId)
-        return save(
-            note.copy(
-                title = requireTitle(data.title),
-                body = data.body,
-                pinned = data.pinned,
-                visibleUntil = data.visibleUntil,
-                updatedAt = clock.instant(),
-                updatedBy = requester.id,
-            )
-        )
+        val title = requireTitle(data.title)
+        val updated = versionCounterService.withVersion(SyncCollection.NOTES) { version ->
+            noteRepository.updateContent(note.id, title, data.body, data.pinned, data.visibleUntil, clock.instant(), requester.id, version)
+        }
+        return announceAtomicSave(note.id, updated)
     }
 
     fun deleteNote(requester: User, noteId: ObjectId) {
@@ -84,9 +79,13 @@ class NoteService(
         val added = versionCounterService.withVersion(SyncCollection.NOTES) { version ->
             noteRepository.addReader(note.id, requester.id, version)
         }
-        val saved = noteRepository.findById(note.id)?.takeIf { added == 1L && !it.deleted }
+        return announceAtomicSave(note.id, added)
+    }
+
+    /** Atomic updates fire no Mongo save event, so announce them like one for the realtime hints. */
+    private fun announceAtomicSave(noteId: ObjectId, matched: Long): StableNote {
+        val saved = noteRepository.findById(noteId)?.takeIf { matched == 1L && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found")
-        // The atomic update fires no Mongo save event, so announce it like one for the realtime hints.
         events.publishEvent(AfterSaveEvent(saved, Document(), "notes"))
         return saved
     }

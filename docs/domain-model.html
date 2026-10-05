@@ -743,7 +743,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "note",
    "kind": "class",
    "name": "StableNote",
-   "note": "Stable notice ('Aushang'), shown on the client's Heute screen. NOTE_WRITE posts, edits and deletes any note of the stable; every member reads and marks read (atomic $addToSet, bumps version, not updatedAt). readByUserIds goes in full only to the author and the admin, everyone else gets at most their own id. visibleUntil (inclusive) is informational, nothing expires on the server. Posting publishes NotePosted for the coming push notifications. Version sync.",
+   "note": "Stable notice ('Aushang'), shown on the client's Heute screen. NOTE_WRITE posts, edits and deletes any note of the stable; every member reads and marks read (atomic $addToSet, bumps version, not updatedAt); edits are atomic $set of the content, so they never drop a read mark. readByUserIds goes in full only to the author and the admin, everyone else gets at most their own id. visibleUntil (inclusive) is informational, nothing expires on the server. Posting publishes NotePosted for the coming push notifications. Version sync.",
    "pkg": "note",
    "x": 1780,
    "y": 420

@@ -8,6 +8,7 @@ import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.note.model.StableNote
 import com.lerchenflo.hufly.server.repository.FakeNoteRepository
+import com.lerchenflo.hufly.server.repository.NoteRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
@@ -185,5 +186,25 @@ class NoteServiceTest {
         noteService.updateNote(writer, note.id, data)
 
         assertEquals(listOf(NotePosted(STABLE_ID, writer.id, note.id)), published.filterIsInstance<NotificationEvent>())
+    }
+
+    @Test
+    fun `an edit keeps a read mark that lands between its load and its save`() {
+        val note = post()
+        // Ben's read mark arrives right after the edit loaded the note.
+        var raced = false
+        val racing = object : NoteRepository by noteRepository {
+            override fun findById(id: ObjectId) = noteRepository.findById(id).also {
+                if (!raced) noteRepository.addReader(id, ben.id, 999).also { raced = true }
+            }
+        }
+        val service = NoteService(racing, accessService, versionCounterService, events, clock)
+
+        val edited = service.updateNote(writer, note.id, NoteService.NoteData("Neu", "", pinned = false, visibleUntil = null))
+
+        assertEquals(listOf(ben.id), stored(note.id).readByUserIds)
+        assertEquals("Neu", stored(note.id).title)
+        assertEquals(stored(note.id), edited)
+        assertEquals(stored(note.id), published.filterIsInstance<AfterSaveEvent<*>>().last().source)
     }
 }

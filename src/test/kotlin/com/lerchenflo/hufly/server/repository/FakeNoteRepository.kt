@@ -3,6 +3,8 @@ package com.lerchenflo.hufly.server.repository
 import com.lerchenflo.hufly.server.note.model.StableNote
 import org.bson.types.ObjectId
 import org.springframework.data.domain.Limit
+import java.time.Instant
+import java.time.LocalDate
 
 class FakeNoteRepository : NoteRepository {
     val notes = mutableListOf<StableNote>()
@@ -27,6 +29,14 @@ class FakeNoteRepository : NoteRepository {
     override fun addReader(noteId: ObjectId, userId: ObjectId, version: Long): Long {
         val note = notes.firstOrNull { it.id == noteId && !it.deleted } ?: return 0
         save(note.copy(readByUserIds = (note.readByUserIds + userId).distinct(), version = version))
+        return 1
+    }
+
+    override fun updateContent(
+        noteId: ObjectId, title: String, body: String, pinned: Boolean, visibleUntil: LocalDate?, updatedAt: Instant, updatedBy: ObjectId, version: Long,
+    ): Long {
+        val note = notes.firstOrNull { it.id == noteId && !it.deleted } ?: return 0
+        save(note.copy(title = title, body = body, pinned = pinned, visibleUntil = visibleUntil, updatedAt = updatedAt, updatedBy = updatedBy, version = version))
         return 1
     }
 }

@@ -68,4 +68,27 @@ class MongoNoteRepositoryTest {
         val gone = noteRepository.save(note(2, deleted = true))
         assertEquals(0, noteRepository.addReader(gone.id, anna, 9))
     }
+
+    @Test
+    fun `editing the content is atomic, keeps the readers and skips deleted notes`() {
+        val note = noteRepository.save(note(1))
+        val anna = ObjectId.get()
+        val editor = ObjectId.get()
+        noteRepository.addReader(note.id, anna, 2)
+
+        val at = Instant.parse("2026-10-05T10:00:00.123Z")
+        assertEquals(1, noteRepository.updateContent(note.id, "Neu", "Text", true, LocalDate.of(1969, 12, 31), at, editor, 3))
+
+        val stored = noteRepository.findById(note.id)!!
+        assertEquals(listOf(anna), stored.readByUserIds)
+        assertEquals(listOf("Neu", "Text", true), listOf(stored.title, stored.body, stored.pinned))
+        assertEquals(LocalDate.of(1969, 12, 31), stored.visibleUntil)
+        assertEquals(at, stored.updatedAt)
+        assertEquals(editor to 3L, stored.updatedBy to stored.version)
+        assertEquals(1, noteRepository.updateContent(note.id, "Neu", "Text", true, null, at, editor, 4))
+        assertEquals(null, noteRepository.findById(note.id)!!.visibleUntil)
+
+        val gone = noteRepository.save(note(5, deleted = true))
+        assertEquals(0, noteRepository.updateContent(gone.id, "x", "", false, null, at, editor, 6))
+    }
 }
