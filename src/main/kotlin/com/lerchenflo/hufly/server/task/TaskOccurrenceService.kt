@@ -14,6 +14,7 @@ import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
+import com.lerchenflo.hufly.server.task.model.rotationAssignee
 import com.lerchenflo.hufly.server.task.model.TaskOccurrenceResponse
 import com.lerchenflo.hufly.server.task.model.toTaskOccurrenceResponse
 import com.lerchenflo.hufly.server.user.model.User
@@ -74,7 +75,8 @@ class TaskOccurrenceService(
     fun setDone(requester: User, taskId: ObjectId, occurrenceDueAt: Instant, done: Boolean): TaskOccurrence {
         val task = seriesTask(requester, taskId, occurrenceDueAt)
         val occurrence = occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)?.takeUnless { it.deleted }
-        taskService.requireMayTick(requester, occurrence?.assigneeUserIds ?: task.assigneeUserIds)
+        val assignees = occurrence?.assigneeUserIds ?: task.rotationAssignee(occurrenceDueAt)?.let(::listOf) ?: task.assigneeUserIds
+        taskService.requireMayTick(requester, assignees)
         if (occurrence?.cancelled == true) throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
         val now = clock.instant()
         return upsert(requester, task, occurrenceDueAt) {

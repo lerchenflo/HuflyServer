@@ -41,6 +41,9 @@ data class Recurrence(
     fun isOccurrence(firstStart: Instant, candidate: Instant): Boolean =
         starts(firstStart).takeWhile { it <= candidate }.any { it == candidate }
 
+    /** Position of the date [key] in the series, counting from 0. */
+    fun indexOf(firstStart: Instant, key: Instant): Int = starts(firstStart).takeWhile { it < key }.count()
+
     private fun candidateDates(firstDate: LocalDate): Sequence<LocalDate> = when (frequency) {
         RecurrenceFrequency.DAILY -> generateSequence(0L) { it + 1 }.map { firstDate.plusDays(it * interval) }
         RecurrenceFrequency.WEEKLY -> {

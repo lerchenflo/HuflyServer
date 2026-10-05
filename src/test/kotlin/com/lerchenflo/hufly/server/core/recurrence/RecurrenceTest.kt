@@ -125,4 +125,14 @@ class RecurrenceTest {
 
         assertEquals(RecurrenceResponse("WEEKLY", 1, listOf("TUESDAY"), "2026-12-31", null, "Europe/Vienna"), response)
     }
+
+    @Test
+    fun `the index of a date counts the regular dates before it`() {
+        val wednesday = vienna("2026-10-21T17:00")
+        val rule = rule(weekdays = listOf(DayOfWeek.THURSDAY, DayOfWeek.TUESDAY))
+
+        assertEquals(0, rule.indexOf(wednesday, vienna("2026-10-22T17:00")))
+        assertEquals(2, rule.indexOf(wednesday, vienna("2026-10-29T17:00")))
+        assertEquals(5, rule(RecurrenceFrequency.DAILY).indexOf(vienna("2026-10-22T07:00"), vienna("2026-10-27T07:00")))
+    }
 }

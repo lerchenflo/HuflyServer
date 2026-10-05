@@ -50,6 +50,8 @@ class TaskController(
         val recurrence: RecurrenceRequest? = null,
         /** Null clears the category, also on update. */
         val categoryTagId: String? = null,
+        /** Only kept for a series with at least two assignees. */
+        val rotatesAssignees: Boolean = false,
     )
 
     data class DoneRequest(val done: Boolean)
@@ -73,6 +75,7 @@ class TaskController(
             requester, request.title, request.comment, dueAt, request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
+            request.rotatesAssignees,
         ).toTaskResponse()
     }
 
@@ -86,6 +89,7 @@ class TaskController(
             request.horseIds.map(::parseObjectId),
             request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
+            request.rotatesAssignees,
         ).toTaskResponse()
     }
 

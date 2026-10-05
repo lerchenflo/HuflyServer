@@ -286,4 +286,36 @@ class TaskSeriesServiceTest {
             taskService.updateTask(planner, task.id, "Misten", "", null, listOf(anna.id), emptyList(), recurrence = daily)
         }
     }
+
+    private fun rotating(assignees: List<ObjectId> = listOf(anna.id, ben.id), recurrence: Recurrence? = daily) =
+        taskService.createTask(planner, "Misten", "", first, assignees, emptyList(), recurrence = recurrence, rotatesAssignees = true)
+
+    @Test
+    fun `rotation is stored only for a series with at least two assignees`() {
+        assertTrue(taskRepository.findById(rotating().id)!!.rotatesAssignees)
+        assertEquals(false, taskRepository.findById(rotating(assignees = listOf(anna.id)).id)!!.rotatesAssignees)
+        assertEquals(false, taskRepository.findById(rotating(recurrence = null).id)!!.rotatesAssignees)
+
+        val task = rotating()
+        taskService.updateTask(planner, task.id, "Misten", "", first, listOf(anna.id, ben.id), emptyList(), recurrence = daily)
+        assertEquals(false, taskRepository.findById(task.id)!!.rotatesAssignees)
+    }
+
+    @Test
+    fun `each date of a rotating series is ticked by its turn's assignee, a stand-in or TASK_EDIT`() {
+        val task = rotating()
+        val third = second.plus(Duration.ofDays(1))
+
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(ben, task.id, first, true) }
+        assertEquals(anna.id, service.setDone(anna, task.id, first, true).doneByUserId)
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, second, true) }
+        assertEquals(ben.id, service.setDone(ben, task.id, second, true).doneByUserId)
+        assertEquals(anna.id, service.setDone(anna, task.id, third, true).doneByUserId)
+        assertEquals(planner.id, service.setDone(planner, task.id, third, true).doneByUserId)
+
+        service.putOccurrence(planner, task.id, third, change(assigneeUserIds = listOf(ben.id)))
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third, false) }
+        assertEquals(ben.id, service.setDone(ben, task.id, third, true).doneByUserId)
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third.plus(Duration.ofDays(1)), true) }
+    }
 }

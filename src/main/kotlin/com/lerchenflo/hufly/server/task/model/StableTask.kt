@@ -25,6 +25,8 @@ data class StableTask(
     val recurrence: Recurrence? = null,
     /** A [com.lerchenflo.hufly.server.tag.model.TagType.TASK_CATEGORY] tag; may dangle after the tag is deleted. */
     val categoryTagId: ObjectId? = null,
+    /** Dates of the series go to [assigneeUserIds] in turn, see [StableTask.rotationAssignee]. */
+    val rotatesAssignees: Boolean = false,
     val createdByUserId: ObjectId,
     val doneByUserId: ObjectId?,
     val doneAt: Instant?,
@@ -35,3 +37,9 @@ data class StableTask(
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
 )
+
+/** The assignee whose turn the series date [occurrenceDueAt] is; must match the client. */
+fun StableTask.rotationAssignee(occurrenceDueAt: Instant): ObjectId? {
+    if (!rotatesAssignees || recurrence == null || dueAt == null || assigneeUserIds.isEmpty()) return null
+    return assigneeUserIds[recurrence.indexOf(dueAt, occurrenceDueAt) % assigneeUserIds.size]
+}

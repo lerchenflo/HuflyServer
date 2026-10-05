@@ -49,6 +49,7 @@ class TaskService(
         clientId: String? = null,
         recurrence: Recurrence? = null,
         categoryTagId: ObjectId? = null,
+        rotatesAssignees: Boolean = false,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -66,6 +67,7 @@ class TaskService(
                     horseIds = horseIds,
                     recurrence = recurrence,
                     categoryTagId = categoryTagId,
+                    rotatesAssignees = rotates(rotatesAssignees, recurrence, assigneeUserIds),
                     createdByUserId = requester.id,
                     doneByUserId = null,
                     doneAt = null,
@@ -87,6 +89,7 @@ class TaskService(
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
         categoryTagId: ObjectId? = null,
+        rotatesAssignees: Boolean = false,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
@@ -103,6 +106,7 @@ class TaskService(
                 horseIds = horseIds,
                 recurrence = recurrence,
                 categoryTagId = categoryTagId,
+                rotatesAssignees = rotates(rotatesAssignees, recurrence, assigneeUserIds),
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -194,6 +198,9 @@ class TaskService(
         }
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
     }
+
+    private fun rotates(requested: Boolean, recurrence: Recurrence?, assigneeUserIds: List<ObjectId>) =
+        requested && recurrence != null && assigneeUserIds.size >= 2
 
     private fun requireDateIfRepeating(dueAt: Instant?, recurrence: Recurrence?) {
         if (dueAt == null && recurrence != null) throw repeatingTaskNeedsDate()

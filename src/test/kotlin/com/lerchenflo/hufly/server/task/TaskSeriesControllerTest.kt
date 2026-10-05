@@ -165,4 +165,15 @@ class TaskSeriesControllerTest {
             jsonPath("$.dueAt") { value(null) }
         }
     }
+
+    @Test
+    fun `a rotating series answers rotatesAssignees`() {
+        val body = """{"title":"Misten","comment":"","dueAt":$first,"assigneeUserIds":["${anna.id.toHexString()}","${admin.id.toHexString()}"],""" +
+            """"horseIds":[],"recurrence":$daily,"rotatesAssignees":true}"""
+        call(HttpMethod.POST, "/tasks", body).andExpect {
+            status { isOk() }
+            jsonPath("$.rotatesAssignees") { value(true) }
+        }
+        call(HttpMethod.POST, "/tasks", taskJson()).andExpect { jsonPath("$.rotatesAssignees") { value(false) } }
+    }
 }
