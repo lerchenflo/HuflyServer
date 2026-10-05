@@ -111,6 +111,18 @@ class UserController(
         return userService.deleteMyPicture(requester).toUserResponse()
     }
 
+    @PutMapping("/{userId}/picture")
+    fun setPicture(@PathVariable userId: String, @RequestParam("picture") picture: MultipartFile): UserResponse {
+        val requester = accessService.requester(requireAuth())
+        return userService.setPicture(requester, parseObjectId(userId), picture.bytes).toUserResponse()
+    }
+
+    @DeleteMapping("/{userId}/picture")
+    fun deletePicture(@PathVariable userId: String): UserResponse {
+        val requester = accessService.requester(requireAuth())
+        return userService.deletePicture(requester, parseObjectId(userId)).toUserResponse()
+    }
+
     @GetMapping("/{userId}/picture")
     fun picture(@PathVariable userId: String): ResponseEntity<ByteArray> {
         val requester = accessService.requester(requireAuth())

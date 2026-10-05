@@ -93,18 +93,32 @@ class UserService(
         pictureStore.delete(PictureKind.USER, target.id)
     }
 
-    /** USR-6: everyone sets only the own profile picture. */
-    fun setMyPicture(requester: User, upload: ByteArray): User {
-        pictureStore.save(PictureKind.USER, requester.id, toStoredPicture(upload))
+    /** USR-6: everyone sets the own profile picture, the admin also those of members (e.g. kids without phones). */
+    fun setMyPicture(requester: User, upload: ByteArray): User = storePicture(requester, requester, upload)
+
+    fun deleteMyPicture(requester: User): User = removePicture(requester, requester)
+
+    fun setPicture(requester: User, userId: ObjectId, upload: ByteArray): User {
+        accessService.requireAdmin(requester)
+        return storePicture(requester, stableMember(requester, userId), upload)
+    }
+
+    fun deletePicture(requester: User, userId: ObjectId): User {
+        accessService.requireAdmin(requester)
+        return removePicture(requester, stableMember(requester, userId))
+    }
+
+    private fun storePicture(requester: User, target: User, upload: ByteArray): User {
+        pictureStore.save(PictureKind.USER, target.id, toStoredPicture(upload))
         val now = clock.instant()
         return userRepository.save(
-            requester.copy(profilePictureUrl = pictureUrl(PictureKind.USER, requester.id, now), updatedAt = now, updatedBy = requester.id)
+            target.copy(profilePictureUrl = pictureUrl(PictureKind.USER, target.id, now), updatedAt = now, updatedBy = requester.id)
         )
     }
 
-    fun deleteMyPicture(requester: User): User {
-        pictureStore.delete(PictureKind.USER, requester.id)
-        return userRepository.save(requester.copy(profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+    private fun removePicture(requester: User, target: User): User {
+        pictureStore.delete(PictureKind.USER, target.id)
+        return userRepository.save(target.copy(profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
     fun picture(requester: User, userId: ObjectId): ByteArray {

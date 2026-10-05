@@ -16,7 +16,9 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.request
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -143,5 +145,27 @@ class UserAdminControllerTest {
     fun `own password change with a short new password answers 400`() {
         call(HttpMethod.POST, "/users/me/password", """{"oldPassword":"OldSecret1","newPassword":"short"}""", userId = rider.id)
             .andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `admin uploads and removes a member's profile picture`() {
+        val auth = "Bearer ${jwtService.generateAccessToken(admin.id)}"
+        val path = "/users/${rider.id.toHexString()}/picture"
+
+        mockMvc.multipart(HttpMethod.PUT, path) {
+            file(MockMultipartFile("picture", "kid.png", "image/png", com.lerchenflo.hufly.server.core.picture.testPng()))
+            header("Authorization", auth)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(rider.id.toHexString()) }
+            jsonPath("$.profilePictureUrl") { value(org.hamcrest.Matchers.startsWith("$path?v=")) }
+        }
+
+        call(HttpMethod.DELETE, path).andExpect {
+            status { isOk() }
+            jsonPath("$.profilePictureUrl") { value(null) }
+        }
+        call(HttpMethod.DELETE, path, userId = rider.id).andExpect { status { isForbidden() } }
+        call(HttpMethod.DELETE, "/users/nope/picture").andExpect { status { isBadRequest() } }
     }
 }

@@ -270,4 +270,30 @@ class UserServiceTest {
         assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
         assertTrue(pictureStore.pictures.isEmpty())
     }
+
+    @Test
+    fun `admin sets and removes a member's profile picture`() {
+        val updated = userService.setPicture(admin, rider.id, com.lerchenflo.hufly.server.core.picture.testPng())
+
+        assertEquals("/users/${rider.id.toHexString()}/picture?v=${clock.instant().toEpochMilli()}", stored(rider.id).profilePictureUrl)
+        assertEquals(updated, stored(rider.id))
+        assertEquals(admin.id, updated.updatedBy)
+        assertTrue(userService.picture(rider, rider.id).isNotEmpty())
+
+        clock.advance(Duration.ofMinutes(1))
+        val cleared = userService.deletePicture(admin, rider.id)
+        assertEquals(null, stored(rider.id).profilePictureUrl)
+        assertEquals(clock.instant(), cleared.updatedAt)
+        assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
+    }
+
+    @Test
+    fun `only the own stable's admin sets other members' pictures`() {
+        val png = com.lerchenflo.hufly.server.core.picture.testPng()
+        assertStatus(HttpStatus.FORBIDDEN) { userService.setPicture(rider, admin.id, png) }
+        assertStatus(HttpStatus.FORBIDDEN) { userService.deletePicture(rider, admin.id) }
+        assertStatus(HttpStatus.NOT_FOUND) { userService.setPicture(admin, foreigner.id, png) }
+        assertStatus(HttpStatus.NOT_FOUND) { userService.deletePicture(admin, foreigner.id) }
+        assertTrue(pictureStore.pictures.isEmpty())
+    }
 }
