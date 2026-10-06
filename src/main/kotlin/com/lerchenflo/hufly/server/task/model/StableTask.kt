@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
@@ -36,7 +37,15 @@ data class StableTask(
     val version: Long = 0,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
+    /** Set for a bring-out/bring-in chore of a paddock assignment, which keeps it in step, see [com.lerchenflo.hufly.server.task.TurnoutTaskService]. */
+    @Indexed(sparse = true) val turnoutAssignmentId: ObjectId? = null,
+    val turnoutKind: TurnoutKind? = null,
 )
+
+/** [OUT] is due at the assignment's start, [IN] at its end. */
+enum class TurnoutKind { OUT, IN }
+
+data class TurnoutLink(val assignmentId: ObjectId, val kind: TurnoutKind)
 
 /** The assignee whose turn the series date [occurrenceDueAt] is; must match the client. */
 fun StableTask.rotationAssignee(occurrenceDueAt: Instant): ObjectId? {

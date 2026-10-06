@@ -10,6 +10,7 @@ import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.versionSync
 import com.lerchenflo.hufly.server.repository.HorseRepository
+import com.lerchenflo.hufly.server.repository.PaddockAssignmentRepository
 import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
@@ -19,6 +20,7 @@ import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.task.model.TaskResponse
+import com.lerchenflo.hufly.server.task.model.TurnoutLink
 import com.lerchenflo.hufly.server.task.model.toTaskResponse
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
@@ -38,6 +40,7 @@ class TaskService(
     private val userRepository: UserRepository,
     private val horseRepository: HorseRepository,
     private val tagRepository: TagRepository,
+    private val assignmentRepository: PaddockAssignmentRepository,
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
@@ -54,6 +57,7 @@ class TaskService(
         recurrence: Recurrence? = null,
         categoryTagId: ObjectId? = null,
         rotatesAssignees: Boolean = false,
+        turnout: TurnoutLink? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -61,6 +65,7 @@ class TaskService(
             requireAssignees(requester, assigneeUserIds)
             requireHorses(requester, horseIds)
             requireCategory(requester, categoryTagId)
+            requireTurnout(requester, turnout, recurrence)
             save(
                 StableTask(
                     stableId = requester.stableId,
@@ -78,6 +83,8 @@ class TaskService(
                     updatedAt = clock.instant(),
                     updatedBy = requester.id,
                     clientId = clientId,
+                    turnoutAssignmentId = turnout?.assignmentId,
+                    turnoutKind = turnout?.kind,
                 )
             ).also { announce(TaskAssigned(it.stableId, requester.id, it.id, it.assigneeUserIds.distinct(), null)) }
         }
@@ -94,6 +101,7 @@ class TaskService(
         recurrence: Recurrence? = null,
         categoryTagId: ObjectId? = null,
         rotatesAssignees: Boolean = false,
+        turnout: TurnoutLink? = null,
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
@@ -101,6 +109,7 @@ class TaskService(
         requireAssignees(requester, assigneeUserIds)
         requireHorses(requester, horseIds)
         requireCategory(requester, categoryTagId)
+        requireTurnout(requester, turnout, recurrence)
         val saved = save(
             task.copy(
                 title = title,
@@ -111,6 +120,8 @@ class TaskService(
                 recurrence = recurrence,
                 categoryTagId = categoryTagId,
                 rotatesAssignees = rotates(rotatesAssignees, recurrence, assigneeUserIds),
+                turnoutAssignmentId = turnout?.assignmentId,
+                turnoutKind = turnout?.kind,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -220,6 +231,13 @@ class TaskService(
         val valid = tagRepository.findById(categoryTagId)
             ?.let { it.stableId == requester.stableId && !it.deleted && it.type == TagType.TASK_CATEGORY } == true
         if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown task category")
+    }
+
+    private fun requireTurnout(requester: User, turnout: TurnoutLink?, recurrence: Recurrence?) {
+        if (turnout == null) return
+        if (recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A turnout chore cannot repeat")
+        val known = assignmentRepository.findById(turnout.assignmentId)?.let { it.stableId == requester.stableId && !it.deleted } == true
+        if (!known) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown paddock assignment")
     }
 
     internal fun stableTask(requester: User, taskId: ObjectId): StableTask =

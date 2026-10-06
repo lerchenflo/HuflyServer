@@ -19,6 +19,8 @@ import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
+import com.lerchenflo.hufly.server.task.model.TurnoutKind
+import com.lerchenflo.hufly.server.task.model.StableTask
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
@@ -43,9 +45,11 @@ class PaddockServiceTest {
     private val assignmentRepository = FakePaddockAssignmentRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
+    private val taskRepository = com.lerchenflo.hufly.server.repository.FakeTaskRepository()
     private val service = PaddockService(
         paddockRepository, groupRepository, conflictRepository, assignmentRepository, horseRepository,
         accessService, versionCounterService, clock,
+        com.lerchenflo.hufly.server.task.TurnoutTaskService(taskRepository, versionCounterService, clock),
     )
 
     private val admin = testUser()
@@ -368,5 +372,91 @@ class PaddockServiceTest {
         val edited = service.updateGroup(planner, group.id, "Wallache", listOf(gone.id, donner.id))
         assertEquals(listOf(donner.id), edited.horseIds)
         assertCode("UNKNOWN_HORSE") { service.updateGroup(planner, group.id, "Wallache", listOf(foreignHorse.id)) }
+    }
+
+    // Turnout chores follow their assignment
+
+    private fun chore(
+        assignmentId: ObjectId?,
+        kind: TurnoutKind?,
+        dueAt: Instant = start,
+        done: Boolean = false,
+    ) = taskRepository.save(
+        StableTask(
+            stableId = STABLE_ID, title = "Koppel", comment = "", dueAt = dueAt, assigneeUserIds = listOf(rider.id),
+            horseIds = listOf(blitz.id), createdByUserId = admin.id, doneByUserId = if (done) rider.id else null,
+            doneAt = if (done) start else null, updatedAt = start, updatedBy = admin.id, version = 0,
+            turnoutAssignmentId = assignmentId, turnoutKind = kind,
+        )
+    )
+
+    private fun task(id: ObjectId) = taskRepository.findById(id)!!
+
+    @Test
+    fun `editing an assignment moves its open chores and their horses, done ones stay`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val end = start.plusSeconds(3600)
+        val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, end, "")
+        val out = chore(assignment.id, TurnoutKind.OUT)
+        val bringIn = chore(assignment.id, TurnoutKind.IN, dueAt = end)
+        val doneOut = chore(assignment.id, TurnoutKind.OUT, done = true)
+        val unrelated = chore(null, null)
+
+        val newStart = start.plusSeconds(600)
+        val newEnd = end.plusSeconds(1800)
+        service.updateAssignment(planner, assignment.id, paddock.id, emptyList(), listOf(donner.id, wolke.id), newStart, newEnd, "")
+
+        assertEquals(newStart, task(out.id).dueAt)
+        assertEquals(newEnd, task(bringIn.id).dueAt)
+        assertEquals(listOf(donner.id, wolke.id), task(out.id).horseIds)
+        assertEquals(listOf(donner.id, wolke.id), task(bringIn.id).horseIds)
+        assertTrue(task(out.id).version > 0)
+        assertEquals(clock.instant(), task(out.id).updatedAt)
+        assertEquals(planner.id, task(out.id).updatedBy)
+        assertEquals(doneOut, task(doneOut.id))
+        assertEquals(unrelated, task(unrelated.id))
+    }
+
+    @Test
+    fun `removing the end of an assignment deletes its open bring-in chore`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, start.plusSeconds(3600), "")
+        val out = chore(assignment.id, TurnoutKind.OUT)
+        val bringIn = chore(assignment.id, TurnoutKind.IN)
+
+        service.updateAssignment(planner, assignment.id, paddock.id, emptyList(), listOf(blitz.id), start, null, "")
+
+        assertTrue(task(bringIn.id).deleted)
+        assertTrue(task(bringIn.id).version > 0)
+        assertEquals(false, task(out.id).deleted)
+    }
+
+    @Test
+    fun `deleting an assignment deletes its open chores and keeps done ones`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val assignment = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), start, null, "")
+        val out = chore(assignment.id, TurnoutKind.OUT)
+        val doneOut = chore(assignment.id, TurnoutKind.OUT, done = true)
+
+        service.deleteAssignment(planner, assignment.id)
+
+        assertTrue(task(out.id).deleted)
+        assertTrue(task(out.id).version > 0)
+        assertEquals(doneOut, task(doneOut.id))
+    }
+
+    @Test
+    fun `deleting a paddock deletes chores of dropped assignments and moves bring-in of ended ones to now`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val now = clock.instant()
+        val running = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(60), now.plusSeconds(600), "")
+        val future = service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
+        val runningIn = chore(running.id, TurnoutKind.IN, dueAt = now.plusSeconds(600))
+        val futureOut = chore(future.id, TurnoutKind.OUT, dueAt = now.plusSeconds(3600))
+
+        service.deletePaddock(admin, paddock.id)
+
+        assertEquals(now, task(runningIn.id).dueAt)
+        assertTrue(task(futureOut.id).deleted)
     }
 }

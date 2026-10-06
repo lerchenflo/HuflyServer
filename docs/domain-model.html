@@ -609,12 +609,14 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "updatedAt: Instant",
     "updatedBy: ObjectId",
     "deleted: Boolean",
-    "version: Long"
+    "version: Long",
+    "turnoutAssignmentId: ObjectId?",
+    "turnoutKind: TurnoutKind?"
    ],
    "id": "task",
    "kind": "class",
    "name": "StableTask",
-   "note": "Stable chore with title and instructions. dueAt is null for an undated task (open until ticked), never for a series. rotatesAssignees (series with 2+ assignees only): date i of the rule belongs to assigneeUserIds[i % n]; a date's own assignees override it without shifting the turns. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. With recurrence it is a series (TSK-5): dueAt is the first date, dates are ticked one by one via TaskOccurrence. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Stable chore with title and instructions. dueAt is null for an undated task (open until ticked), never for a series. rotatesAssignees (series with 2+ assignees only): date i of the rule belongs to assigneeUserIds[i % n]; a date's own assignees override it without shifting the turns. Creating and assigning needs TASK_EDIT. Several assignees; done as soon as any assignee ticks it. Separate from Event; the calendar shows both. With recurrence it is a series (TSK-5): dueAt is the first date, dates are ticked one by one via TaskOccurrence. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. Turnout chores: turnoutAssignmentId + turnoutKind (OUT due at the assignment's start, IN at its end) link a single task to a PaddockAssignment; open linked chores follow every assignment edit (dates, horseIds), an assignment without end drops its open IN chore, deleting the assignment drops open chores; done ones stay.",
    "pkg": "task",
    "x": 1180,
    "y": 420
@@ -1171,6 +1173,15 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "status",
    "to": "invst",
    "toCard": "1"
+  },
+  {
+   "from": "task",
+   "fromCard": "*",
+   "id": "r43",
+   "kind": "assoc",
+   "label": "turnout chore of",
+   "to": "passign",
+   "toCard": "0..1"
   },
   {
    "from": "task",

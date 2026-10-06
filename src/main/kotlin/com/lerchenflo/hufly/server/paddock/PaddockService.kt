@@ -19,6 +19,7 @@ import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.PaddockAssignmentRepository
 import com.lerchenflo.hufly.server.repository.PaddockRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.task.TurnoutTaskService
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
 import org.springframework.data.domain.Limit
@@ -42,6 +43,7 @@ class PaddockService(
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
+    private val turnoutTaskService: TurnoutTaskService,
 ) {
     // Paddocks
 
@@ -73,7 +75,8 @@ class PaddockService(
             when {
                 it.startAt > now -> saveAssignment(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
                 it.endAt == null || it.endAt > now -> saveAssignment(it.copy(endAt = now, updatedAt = now, updatedBy = requester.id))
-            }
+                else -> null
+            }?.let { turnoutTaskService.follow(it, requester.id) }
         }
     }
 
@@ -198,7 +201,7 @@ class PaddockService(
         requirePlanner(requester)
         val assignment = ownAssignment(requester, assignmentId)
         val resolved = resolveAssignment(requester, paddockId, groupIds, horseIds, startAt, endAt)
-        return saveAssignment(
+        val saved = saveAssignment(
             assignment.copy(
                 paddockId = paddockId,
                 groupIds = resolved.groupIds,
@@ -211,12 +214,15 @@ class PaddockService(
                 updatedBy = requester.id,
             )
         )
+        turnoutTaskService.follow(saved, requester.id)
+        return saved
     }
 
     fun deleteAssignment(requester: User, assignmentId: ObjectId) {
         requirePlanner(requester)
         val assignment = ownAssignment(requester, assignmentId)
         saveAssignment(assignment.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        turnoutTaskService.drop(assignment.id, requester.id)
     }
 
     fun syncAssignments(requester: User, since: Long, pageSize: Int): VersionSyncResponse<PaddockAssignmentResponse> {

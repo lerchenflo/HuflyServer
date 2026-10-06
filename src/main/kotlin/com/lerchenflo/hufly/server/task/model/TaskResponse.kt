@@ -21,6 +21,8 @@ data class TaskResponse(
     val updatedAt: Long,
     val updatedBy: String,
     val version: Long,
+    val turnoutAssignmentId: String?,
+    val turnoutKind: String?,
 )
 
 fun StableTask.toTaskResponse() = TaskResponse(
@@ -40,4 +42,6 @@ fun StableTask.toTaskResponse() = TaskResponse(
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
     version = version,
+    turnoutAssignmentId = turnoutAssignmentId?.toHexString(),
+    turnoutKind = turnoutKind?.name,
 )

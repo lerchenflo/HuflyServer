@@ -48,7 +48,8 @@ class TaskSeriesServiceTest {
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskService = TaskService(
-        taskRepository, occurrenceRepository, userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock,
+        taskRepository, occurrenceRepository, userRepository, horseRepository, tagRepository,
+        com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository(), accessService, versionCounterService, clock,
         ApplicationEventPublisher { published += it },
     )
     private val service = TaskOccurrenceService(

@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
+import com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository
@@ -12,6 +13,8 @@ import com.lerchenflo.hufly.server.repository.FakeTaskRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
+import com.lerchenflo.hufly.server.task.model.TurnoutKind
+import com.lerchenflo.hufly.server.task.model.TurnoutLink
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testHorse
@@ -45,8 +48,10 @@ class TaskServiceTest {
     private val horseRepository = FakeHorseRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
+    private val assignmentRepository = FakePaddockAssignmentRepository()
     private val taskService = TaskService(
-        taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock,
+        taskRepository, FakeTaskOccurrenceRepository(), userRepository, horseRepository, tagRepository, assignmentRepository,
+        accessService, versionCounterService, clock,
         ApplicationEventPublisher { published += it },
     )
 
@@ -318,5 +323,57 @@ class TaskServiceTest {
             ),
             announced(),
         )
+    }
+
+    // Turnout chores linked to a paddock assignment
+
+    private fun assignment(stableId: ObjectId = STABLE_ID, deleted: Boolean = false) = assignmentRepository.save(
+        com.lerchenflo.hufly.server.paddock.model.PaddockAssignment(
+            stableId = stableId, paddockId = ObjectId.get(), groupIds = emptyList(), horseIds = listOf(blitz.id),
+            startAt = due, endAt = due.plusSeconds(3600), comment = "", updatedAt = clock.instant(), updatedBy = admin.id, deleted = deleted,
+        )
+    )
+
+    private fun createTurnout(link: TurnoutLink?, recurrence: com.lerchenflo.hufly.server.core.recurrence.Recurrence? = null) =
+        taskService.createTask(planner, "Rausbringen", "", due, listOf(anna.id), listOf(blitz.id), recurrence = recurrence, turnout = link)
+
+    @Test
+    fun `a turnout chore stores its assignment link and an update without one clears it`() {
+        val koppel = assignment()
+
+        val task = createTurnout(TurnoutLink(koppel.id, TurnoutKind.OUT))
+        assertEquals(koppel.id, stored(task.id).turnoutAssignmentId)
+        assertEquals(TurnoutKind.OUT, stored(task.id).turnoutKind)
+
+        taskService.updateTask(planner, task.id, "Reinholen", "", due, listOf(anna.id), emptyList(), turnout = TurnoutLink(koppel.id, TurnoutKind.IN))
+        assertEquals(TurnoutKind.IN, stored(task.id).turnoutKind)
+
+        taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList())
+        assertNull(stored(task.id).turnoutAssignmentId)
+        assertNull(stored(task.id).turnoutKind)
+    }
+
+    @Test
+    fun `a turnout link needs a live assignment of the own stable`() {
+        val foreign = assignment(stableId = OTHER_STABLE_ID)
+        val deleted = assignment(deleted = true)
+        val task = create()
+
+        listOf(foreign.id, deleted.id, ObjectId.get()).forEach { id ->
+            assertStatus(HttpStatus.BAD_REQUEST) { createTurnout(TurnoutLink(id, TurnoutKind.OUT)) }
+            assertStatus(HttpStatus.BAD_REQUEST) {
+                taskService.updateTask(planner, task.id, "Misten", "", due, listOf(anna.id), emptyList(), turnout = TurnoutLink(id, TurnoutKind.OUT))
+            }
+        }
+    }
+
+    @Test
+    fun `a turnout chore is never a series`() {
+        val koppel = assignment()
+        val daily = com.lerchenflo.hufly.server.core.recurrence.Recurrence(
+            com.lerchenflo.hufly.server.core.recurrence.RecurrenceFrequency.DAILY, 1, emptyList(), null, 5, "UTC",
+        )
+
+        assertStatus(HttpStatus.BAD_REQUEST) { createTurnout(TurnoutLink(koppel.id, TurnoutKind.OUT), recurrence = daily) }
     }
 }

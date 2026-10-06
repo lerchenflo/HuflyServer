@@ -11,6 +11,8 @@ import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.requireValidVersionSyncRequest
 import com.lerchenflo.hufly.server.task.model.TaskOccurrenceResponse
 import com.lerchenflo.hufly.server.task.model.TaskResponse
+import com.lerchenflo.hufly.server.task.model.TurnoutKind
+import com.lerchenflo.hufly.server.task.model.TurnoutLink
 import com.lerchenflo.hufly.server.task.model.toTaskOccurrenceResponse
 import com.lerchenflo.hufly.server.task.model.toTaskResponse
 import jakarta.validation.Valid
@@ -18,6 +20,7 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 @RestController
@@ -52,7 +56,21 @@ class TaskController(
         val categoryTagId: String? = null,
         /** Only kept for a series with at least two assignees. */
         val rotatesAssignees: Boolean = false,
-    )
+        /** Set together with [turnoutKind] for a chore of a paddock assignment; a PUT without them clears the link. */
+        val turnoutAssignmentId: String? = null,
+        /** OUT or IN. */
+        val turnoutKind: String? = null,
+    ) {
+        fun turnoutLink(): TurnoutLink? {
+            if ((turnoutAssignmentId == null) != (turnoutKind == null)) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "turnoutAssignmentId and turnoutKind go together")
+            }
+            if (turnoutAssignmentId == null || turnoutKind == null) return null
+            val kind = TurnoutKind.entries.firstOrNull { it.name == turnoutKind }
+                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown turnoutKind")
+            return TurnoutLink(parseObjectId(turnoutAssignmentId), kind)
+        }
+    }
 
     data class DoneRequest(val done: Boolean)
 
@@ -76,6 +94,7 @@ class TaskController(
             request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
             request.rotatesAssignees,
+            request.turnoutLink(),
         ).toTaskResponse()
     }
 
@@ -90,6 +109,7 @@ class TaskController(
             request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
             request.categoryTagId?.let(::parseObjectId),
             request.rotatesAssignees,
+            request.turnoutLink(),
         ).toTaskResponse()
     }
 

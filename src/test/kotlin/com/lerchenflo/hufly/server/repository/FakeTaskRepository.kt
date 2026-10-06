@@ -21,6 +21,9 @@ class FakeTaskRepository : TaskRepository {
 
     override fun findByIdIn(ids: Collection<ObjectId>): List<StableTask> = tasks.filter { it.id in ids }
 
+    override fun findByTurnoutAssignmentIdAndDeletedFalse(turnoutAssignmentId: ObjectId): List<StableTask> =
+        tasks.filter { it.turnoutAssignmentId == turnoutAssignmentId && !it.deleted }
+
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<StableTask> =
         tasks.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }

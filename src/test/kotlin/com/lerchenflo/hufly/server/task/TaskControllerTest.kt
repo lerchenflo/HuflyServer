@@ -36,6 +36,7 @@ class TaskControllerTest {
     @Autowired lateinit var stableRepository: FakeStableRepository
     @Autowired lateinit var tagRepository: FakeTagRepository
     @Autowired lateinit var taskRepository: FakeTaskRepository
+    @Autowired lateinit var assignmentRepository: com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository
 
     private val admin = testUser()
     private val anna = testUser()
@@ -170,5 +171,36 @@ class TaskControllerTest {
             jsonPath("$.categoryTagId") { value(null) }
         }
         call(HttpMethod.POST, "/tasks", taskJson().dropLast(1) + ""","categoryTagId":"nope"}""").andExpect { status { isBadRequest() } }
+    }
+
+    private fun turnoutJson(link: String) =
+        """{"title":"Rausbringen","dueAt":1790000000000,"assigneeUserIds":["${anna.id.toHexString()}"]$link}"""
+
+    @Test
+    fun `turnout chores carry their assignment link, both fields or none, kind OUT or IN`() {
+        val assignment = assignmentRepository.save(
+            com.lerchenflo.hufly.server.paddock.model.PaddockAssignment(
+                stableId = admin.stableId, paddockId = ObjectId.get(), groupIds = emptyList(), horseIds = emptyList(),
+                startAt = java.time.Instant.ofEpochMilli(1790000000000), endAt = null, comment = "",
+                updatedAt = java.time.Instant.now(), updatedBy = admin.id,
+            )
+        )
+        val id = assignment.id.toHexString()
+
+        call(HttpMethod.POST, "/tasks", turnoutJson(""","turnoutAssignmentId":"$id","turnoutKind":"OUT"""")).andExpect {
+            status { isOk() }
+            jsonPath("$.turnoutAssignmentId") { value(id) }
+            jsonPath("$.turnoutKind") { value("OUT") }
+        }
+        call(HttpMethod.POST, "/tasks", turnoutJson("")).andExpect {
+            status { isOk() }
+            jsonPath("$.turnoutAssignmentId") { value(null) }
+            jsonPath("$.turnoutKind") { value(null) }
+        }
+        call(HttpMethod.POST, "/tasks", turnoutJson(""","turnoutAssignmentId":"$id"""")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/tasks", turnoutJson(""","turnoutKind":"IN"""")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/tasks", turnoutJson(""","turnoutAssignmentId":"$id","turnoutKind":"SIDEWAYS"""")).andExpect {
+            status { isBadRequest() }
+        }
     }
 }
