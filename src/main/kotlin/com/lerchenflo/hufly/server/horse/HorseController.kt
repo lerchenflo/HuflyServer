@@ -88,14 +88,14 @@ class HorseController(
     fun createHorse(@Valid @RequestBody request: HorseRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
         return horseService.createHorse(requester, request.toData(), request.medications.toMedications(), request.clientId)
-            .toHorseResponse(horseService.canSeeMedications(requester))
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     @PutMapping("/{horseId}")
     fun updateHorse(@PathVariable horseId: String, @Valid @RequestBody request: HorseRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
         return horseService.updateHorse(requester, parseObjectId(horseId), request.toData())
-            .toHorseResponse(horseService.canSeeMedications(requester))
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     @PutMapping("/{horseId}/medications")
@@ -105,26 +105,26 @@ class HorseController(
             .toHorseResponse(showMedications = true)
     }
 
-    /** Needs FOODPLAN_EDIT, not HORSE_EDIT (FOD-3). Null removes the plan. */
+    /** Needs FOODPLAN_EDIT (or HORSE_EDIT_OWN on an own horse), not HORSE_EDIT (FOD-3). Null removes the plan. */
     @PutMapping("/{horseId}/foodplan")
     fun assignFoodPlan(@PathVariable horseId: String, @RequestBody request: AssignFoodPlanRequest): HorseResponse {
         val requester = accessService.requester(requireAuth())
         return foodPlanService.assignPlan(requester, parseObjectId(horseId), request.foodPlanId?.let(::parseObjectId))
-            .toHorseResponse(horseService.canSeeMedications(requester))
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     @PutMapping("/{horseId}/picture")
     fun setPicture(@PathVariable horseId: String, @RequestParam("picture") picture: MultipartFile): HorseResponse {
         val requester = accessService.requester(requireAuth())
         return horseService.setPicture(requester, parseObjectId(horseId), picture.bytes)
-            .toHorseResponse(horseService.canSeeMedications(requester))
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     @DeleteMapping("/{horseId}/picture")
     fun deletePicture(@PathVariable horseId: String): HorseResponse {
         val requester = accessService.requester(requireAuth())
         return horseService.deletePicture(requester, parseObjectId(horseId))
-            .toHorseResponse(horseService.canSeeMedications(requester))
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     @GetMapping("/{horseId}/picture")
@@ -139,7 +139,7 @@ class HorseController(
         horseService.deleteHorse(requester, parseObjectId(horseId))
     }
 
-    /** Every member may view horses (HOR-1); medications only with HORSE_MEDICATION_VIEW. */
+    /** Every member may view horses (HOR-1); medications only with HORSE_MEDICATION_VIEW, or HORSE_EDIT_OWN for own horses. */
     @PostMapping("/sync")
     fun sync(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
@@ -148,10 +148,10 @@ class HorseController(
     ): SyncResponse<HorseResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
-        val showMedications = horseService.canSeeMedications(requester)
+        val showMedications = horseService.medicationVisibility(requester)
         return deltaSync(
             horseRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseResponse(showMedications) },
+            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseResponse(showMedications(it)) },
         )
     }
 }

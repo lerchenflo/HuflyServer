@@ -31,6 +31,7 @@ import java.time.Instant
 
 /**
  * Paddocks themselves are managed by the admin only; every other write needs PADDOCK_PLAN; every member reads.
+ * HORSE_EDIT_OWN holders plan assignments without groups (groups mix owners) whose horses, before and after, are all their own.
  * Conflicts never block an assignment.
  */
 @Service
@@ -167,7 +168,7 @@ class PaddockService(
         comment: String,
         clientId: String? = null,
     ): PaddockAssignment {
-        requirePlanner(requester)
+        requireAssignmentPlanner(requester, groupIds, horseIds)
         return idempotentCreate(clientId, { assignmentRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             val resolved = resolveAssignment(requester, paddockId, groupIds, horseIds, startAt, endAt)
             saveAssignment(
@@ -198,8 +199,8 @@ class PaddockService(
         endAt: Instant?,
         comment: String,
     ): PaddockAssignment {
-        requirePlanner(requester)
         val assignment = ownAssignment(requester, assignmentId)
+        requireAssignmentPlanner(requester, assignment.groupIds + groupIds, assignment.horseIds + horseIds)
         val resolved = resolveAssignment(requester, paddockId, groupIds, horseIds, startAt, endAt)
         val saved = saveAssignment(
             assignment.copy(
@@ -219,8 +220,8 @@ class PaddockService(
     }
 
     fun deleteAssignment(requester: User, assignmentId: ObjectId) {
-        requirePlanner(requester)
         val assignment = ownAssignment(requester, assignmentId)
+        requireAssignmentPlanner(requester, assignment.groupIds, assignment.horseIds)
         saveAssignment(assignment.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
         turnoutTaskService.drop(assignment.id, requester.id)
     }
@@ -268,6 +269,13 @@ class PaddockService(
         }
 
     private fun requirePlanner(requester: User) = accessService.requirePermission(requester, Permission.PADDOCK_PLAN)
+
+    private fun requireAssignmentPlanner(requester: User, groupIds: List<ObjectId>, horseIds: List<ObjectId>) {
+        val ownerIds = if (groupIds.isNotEmpty()) listOf(null) else horseIds.map { id ->
+            horseRepository.findById(id)?.takeIf { it.stableId == requester.stableId }?.ownerUserId
+        }
+        accessService.requireHorsePermission(requester, Permission.PADDOCK_PLAN, ownerIds)
+    }
 
     private fun requireOwnHorses(requester: User, horseIds: List<ObjectId>) {
         val valid = horseIds.all { id -> horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }

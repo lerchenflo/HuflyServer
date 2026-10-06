@@ -41,5 +41,19 @@ class AccessService(
         if (permission !in effectivePermissions(user)) throw forbidden()
     }
 
+    /**
+     * [permission] covers every horse; HORSE_EDIT_OWN covers only horses the requester owns, so it needs at least one
+     * owner id in [horseOwnerIds] and every one of them the requester's.
+     */
+    fun hasHorsePermission(user: User, permission: Permission, horseOwnerIds: Collection<ObjectId?>): Boolean {
+        val permissions = effectivePermissions(user)
+        return permission in permissions ||
+            Permission.HORSE_EDIT_OWN in permissions && horseOwnerIds.isNotEmpty() && horseOwnerIds.all { it == user.id }
+    }
+
+    fun requireHorsePermission(user: User, permission: Permission, horseOwnerIds: Collection<ObjectId?>) {
+        if (!hasHorsePermission(user, permission, horseOwnerIds)) throw forbidden()
+    }
+
     private fun forbidden() = ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed")
 }

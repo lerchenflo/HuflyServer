@@ -337,12 +337,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "EVENT_EDIT",
     "TASK_VIEW",
     "TASK_EDIT",
-    "NOTE_WRITE"
+    "NOTE_WRITE",
+    "HORSE_EDIT_OWN"
    ],
    "id": "perm",
    "kind": "enum",
    "name": "Permission",
-   "note": "Grantable through USER_ROLE tags. An EDIT permission includes its VIEW permission. Without a VIEW permission, members still see their own invited events and their own assigned tasks; medications come as null. Medical notes and vet contact are visible to everyone. Adding and removing horses is admin-only and never grantable.",
+   "note": "Grantable through USER_ROLE tags. An EDIT permission includes its VIEW permission. Without a VIEW permission, members still see their own invited events and their own assigned tasks; medications come as null. Medical notes and vet contact are visible to everyone. Adding and removing horses is admin-only and never grantable. HORSE_EDIT_OWN grants HORSE_EDIT, HORSE_MEDICATION_VIEW/EDIT, HORSE_LOG_WRITE, FOODPLAN_EDIT and PADDOCK_PLAN only for horses whose ownerUserId is the requester (not for co-riders): it never changes the owner, food plans only when every horse on them is own (an unused plan: its creator), it creates plans when owning a horse, never deletes them; paddock assignments only without groups and with only own horses before and after.",
    "pkg": "tag",
    "x": 322,
    "y": 746
@@ -355,7 +356,8 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "entries: List\u003cFoodPlanEntry>",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "createdByUserId: ObjectId?"
    ],
    "id": "foodplan",
    "kind": "class",

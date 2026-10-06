@@ -23,8 +23,9 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * Adding and removing horses is admin-only (TAG-6); editing needs HORSE_EDIT, medications HORSE_MEDICATION_EDIT.
- * An edit only changes the food plan with FOODPLAN_EDIT; otherwise the sent id is ignored, so offline edits never fail on it.
+ * Adding and removing horses is admin-only (TAG-6); editing needs HORSE_EDIT, medications HORSE_MEDICATION_EDIT,
+ * or HORSE_EDIT_OWN for horses the requester owns.
+ * An edit only changes the food plan with FOODPLAN_EDIT (or on an own horse); otherwise the sent id is ignored, so offline edits never fail on it.
  */
 @Service
 class HorseService(
@@ -82,10 +83,12 @@ class HorseService(
     }
 
     fun updateHorse(requester: User, horseId: ObjectId, data: HorseData): Horse {
-        accessService.requirePermission(requester, Permission.HORSE_EDIT)
-        val horse = stableHorse(requester, horseId)
+        val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
+        if (data.ownerUserId != horse.ownerUserId && Permission.HORSE_EDIT !in accessService.effectivePermissions(requester)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only HORSE_EDIT may change the owner")
+        }
         validate(requester, data)
-        val foodPlanId = if (Permission.FOODPLAN_EDIT in accessService.effectivePermissions(requester)) {
+        val foodPlanId = if (accessService.hasHorsePermission(requester, Permission.FOODPLAN_EDIT, listOf(horse.ownerUserId))) {
             requireStablePlan(requester, data.foodPlanId)
         } else {
             horse.foodPlanId
@@ -110,16 +113,14 @@ class HorseService(
 
     /** Medications are edited separately so horse edits by members who cannot see them never overwrite them. */
     fun updateMedications(requester: User, horseId: ObjectId, medications: List<Medication>): Horse {
-        accessService.requirePermission(requester, Permission.HORSE_MEDICATION_EDIT)
-        val horse = stableHorse(requester, horseId)
+        val horse = editableHorse(requester, horseId, Permission.HORSE_MEDICATION_EDIT)
         validateMedications(medications)
         return horseRepository.save(horse.copy(medications = medications, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
     /** HOR-3: whoever may edit the horse sets its picture. */
     fun setPicture(requester: User, horseId: ObjectId, upload: ByteArray): Horse {
-        accessService.requirePermission(requester, Permission.HORSE_EDIT)
-        val horse = stableHorse(requester, horseId)
+        val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
         pictureStore.save(PictureKind.HORSE, horse.id, toStoredPicture(upload))
         val now = clock.instant()
         return horseRepository.save(
@@ -128,8 +129,7 @@ class HorseService(
     }
 
     fun deletePicture(requester: User, horseId: ObjectId): Horse {
-        accessService.requirePermission(requester, Permission.HORSE_EDIT)
-        val horse = stableHorse(requester, horseId)
+        val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
         pictureStore.delete(PictureKind.HORSE, horse.id)
         return horseRepository.save(horse.copy(pictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
     }
@@ -140,8 +140,12 @@ class HorseService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No picture")
     }
 
-    fun canSeeMedications(requester: User): Boolean =
-        Permission.HORSE_MEDICATION_VIEW in accessService.effectivePermissions(requester)
+    fun medicationVisibility(requester: User): (Horse) -> Boolean {
+        val permissions = accessService.effectivePermissions(requester)
+        if (Permission.HORSE_MEDICATION_VIEW in permissions) return { true }
+        if (Permission.HORSE_EDIT_OWN !in permissions) return { false }
+        return { it.ownerUserId == requester.id }
+    }
 
     fun deleteHorse(requester: User, horseId: ObjectId) {
         accessService.requireAdmin(requester)
@@ -177,6 +181,9 @@ class HorseService(
     private fun validateMedications(medications: List<Medication>) {
         if (medications.any { it.until != null && it.until < it.from }) throw badRequest("Medication ends before it starts")
     }
+
+    private fun editableHorse(requester: User, horseId: ObjectId, permission: Permission): Horse =
+        stableHorse(requester, horseId).also { accessService.requireHorsePermission(requester, permission, listOf(it.ownerUserId)) }
 
     private fun stableHorse(requester: User, horseId: ObjectId): Horse =
         horseRepository.findById(horseId)?.takeIf { it.stableId == requester.stableId && !it.deleted }

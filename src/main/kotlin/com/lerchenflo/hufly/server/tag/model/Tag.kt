@@ -25,6 +25,9 @@ enum class Permission(val impliedView: Permission? = null) {
     TASK_VIEW,
     TASK_EDIT(impliedView = TASK_VIEW),
     NOTE_WRITE,
+
+    /** HORSE_EDIT, medications, horse log, food plan and turnout rights, but only for horses the requester owns. */
+    HORSE_EDIT_OWN,
 }
 
 @Document("tags")

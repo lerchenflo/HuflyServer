@@ -28,4 +28,6 @@ data class FoodPlan(
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
+    /** Null for plans created before it was stored. An owner (HORSE_EDIT_OWN) may edit their own plan while no horse uses it. */
+    val createdByUserId: ObjectId? = null,
 )

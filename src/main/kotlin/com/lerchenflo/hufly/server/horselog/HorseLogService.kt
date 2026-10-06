@@ -25,7 +25,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 
-/** Writing needs HORSE_LOG_WRITE; every member reads the whole log. */
+/** Writing needs HORSE_LOG_WRITE, or HORSE_EDIT_OWN for entries of own horses; every member reads the whole log. */
 @Service
 class HorseLogService(
     private val logRepository: HorseLogRepository,
@@ -47,7 +47,7 @@ class HorseLogService(
     )
 
     fun createEntry(requester: User, data: LogData, clientId: String? = null): HorseLogEntry {
-        accessService.requirePermission(requester, Permission.HORSE_LOG_WRITE)
+        requireWriter(requester, listOf(data.horseId))
         return idempotentCreate(clientId, { logRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             validate(requester, data)
             val now = clock.instant()
@@ -71,8 +71,8 @@ class HorseLogService(
     }
 
     fun updateEntry(requester: User, entryId: ObjectId, data: LogData): HorseLogEntry {
-        accessService.requirePermission(requester, Permission.HORSE_LOG_WRITE)
         val entry = stableEntry(requester, entryId)
+        requireWriter(requester, listOf(entry.horseId, data.horseId))
         validate(requester, data)
         return save(
             entry.copy(
@@ -90,8 +90,8 @@ class HorseLogService(
     }
 
     fun deleteEntry(requester: User, entryId: ObjectId) {
-        accessService.requirePermission(requester, Permission.HORSE_LOG_WRITE)
         val entry = stableEntry(requester, entryId)
+        requireWriter(requester, listOf(entry.horseId))
         save(entry.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
     }
 
@@ -119,6 +119,11 @@ class HorseLogService(
             userRepository.findById(data.doneByUserId)?.let { it.stableId == requester.stableId && !it.deleted } == true
         if (!horseOk || !tagOk || !doerOk) throw badRequest("Unknown horse, activity or user")
         if (data.endAt != null && data.endAt < data.startAt) throw badRequest("End before start")
+    }
+
+    private fun requireWriter(requester: User, horseIds: List<ObjectId>) {
+        val ownerIds = horseIds.map { id -> horseRepository.findById(id)?.takeIf { it.stableId == requester.stableId }?.ownerUserId }
+        accessService.requireHorsePermission(requester, Permission.HORSE_LOG_WRITE, ownerIds)
     }
 
     private fun stableEntry(requester: User, entryId: ObjectId): HorseLogEntry =

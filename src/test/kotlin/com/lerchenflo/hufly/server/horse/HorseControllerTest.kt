@@ -233,6 +233,24 @@ class HorseControllerTest {
     }
 
     @Test
+    fun `sync shows medications of own horses with HORSE_EDIT_OWN`() {
+        val ownTag = tagRepository.save(testTag(permissions = setOf(Permission.HORSE_EDIT_OWN)))
+        val owner = userRepository.save(testUser(roleTagIds = listOf(ownTag.id)))
+        val own = horseRepository.save(testHorse(name = "Mein").copy(ownerUserId = owner.id, medications = listOf(aspirin)))
+        horseRepository.save(testHorse(name = "Fremd").copy(medications = listOf(aspirin)))
+
+        call(HttpMethod.POST, "/horses/sync", "[]", userId = owner.id).andExpect {
+            jsonPath("$.updatedEntries[?(@.name == 'Mein')].medications[0].name") { value("Aspirin") }
+            jsonPath("$.updatedEntries[?(@.name == 'Fremd')].medications") { value(null) }
+        }
+        call(HttpMethod.PUT, "/horses/${own.id.toHexString()}", horseJson.replace("\"ownerUserId\":null", "\"ownerUserId\":\"${owner.id.toHexString()}\""), userId = owner.id)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.medications[0].name") { value("Aspirin") }
+            }
+    }
+
+    @Test
     fun `medication update answers with the horse`() {
         val horse = horseRepository.save(testHorse())
 
