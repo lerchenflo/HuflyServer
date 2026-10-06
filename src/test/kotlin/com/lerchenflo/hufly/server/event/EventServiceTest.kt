@@ -282,13 +282,56 @@ class EventServiceTest {
     }
 
     @Test
-    fun `the creator is never invited to the own event`() {
-        val event = lesson(invitees = listOf(teacher.id, anna.id))
-        assertEquals(setOf(anna.id), invitationRepository.findByEventIdAndDeletedFalse(event.id).map { it.userId }.toSet())
+    fun `the organiser takes part as an accepted invitee without a push to themselves`() {
+        val event = lesson(invitees = listOf(anna.id))
+        published.clear()
 
         val live = service.invite(teacher, event.id, listOf(teacher.id, ben.id))
 
-        assertEquals(setOf(anna.id, ben.id), live.map { it.userId }.toSet())
+        assertEquals(setOf(anna.id, ben.id, teacher.id), live.map { it.userId }.toSet())
+        val own = invitationOf(event, teacher)
+        assertEquals(InvitationStatus.ACCEPTED, own.status)
+        assertEquals(clock.instant(), own.respondedAt)
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, ben).status)
+        assertEquals(
+            listOf(com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, event.id, listOf(ben.id), null)),
+            announced(),
+        )
+    }
+
+    @Test
+    fun `the organiser alone taking part announces nothing and a second switch changes nothing`() {
+        val event = lesson(invitees = listOf(anna.id))
+        published.clear()
+
+        service.invite(teacher, event.id, listOf(teacher.id))
+        service.invite(teacher, event.id, listOf(teacher.id))
+
+        assertEquals(1, invitationRepository.findByEventIdAndDeletedFalse(event.id).count { it.userId == teacher.id })
+        assertEquals(emptyList(), announced())
+    }
+
+    @Test
+    fun `the admin may add the organiser too, still accepted and without a push`() {
+        val event = lesson(invitees = listOf(anna.id))
+        published.clear()
+
+        service.invite(admin, event.id, listOf(teacher.id))
+
+        assertEquals(InvitationStatus.ACCEPTED, invitationOf(event, teacher).status)
+        assertEquals(emptyList(), announced())
+    }
+
+    @Test
+    fun `the organiser or the admin turn the switch off again`() {
+        val event = lesson(invitees = listOf(anna.id))
+        service.invite(teacher, event.id, listOf(teacher.id))
+        service.removeInvitation(teacher, invitationOf(event, teacher).id)
+        assertTrue(invitationRepository.findByEventIdAndDeletedFalse(event.id).none { it.userId == teacher.id })
+
+        service.invite(teacher, event.id, listOf(teacher.id))
+        service.removeInvitation(admin, invitationOf(event, teacher).id)
+        assertTrue(invitationRepository.findByEventIdAndDeletedFalse(event.id).none { it.userId == teacher.id })
     }
 
     @Test

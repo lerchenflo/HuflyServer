@@ -139,8 +139,9 @@ class EventService(
     }
 
     /**
-     * Already invited users and the creator are skipped. With [occurrenceStartAt] the users are invited to that one
-     * date of the series; users invited to the whole series are skipped then. Answers the live invitations afterwards.
+     * Already invited users are skipped. With [occurrenceStartAt] the users are invited to that one date of the series;
+     * users invited to the whole series and the creator are skipped then. The creator takes part in the whole event
+     * ("Ich nehme auch teil") as accepted, without a push. Answers the live invitations afterwards.
      */
     fun invite(requester: User, eventId: ObjectId, userIds: List<ObjectId>, occurrenceStartAt: Instant? = null): List<EventInvitation> {
         val event = managedEvent(requester, eventId)
@@ -148,12 +149,13 @@ class EventService(
         requireOwnUsers(requester, userIds)
         val live = invitationRepository.findByEventIdAndDeletedFalse(event.id)
         val skipped = live.filter { it.occurrenceStartAt == null || it.occurrenceStartAt == occurrenceStartAt }.map { it.userId }.toSet()
-        val newUserIds = userIds.distinct().filter { it !in skipped && it != event.creatorUserId }
+        val newUserIds = userIds.distinct().filter { it !in skipped && (it != event.creatorUserId || occurrenceStartAt == null) }
         if (newUserIds.isNotEmpty()) {
             requireInvitationCap(live.size + newUserIds.size)
             newUserIds.forEach { saveInvitation(newInvitation(requester, event, it, occurrenceStartAt)) }
             restamp(event)
-            announce(EventInvited(event.stableId, requester.id, event.id, newUserIds, occurrenceStartAt))
+            val invitees = newUserIds - event.creatorUserId
+            if (invitees.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, invitees, occurrenceStartAt))
         }
         return invitationRepository.findByEventIdAndDeletedFalse(event.id)
     }
@@ -238,13 +240,14 @@ class EventService(
 
     private fun newInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Instant? = null): EventInvitation {
         val now = clock.instant()
+        val organiser = userId == event.creatorUserId
         return EventInvitation(
             stableId = event.stableId,
             eventId = event.id,
             userId = userId,
-            status = InvitationStatus.PENDING,
+            status = if (organiser) InvitationStatus.ACCEPTED else InvitationStatus.PENDING,
             invitedAt = now,
-            respondedAt = null,
+            respondedAt = if (organiser) now else null,
             occurrenceStartAt = occurrenceStartAt,
             updatedAt = now,
             updatedBy = requester.id,

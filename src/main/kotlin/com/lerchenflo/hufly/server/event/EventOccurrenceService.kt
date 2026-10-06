@@ -111,7 +111,7 @@ class EventOccurrenceService(
                 )
             )
         }
-        if (before != status) eventService.announce(InvitationAnswered(invitation.stableId, requester.id, event.id, accepted, occurrenceStartAt))
+        if (before != status && invitation.userId != event.creatorUserId) eventService.announce(InvitationAnswered(invitation.stableId, requester.id, event.id, accepted, occurrenceStartAt))
         return saved
     }
 

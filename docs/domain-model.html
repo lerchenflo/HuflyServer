@@ -572,7 +572,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "inv",
    "kind": "class",
    "name": "EventInvitation",
-   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. occurrenceStartAt set = invited to that one date of a series only (e.g. a stand-in); answered like any invitation.",
+   "note": "Creator invites, invitee accepts or declines, creator can invite a replacement for someone who declined. Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. occurrenceStartAt set = invited to that one date of a series only (e.g. a stand-in); answered like any invitation. The creator may hold one invitation to the whole event (\"Ich nehme auch teil\"): created ACCEPTED, no push to themselves; on a series, dates without own answer count as accepted and their per-date answers notify nobody.",
    "pkg": "event",
    "x": 395,
    "y": 820

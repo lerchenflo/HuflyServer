@@ -362,4 +362,31 @@ class EventSeriesServiceTest {
             announced().drop(1),
         )
     }
+
+    // The organiser takes part
+
+    @Test
+    fun `the organiser takes part in a whole series, not in single dates`() {
+        val event = series(invitees = listOf(anna.id))
+
+        eventService.invite(teacher, event.id, listOf(teacher.id), occurrenceStartAt = second)
+        assertTrue(invitationRepository.findByEventIdAndDeletedFalse(event.id).none { it.userId == teacher.id })
+
+        eventService.invite(teacher, event.id, listOf(teacher.id))
+        assertEquals(InvitationStatus.ACCEPTED, invitationOf(event, teacher).status)
+    }
+
+    @Test
+    fun `the organiser declines and re-accepts single dates and notifies nobody`() {
+        val event = series(invitees = listOf(anna.id))
+        eventService.invite(teacher, event.id, listOf(teacher.id))
+        val own = invitationOf(event, teacher)
+        published.clear()
+
+        assertEquals(InvitationStatus.DECLINED, service.answer(teacher, own.id, second, accepted = false).status)
+        assertEquals(InvitationStatus.ACCEPTED, service.answer(teacher, own.id, second, accepted = true).status)
+        assertStatus(HttpStatus.BAD_REQUEST) { eventService.respond(teacher, own.id, false) }
+
+        assertEquals(emptyList(), announced())
+    }
 }
