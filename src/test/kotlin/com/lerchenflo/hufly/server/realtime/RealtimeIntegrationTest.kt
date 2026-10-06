@@ -77,6 +77,7 @@ class RealtimeIntegrationTest {
     @Autowired lateinit var answerRepository: EventOccurrenceAnswerRepository
     @Autowired lateinit var taskOccurrenceRepository: TaskOccurrenceRepository
     @Autowired lateinit var noteRepository: com.lerchenflo.hufly.server.repository.NoteRepository
+    @Autowired lateinit var absenceRepository: com.lerchenflo.hufly.server.repository.AbsenceRepository
     @Autowired lateinit var noteService: com.lerchenflo.hufly.server.note.NoteService
 
     private class Inbox : StompFrameHandler {
@@ -157,6 +158,22 @@ class RealtimeIntegrationTest {
         noteService.markRead(reader, note.id)
 
         assertEquals(hint("note"), inbox.next())
+    }
+
+    @Test
+    fun `absences send hints under the collection name absence`() {
+        val stableId = ObjectId.get()
+        val member = userRepository.save(testUser(stableId = stableId))
+        val inbox = subscribe(connect(member.id))
+
+        absenceRepository.save(
+            com.lerchenflo.hufly.server.absence.model.Absence(
+                stableId = stableId, userId = member.id, from = java.time.LocalDate.of(2026, 10, 12), until = java.time.LocalDate.of(2026, 10, 12),
+                note = "", createdByUserId = member.id, updatedAt = Instant.EPOCH, updatedBy = member.id,
+            )
+        )
+
+        assertEquals(hint("absence"), inbox.next())
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.absence.AbsenceService
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.picture.PictureKind
@@ -26,6 +27,7 @@ class UserService(
     private val tagRepository: TagRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val horseRepository: HorseRepository,
+    private val absenceService: AbsenceService,
     private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val hashEncoder: HashEncoder,
@@ -97,6 +99,7 @@ class UserService(
         horseRepository.findByStableIdAndDeletedFalse(requester.stableId).filter { target.id in it.coRiderUserIds }.forEach {
             horseRepository.save(it.copy(coRiderUserIds = it.coRiderUserIds - target.id, updatedAt = now, updatedBy = requester.id))
         }
+        absenceService.removeUser(target.id, requester.id)
         pictureStore.delete(PictureKind.USER, target.id)
     }
 

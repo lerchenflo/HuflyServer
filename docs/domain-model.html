@@ -756,6 +756,28 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   {
    "fields": [
     "id: ObjectId",
+    "stableId: ObjectId",
+    "userId: ObjectId",
+    "from: LocalDate",
+    "until: LocalDate",
+    "note: String",
+    "createdByUserId: ObjectId",
+    "updatedAt: Instant",
+    "updatedBy: ObjectId",
+    "deleted: Boolean",
+    "version: Long"
+   ],
+   "id": "absence",
+   "kind": "class",
+   "name": "Absence",
+   "note": "Abwesenheit: a member is away from `from` to `until` (both days included). Own absences for everyone, others' with TASK_EDIT or as admin. Every member sees all; only a hint in the app (task editor, Heute), no pushes. Deleting a user deletes their absences. Version sync like notes.",
+   "pkg": "absence",
+   "x": 1780,
+   "y": 700
+  },
+  {
+   "fields": [
+    "id: ObjectId",
     "userId: ObjectId",
     "title: String",
     "body: String",
@@ -781,6 +803,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   "event",
   "task",
   "note",
+  "absence",
   "notification",
   "authentication"
  ],
@@ -1185,6 +1208,15 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "turnout chore of",
    "to": "passign",
    "toCard": "0..1"
+  },
+  {
+   "from": "absence",
+   "fromCard": "*",
+   "id": "r44",
+   "kind": "assoc",
+   "label": "away",
+   "to": "user",
+   "toCard": "1"
   },
   {
    "from": "task",

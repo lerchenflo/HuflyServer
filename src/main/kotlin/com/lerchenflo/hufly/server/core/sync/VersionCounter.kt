@@ -20,6 +20,7 @@ enum class SyncCollection(val key: String) {
     EVENT_OCCURRENCE_ANSWERS("eventOccurrenceAnswers"),
     TASK_OCCURRENCES("taskOccurrences"),
     NOTES("notes"),
+    ABSENCES("absences"),
 }
 
 @Document("counters")

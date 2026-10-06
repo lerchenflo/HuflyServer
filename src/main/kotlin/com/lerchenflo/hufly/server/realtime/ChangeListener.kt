@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.realtime
 
+import com.lerchenflo.hufly.server.absence.model.Absence
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
@@ -52,6 +53,7 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is EventOccurrenceAnswer -> Triple(HintTarget.Stable(saved.stableId), "eventoccurrenceanswers", saved.id)
             is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
             is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
+            is Absence -> Triple(HintTarget.Stable(saved.stableId), "absence", saved.id)
             else -> return
         }
         queueOrSend(notifier, target, collection, id)

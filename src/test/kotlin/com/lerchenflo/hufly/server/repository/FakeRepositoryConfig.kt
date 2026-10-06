@@ -65,6 +65,9 @@ class FakeRepositoryConfig {
     fun fakeNoteRepository() = FakeNoteRepository()
 
     @Bean @Primary
+    fun fakeAbsenceRepository() = FakeAbsenceRepository()
+
+    @Bean @Primary
     fun fakeDigestItemRepository() = FakeDigestItemRepository()
 
     @Bean @Primary

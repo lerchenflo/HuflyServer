@@ -38,8 +38,13 @@ class UserServiceTest {
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val pictureStore = com.lerchenflo.hufly.server.core.picture.FakePictureStore()
     private val horseRepository = com.lerchenflo.hufly.server.repository.FakeHorseRepository()
+    private val absenceRepository = com.lerchenflo.hufly.server.repository.FakeAbsenceRepository()
+    private val absenceService = com.lerchenflo.hufly.server.absence.AbsenceService(
+        absenceRepository, userRepository, accessService,
+        com.lerchenflo.hufly.server.core.sync.VersionCounterService(com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()), clock,
+    )
     private val userService = UserService(
-        userRepository, tagRepository, refreshTokenRepository, horseRepository, pictureStore, accessService, hashEncoder, clock,
+        userRepository, tagRepository, refreshTokenRepository, horseRepository, absenceService, pictureStore, accessService, hashEncoder, clock,
     )
 
     private val admin = testUser(email = "admin@hufly.test")
@@ -326,5 +331,16 @@ class UserServiceTest {
         assertEquals(clock.instant(), stored.updatedAt)
         assertEquals(admin.id, stored.updatedBy)
         assertEquals(untouched, horseRepository.findById(untouched.id))
+    }
+
+    @Test
+    fun `a deleted member's absences are deleted`() {
+        val absence = absenceService.createAbsence(
+            rider, com.lerchenflo.hufly.server.absence.AbsenceService.AbsenceData(rider.id, java.time.LocalDate.of(2026, 10, 12), java.time.LocalDate.of(2026, 10, 13), ""),
+        )
+
+        userService.deleteUser(admin, rider.id)
+
+        assertTrue(absenceRepository.findById(absence.id)!!.deleted)
     }
 }
