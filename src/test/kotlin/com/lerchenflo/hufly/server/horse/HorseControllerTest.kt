@@ -242,4 +242,17 @@ class HorseControllerTest {
             jsonPath("$.medications[0].name") { value("Aspirin") }
         }
     }
+
+    @Test
+    fun `horses carry their co-riders`() {
+        val body = horseJson.replace("\"ownerUserId\":null", "\"ownerUserId\":null,\"coRiderUserIds\":[\"${rider.id.toHexString()}\"]")
+        call(HttpMethod.POST, "/horses", body).andExpect {
+            status { isOk() }
+            jsonPath("$.coRiderUserIds[0]") { value(rider.id.toHexString()) }
+        }
+        call(HttpMethod.POST, "/horses", horseJson).andExpect {
+            status { isOk() }
+            jsonPath("$.coRiderUserIds.length()") { value(0) }
+        }
+    }
 }

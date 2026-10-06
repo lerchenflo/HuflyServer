@@ -8,6 +8,7 @@ import com.lerchenflo.hufly.server.core.picture.pictureUrl
 import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.generatePassword
+import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
 import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
@@ -24,6 +25,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val tagRepository: TagRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
+    private val horseRepository: HorseRepository,
     private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val hashEncoder: HashEncoder,
@@ -89,8 +91,12 @@ class UserService(
         accessService.requireAdmin(requester)
         if (userId == requester.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The admin cannot be deleted")
         val target = stableMember(requester, userId)
-        userRepository.save(target.copy(deleted = true, profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+        val now = clock.instant()
+        userRepository.save(target.copy(deleted = true, profilePictureUrl = null, updatedAt = now, updatedBy = requester.id))
         refreshTokenRepository.deleteByUserId(target.id)
+        horseRepository.findByStableIdAndDeletedFalse(requester.stableId).filter { target.id in it.coRiderUserIds }.forEach {
+            horseRepository.save(it.copy(coRiderUserIds = it.coRiderUserIds - target.id, updatedAt = now, updatedBy = requester.id))
+        }
         pictureStore.delete(PictureKind.USER, target.id)
     }
 

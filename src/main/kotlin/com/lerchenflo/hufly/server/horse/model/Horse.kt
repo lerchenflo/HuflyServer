@@ -37,4 +37,6 @@ data class Horse(
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
+    /** Reitbeteiligungen; no extra rights. */
+    val coRiderUserIds: List<ObjectId> = emptyList(),
 )

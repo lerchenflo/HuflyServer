@@ -20,6 +20,7 @@ data class HorseResponse(
     val foodPlanId: String?,
     val updatedAt: Long,
     val updatedBy: String,
+    val coRiderUserIds: List<String>,
 )
 
 fun Horse.toHorseResponse(showMedications: Boolean) = HorseResponse(
@@ -38,4 +39,5 @@ fun Horse.toHorseResponse(showMedications: Boolean) = HorseResponse(
     foodPlanId = foodPlanId?.toHexString(),
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
+    coRiderUserIds = coRiderUserIds.map { it.toHexString() },
 )

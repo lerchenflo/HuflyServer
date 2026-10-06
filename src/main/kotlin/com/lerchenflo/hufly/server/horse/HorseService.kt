@@ -47,7 +47,11 @@ class HorseService(
         val medicalNotes: String,
         val vetContact: String,
         val foodPlanId: ObjectId? = null,
-    )
+        val coRiderUserIds: List<ObjectId> = emptyList(),
+    ) {
+        /** Duplicates and the owner are dropped. */
+        val coRiders get() = coRiderUserIds.distinct() - setOfNotNull(ownerUserId)
+    }
 
     fun createHorse(requester: User, data: HorseData, medications: List<Medication>, clientId: String? = null): Horse {
         accessService.requireAdmin(requester)
@@ -68,6 +72,7 @@ class HorseService(
                     vetContact = data.vetContact,
                     medications = medications,
                     foodPlanId = requireStablePlan(requester, data.foodPlanId),
+                    coRiderUserIds = data.coRiders,
                     updatedAt = clock.instant(),
                     updatedBy = requester.id,
                     clientId = clientId,
@@ -96,6 +101,7 @@ class HorseService(
                 medicalNotes = data.medicalNotes,
                 vetContact = data.vetContact,
                 foodPlanId = foodPlanId,
+                coRiderUserIds = data.coRiders,
                 updatedAt = clock.instant(),
                 updatedBy = requester.id,
             )
@@ -157,6 +163,10 @@ class HorseService(
             val owner = userRepository.findById(ownerId)
             if (owner == null || owner.deleted || owner.stableId != requester.stableId) throw badRequest("Unknown owner")
         }
+        val coRidersKnown = data.coRiders.all { id ->
+            userRepository.findById(id)?.let { !it.deleted && it.stableId == requester.stableId } == true
+        }
+        if (!coRidersKnown) throw badRequest("Unknown user")
     }
 
     private fun requireStablePlan(requester: User, planId: ObjectId?): ObjectId? = planId?.also {

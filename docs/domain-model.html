@@ -262,12 +262,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "foodPlanId: ObjectId?",
     "updatedAt: Instant",
     "updatedBy: ObjectId",
-    "deleted: Boolean"
+    "deleted: Boolean",
+    "coRiderUserIds: List\u003cObjectId>"
    ],
    "id": "horse",
    "kind": "class",
    "name": "Horse",
-   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung'). Medications are only visible with HORSE_MEDICATION_VIEW and edited separately with HORSE_MEDICATION_EDIT.",
+   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung'). Medications are only visible with HORSE_MEDICATION_VIEW and edited separately with HORSE_MEDICATION_EDIT. coRiderUserIds: co-riders (Reitbeteiligungen), set with the horse edit, no extra rights; a deleted user is removed from them.",
    "pkg": "horse",
    "x": 813,
    "y": 22

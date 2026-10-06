@@ -37,7 +37,10 @@ class UserServiceTest {
     private val refreshTokenRepository = FakeRefreshTokenRepository()
     private val accessService = AccessService(userRepository, stableRepository, tagRepository)
     private val pictureStore = com.lerchenflo.hufly.server.core.picture.FakePictureStore()
-    private val userService = UserService(userRepository, tagRepository, refreshTokenRepository, pictureStore, accessService, hashEncoder, clock)
+    private val horseRepository = com.lerchenflo.hufly.server.repository.FakeHorseRepository()
+    private val userService = UserService(
+        userRepository, tagRepository, refreshTokenRepository, horseRepository, pictureStore, accessService, hashEncoder, clock,
+    )
 
     private val admin = testUser(email = "admin@hufly.test")
     private val rider = testUser(email = "rider@hufly.test", hashedPassword = hashEncoder.encode("OldSecret1"))
@@ -308,5 +311,20 @@ class UserServiceTest {
         userService.resetPassword(admin, created.user.id)
         assertTrue(stored(created.user.id).mustChangePassword)
         assertEquals(false, stored(rider.id).mustChangePassword)
+    }
+
+    @Test
+    fun `a deleted member is removed from every horse they co-ride`() {
+        val shared = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse().copy(coRiderUserIds = listOf(rider.id, admin.id)))
+        val untouched = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse().copy(coRiderUserIds = listOf(admin.id)))
+        clock.advance(java.time.Duration.ofMinutes(1))
+
+        userService.deleteUser(admin, rider.id)
+
+        val stored = horseRepository.findById(shared.id)!!
+        assertEquals(listOf(admin.id), stored.coRiderUserIds)
+        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(admin.id, stored.updatedBy)
+        assertEquals(untouched, horseRepository.findById(untouched.id))
     }
 }

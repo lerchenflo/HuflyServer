@@ -66,6 +66,7 @@ class HorseServiceTest {
         name: String = "Blitz",
         ownerUserId: org.bson.types.ObjectId? = null,
         foodPlanId: org.bson.types.ObjectId? = null,
+        coRiderUserIds: List<org.bson.types.ObjectId> = emptyList(),
     ) = HorseService.HorseData(
         name = name,
         description = "Brav",
@@ -76,6 +77,7 @@ class HorseServiceTest {
         medicalNotes = "",
         vetContact = "Dr. Huf, 0664 123",
         foodPlanId = foodPlanId,
+        coRiderUserIds = coRiderUserIds,
     )
 
     @BeforeTest
@@ -352,5 +354,30 @@ class HorseServiceTest {
         val storedConflict = conflictRepository.findById(conflict.id)!!
         assertTrue(storedConflict.deleted)
         assertEquals(clock.instant(), storedConflict.updatedAt)
+    }
+
+    // Co-riders (Reitbeteiligungen)
+
+    @Test
+    fun `a horse keeps its co-riders without duplicates or the owner`() {
+        val horse = horseService.createHorse(admin, data(ownerUserId = rider.id, coRiderUserIds = listOf(editor.id, rider.id, editor.id)), emptyList())
+        assertEquals(listOf(editor.id), horseRepository.findById(horse.id)!!.coRiderUserIds)
+
+        horseService.updateHorse(editor, horse.id, data(ownerUserId = rider.id, coRiderUserIds = listOf(medic.id, planner.id)))
+        assertEquals(listOf(medic.id, planner.id), horseRepository.findById(horse.id)!!.coRiderUserIds)
+
+        horseService.updateHorse(editor, horse.id, data(ownerUserId = rider.id))
+        assertEquals(emptyList(), horseRepository.findById(horse.id)!!.coRiderUserIds)
+    }
+
+    @Test
+    fun `co-riders must be live users of the own stable`() {
+        val gone = userRepository.save(testUser(deleted = true))
+        val horse = horseService.createHorse(admin, data(), emptyList())
+
+        listOf(foreigner.id, gone.id, org.bson.types.ObjectId.get()).forEach { id ->
+            assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(coRiderUserIds = listOf(id)), emptyList()) }
+            assertStatus(HttpStatus.BAD_REQUEST) { horseService.updateHorse(editor, horse.id, data(coRiderUserIds = listOf(id))) }
+        }
     }
 }
