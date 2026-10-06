@@ -82,6 +82,8 @@ class EventController(
         val startAt: Long?,
         val endAt: Long?,
         @field:Size(max = 50) val horseIds: List<String>?,
+        /** Series invitees not taking part on this date. */
+        @field:Size(max = 500) val removedUserIds: List<String>? = null,
     )
 
     data class AnswerRequest(val accepted: Boolean)
@@ -135,6 +137,7 @@ class EventController(
             startAt = request.startAt?.let(::epochMillisToInstant),
             endAt = request.endAt?.let(::epochMillisToInstant),
             horseIds = request.horseIds?.map(::parseObjectId),
+            removedUserIds = request.removedUserIds?.map(::parseObjectId),
         )
         return occurrenceService.putOccurrence(requester, parseObjectId(eventId), epochMillisToInstant(occurrenceStartAt), change)
             .toEventOccurrenceResponse()

@@ -669,12 +669,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "updatedAt: Instant",
     "updatedBy: ObjectId",
     "deleted: Boolean",
-    "version: Long"
+    "version: Long",
+    "removedUserIds: List\u003cObjectId>?"
    ],
    "id": "evocc",
    "kind": "class",
    "name": "EventOccurrence",
-   "note": "Change to one date of an event series, unique per (eventId, occurrenceStartAt). Null fields keep the series' value. Written by whoever may edit the event (upsert). Version sync, visibility like the event.",
+   "note": "Change to one date of an event series, unique per (eventId, occurrenceStartAt). Null fields keep the series' value. Written by whoever may edit the event (upsert). removedUserIds: series invitees (or the creator) taken off this date; they cannot answer it (400) and their answers for it are kept but ignored. Version sync, visibility like the event.",
    "pkg": "event",
    "x": 700,
    "y": 520

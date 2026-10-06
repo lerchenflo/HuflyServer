@@ -8,6 +8,7 @@ import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.versionSync
+import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswerResponse
@@ -38,6 +39,7 @@ data class EventOccurrenceChange(
     val startAt: Instant?,
     val endAt: Instant?,
     val horseIds: List<ObjectId>?,
+    val removedUserIds: List<ObjectId>? = null,
 )
 
 /**
@@ -60,6 +62,8 @@ class EventOccurrenceService(
         val event = eventService.managedEvent(requester, eventId)
         event.recurrence.requireOccurrence(event.startAt, occurrenceStartAt)
         validate(requester, change)
+        val removedUserIds = change.removedUserIds?.distinct()?.takeIf { it.isNotEmpty() }
+        removedUserIds?.let { requireSeriesInvitees(event, it) }
         return retryOnDuplicate {
             val existing = occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)
             eventService.saveOccurrence(
@@ -74,6 +78,7 @@ class EventOccurrenceService(
                     startAt = change.startAt,
                     endAt = change.endAt,
                     horseIds = change.horseIds?.distinct(),
+                    removedUserIds = removedUserIds,
                     updatedAt = clock.instant(),
                     updatedBy = requester.id,
                 )
@@ -88,9 +93,9 @@ class EventOccurrenceService(
         val event = eventRepository.findById(invitation.eventId)?.takeIf { !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found")
         event.recurrence.requireOccurrence(event.startAt, occurrenceStartAt)
-        if (occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)?.let { it.cancelled && !it.deleted } == true) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
-        }
+        val occurrence = occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)?.takeUnless { it.deleted }
+        if (occurrence?.cancelled == true) throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
+        if (occurrence?.removedUserIds?.contains(invitation.userId) == true) throw badRequest("Not invited to this date")
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
         val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
         val saved = retryOnDuplicate {
@@ -156,6 +161,13 @@ class EventOccurrenceService(
             }
             if (!valid) throw badRequest("A date needs 1 to $MAX_HORSES horses of the stable")
         }
+    }
+
+    /** The creator takes part through their own invitation, so they may always be listed. */
+    private fun requireSeriesInvitees(event: Event, userIds: List<ObjectId>) {
+        val seriesInvitees = invitationRepository.findByEventIdAndDeletedFalse(event.id)
+            .filter { it.occurrenceStartAt == null }.mapTo(mutableSetOf()) { it.userId } + event.creatorUserId
+        if (!seriesInvitees.containsAll(userIds)) throw badRequest("Not invited to the series")
     }
 
     private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)

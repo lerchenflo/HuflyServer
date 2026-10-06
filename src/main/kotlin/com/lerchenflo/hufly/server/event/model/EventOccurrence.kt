@@ -29,6 +29,8 @@ data class EventOccurrence(
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
+    /** Series invitees not taking part on this date; their answers for it are kept but ignored. */
+    val removedUserIds: List<ObjectId>? = null,
 )
 
 /** An invitee's answer for one date of a series invitation; wins over the invitation's own status for that date. */
@@ -65,6 +67,7 @@ data class EventOccurrenceResponse(
     val updatedAt: Long,
     val updatedBy: String,
     val version: Long,
+    val removedUserIds: List<String>?,
 )
 
 data class EventOccurrenceAnswerResponse(
@@ -95,6 +98,7 @@ fun EventOccurrence.toEventOccurrenceResponse() = EventOccurrenceResponse(
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
     version = version,
+    removedUserIds = removedUserIds?.map { it.toHexString() },
 )
 
 fun EventOccurrenceAnswer.toEventOccurrenceAnswerResponse() = EventOccurrenceAnswerResponse(

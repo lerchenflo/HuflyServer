@@ -145,6 +145,24 @@ class EventSeriesControllerTest {
     }
 
     @Test
+    fun `a date change takes series invitees off the date`() {
+        val eventId = createSeries()
+        val body = """{"cancelled":false,"title":null,"description":null,"startAt":null,"endAt":null,"horseIds":null,"removedUserIds":["${anna.id.toHexString()}"]}"""
+
+        call(HttpMethod.PUT, "/events/$eventId/occurrences/$second", body).andExpect {
+            status { isOk() }
+            jsonPath("$.removedUserIds[0]") { value(anna.id.toHexString()) }
+        }
+        call(HttpMethod.PUT, "/events/$eventId/occurrences/$second", occurrenceJson()).andExpect {
+            status { isOk() }
+            jsonPath("$.removedUserIds") { value(null) }
+        }
+        val unknown = body.replace(anna.id.toHexString(), ben.id.toHexString())
+        call(HttpMethod.PUT, "/events/$eventId/occurrences/$second", unknown).andExpect { status { isBadRequest() } }
+        call(HttpMethod.PUT, "/events/$eventId/occurrences/$second", body.replace(anna.id.toHexString(), "nope")).andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun `an invitee answers one date and the organiser syncs it`() {
         createSeries()
         val invitationId = invitationRepository.invitations.single { it.userId == anna.id }.id.toHexString()

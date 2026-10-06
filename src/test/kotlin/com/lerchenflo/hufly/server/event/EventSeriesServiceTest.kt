@@ -107,7 +107,8 @@ class EventSeriesServiceTest {
         startAt: Instant? = null,
         endAt: Instant? = null,
         horseIds: List<ObjectId>? = null,
-    ) = EventOccurrenceChange(cancelled, title, description, startAt, endAt, horseIds)
+        removedUserIds: List<ObjectId>? = null,
+    ) = EventOccurrenceChange(cancelled, title, description, startAt, endAt, horseIds, removedUserIds)
 
     // Series
 
@@ -251,6 +252,49 @@ class EventSeriesServiceTest {
 
         val page = service.syncAnswers(teacher, 0, 100)
         assertEquals(listOf("DECLINED"), page.updatedEntries.map { it.status.name })
+    }
+
+    // Series invitees taken off one date
+
+    @Test
+    fun `the organiser takes series invitees off one date and back on`() {
+        val event = series(invitees = listOf(anna.id, ben.id))
+
+        val removed = service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(anna.id, anna.id)))
+        assertEquals(listOf(anna.id), removed.removedUserIds)
+        assertEquals(listOf(anna.id.toHexString()), service.syncOccurrences(anna, 0, 100).updatedEntries.single().removedUserIds)
+
+        val restored = service.putOccurrence(teacher, event.id, second, change(title = "Dressur"))
+        assertNull(restored.removedUserIds)
+    }
+
+    @Test
+    fun `only series invitees and the creator can be taken off a date`() {
+        val event = series(invitees = listOf(anna.id))
+        eventService.invite(teacher, event.id, listOf(clara.id), occurrenceStartAt = second)
+
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(ben.id))) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(clara.id))) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(ObjectId.get()))) }
+        service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(teacher.id)))
+    }
+
+    @Test
+    fun `a user taken off a date cannot answer it, other dates stay open and old answers are kept`() {
+        val event = series(invitees = listOf(anna.id))
+        val invitation = invitationOf(event, anna)
+        val earlier = service.answer(anna, invitation.id, second, accepted = true)
+        published.clear()
+
+        service.putOccurrence(teacher, event.id, second, change(removedUserIds = listOf(anna.id)))
+
+        assertStatus(HttpStatus.BAD_REQUEST) { service.answer(anna, invitation.id, second, accepted = false) }
+        assertEquals(listOf(earlier), answerRepository.answers)
+        assertTrue(announced().isEmpty())
+        service.answer(anna, invitation.id, first, accepted = false)
+
+        service.putOccurrence(teacher, event.id, second, change())
+        assertEquals(InvitationStatus.DECLINED, service.answer(anna, invitation.id, second, accepted = false).status)
     }
 
     // Invitations to single dates
