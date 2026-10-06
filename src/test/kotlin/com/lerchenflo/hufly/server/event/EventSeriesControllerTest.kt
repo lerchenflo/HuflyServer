@@ -180,4 +180,25 @@ class EventSeriesControllerTest {
         call(HttpMethod.GET, "/eventoccurrenceanswers/sync?page_size=0").andExpect { status { isBadRequest() } }
         mockMvc.request(HttpMethod.GET, "/eventoccurrences/sync").andExpect { status { isUnauthorized() } }
     }
+
+    @Test
+    fun `a split create stores its origin, both fields or none`() {
+        val oldId = createSeries()
+        val second = first + 7 * 86_400_000L
+        fun splitJson(fields: String) =
+            """{"title":"Neu","startAt":$second,"endAt":${second + 3_600_000},"horseIds":["${blitz.id.toHexString()}"],""" +
+                """"recurrence":$weekly$fields}"""
+
+        call(HttpMethod.POST, "/events", splitJson(""","splitFromEventId":"$oldId","splitFromOccurrenceStartAt":$second""")).andExpect {
+            status { isOk() }
+            jsonPath("$.splitFromEventId") { value(oldId) }
+            jsonPath("$.splitFromOccurrenceStartAt") { value(second) }
+        }
+        call(HttpMethod.POST, "/events", splitJson(""","splitFromEventId":"$oldId"""")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/events", splitJson(""","splitFromOccurrenceStartAt":$second""")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/events", splitJson("")).andExpect {
+            status { isOk() }
+            jsonPath("$.splitFromEventId") { value(null) }
+        }
+    }
 }

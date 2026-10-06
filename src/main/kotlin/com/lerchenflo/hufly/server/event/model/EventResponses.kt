@@ -18,6 +18,8 @@ data class EventResponse(
     val updatedAt: Long,
     val updatedBy: String,
     val version: Long,
+    val splitFromEventId: String?,
+    val splitFromOccurrenceStartAt: Long?,
 )
 
 data class EventInvitationResponse(
@@ -48,6 +50,8 @@ fun Event.toEventResponse() = EventResponse(
     updatedAt = updatedAt.toEpochMilli(),
     updatedBy = updatedBy.toHexString(),
     version = version,
+    splitFromEventId = splitFromEventId?.toHexString(),
+    splitFromOccurrenceStartAt = splitFromOccurrenceStartAt?.toEpochMilli(),
 )
 
 fun EventInvitation.toEventInvitationResponse() = EventInvitationResponse(

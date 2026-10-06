@@ -13,6 +13,7 @@ import com.lerchenflo.hufly.server.event.model.EventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswerResponse
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceResponse
 import com.lerchenflo.hufly.server.event.model.EventResponse
+import com.lerchenflo.hufly.server.event.model.EventSplit
 import com.lerchenflo.hufly.server.event.model.toEventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.toEventOccurrenceAnswerResponse
 import com.lerchenflo.hufly.server.event.model.toEventOccurrenceResponse
@@ -22,6 +23,7 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 @RestController
@@ -52,7 +55,18 @@ class EventController(
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
         /** Null makes it a single event, also on update. */
         val recurrence: RecurrenceRequest? = null,
-    )
+        /** Only read on create, both or none: the series this one was split off and its first date taken over. */
+        val splitFromEventId: String? = null,
+        @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val splitFromOccurrenceStartAt: Long? = null,
+    ) {
+        fun split(): EventSplit? {
+            if ((splitFromEventId == null) != (splitFromOccurrenceStartAt == null)) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "splitFromEventId and splitFromOccurrenceStartAt go together")
+            }
+            if (splitFromEventId == null || splitFromOccurrenceStartAt == null) return null
+            return EventSplit(parseObjectId(splitFromEventId), Instant.ofEpochMilli(splitFromOccurrenceStartAt))
+        }
+    }
 
     data class InviteRequest(
         @field:Size(min = 1, max = 500) val userIds: List<String>,
@@ -79,6 +93,7 @@ class EventController(
             requester, request.title, request.description, Instant.ofEpochMilli(request.startAt), Instant.ofEpochMilli(request.endAt),
             request.horseIds.map(::parseObjectId), request.inviteeUserIds.map(::parseObjectId), request.clientId,
             request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.startAt)),
+            request.split(),
         ).toEventResponse()
     }
 

@@ -17,6 +17,7 @@ import com.lerchenflo.hufly.server.event.model.EventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.event.model.EventResponse
+import com.lerchenflo.hufly.server.event.model.EventSplit
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
 import com.lerchenflo.hufly.server.event.model.toEventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.toEventResponse
@@ -67,6 +68,7 @@ class EventService(
         inviteeUserIds: List<ObjectId>,
         clientId: String? = null,
         recurrence: Recurrence? = null,
+        splitFrom: EventSplit? = null,
     ): Event {
         accessService.requirePermission(requester, Permission.EVENT_EDIT)
         return idempotentCreate(clientId, { eventRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -74,6 +76,7 @@ class EventService(
             validate(requester, startAt, endAt, horseIds)
             requireOwnUsers(requester, invitees)
             requireInvitationCap(invitees.size)
+            requireSplitSource(requester, splitFrom)
             val now = clock.instant()
             val event = saveEvent(
                 Event(
@@ -89,10 +92,13 @@ class EventService(
                     updatedAt = now,
                     updatedBy = requester.id,
                     clientId = clientId,
+                    splitFromEventId = splitFrom?.eventId,
+                    splitFromOccurrenceStartAt = splitFrom?.occurrenceStartAt,
                 )
             )
-            invitees.forEach { saveInvitation(newInvitation(requester, event, it)) }
-            if (invitees.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, invitees, null))
+            invitees.forEach { addInvitation(requester, event, it, null) }
+            val fresh = invitees - invitedBeforeSplit(event)
+            if (fresh.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, fresh, null))
             event
         }
     }
@@ -152,9 +158,9 @@ class EventService(
         val newUserIds = userIds.distinct().filter { it !in skipped && (it != event.creatorUserId || occurrenceStartAt == null) }
         if (newUserIds.isNotEmpty()) {
             requireInvitationCap(live.size + newUserIds.size)
-            newUserIds.forEach { saveInvitation(newInvitation(requester, event, it, occurrenceStartAt)) }
+            newUserIds.forEach { addInvitation(requester, event, it, occurrenceStartAt) }
             restamp(event)
-            val invitees = newUserIds - event.creatorUserId
+            val invitees = newUserIds - event.creatorUserId - invitedBeforeSplit(event)
             if (invitees.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, invitees, occurrenceStartAt))
         }
         return invitationRepository.findByEventIdAndDeletedFalse(event.id)
@@ -236,6 +242,43 @@ class EventService(
         invitationRepository.findByEventIdAndDeletedFalse(event.id).forEach { saveInvitation(it) }
         occurrenceRepository.findByEventIdAndDeletedFalse(event.id).forEach { saveOccurrence(it) }
         answerRepository.findByEventIdAndDeletedFalse(event.id).forEach { saveAnswer(it) }
+    }
+
+    /** Saves a new invitation; on a split series it takes over what the user answered on the old one from the split date on. */
+    private fun addInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Instant?) {
+        val invitation = newInvitation(requester, event, userId, occurrenceStartAt)
+        val splitFrom = event.splitFromEventId ?: return run { saveInvitation(invitation) }
+        val splitAt = event.splitFromOccurrenceStartAt ?: return run { saveInvitation(invitation) }
+        val old = invitationRepository.findByEventIdAndDeletedFalse(splitFrom)
+            .firstOrNull { it.userId == userId && it.occurrenceStartAt == occurrenceStartAt }
+        if (occurrenceStartAt != null) {
+            val answered = old?.takeIf { it.status != InvitationStatus.PENDING }
+            saveInvitation(answered?.let { invitation.copy(status = it.status, respondedAt = it.respondedAt) } ?: invitation)
+            return
+        }
+        val saved = saveInvitation(invitation)
+        if (old == null) return
+        val now = clock.instant()
+        answerRepository.findByInvitationIdAndDeletedFalse(old.id).filter { it.occurrenceStartAt >= splitAt }.forEach {
+            saveAnswer(
+                it.copy(
+                    id = ObjectId.get(), eventId = event.id, invitationId = saved.id, updatedAt = now, updatedBy = requester.id,
+                )
+            )
+        }
+    }
+
+    /** Users of the old series were invited before, so a split must not push them again. */
+    private fun invitedBeforeSplit(event: Event): Set<ObjectId> =
+        event.splitFromEventId?.let { id -> invitationRepository.findByEventIdAndDeletedFalse(id).mapTo(mutableSetOf()) { it.userId } }
+            ?: emptySet()
+
+    private fun requireSplitSource(requester: User, splitFrom: EventSplit?) {
+        if (splitFrom == null) return
+        val source = eventRepository.findById(splitFrom.eventId)
+            ?.takeIf { it.stableId == requester.stableId && !it.deleted && it.recurrence != null }
+            ?: throw badRequest("Unknown series to split")
+        if (source.creatorUserId != requester.id && !accessService.isAdmin(requester)) throw badRequest("Not your series to split")
     }
 
     private fun newInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Instant? = null): EventInvitation {

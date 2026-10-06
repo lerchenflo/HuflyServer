@@ -8,6 +8,7 @@ import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
+import com.lerchenflo.hufly.server.event.model.EventSplit
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
 import com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository
 import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository
@@ -387,6 +388,103 @@ class EventSeriesServiceTest {
         assertEquals(InvitationStatus.ACCEPTED, service.answer(teacher, own.id, second, accepted = true).status)
         assertStatus(HttpStatus.BAD_REQUEST) { eventService.respond(teacher, own.id, false) }
 
+        assertEquals(emptyList(), announced())
+    }
+
+    // "Diesen und alle folgenden": a split series takes over invitees' answers
+
+    private val third = second.plus(Duration.ofDays(7))
+
+    private fun splitOff(by: User = teacher, from: Event, at: Instant = second, invitees: List<ObjectId> = emptyList()) =
+        eventService.createEvent(
+            by, "Springstunde neu", "", at, at.plusSeconds(3600), listOf(blitz.id), invitees,
+            recurrence = weekly, splitFrom = EventSplit(from.id, at),
+        )
+
+    @Test
+    fun `a split series stores where it came from`() {
+        val old = series()
+
+        val split = splitOff(from = old)
+
+        assertEquals(old.id, split.splitFromEventId)
+        assertEquals(second, split.splitFromOccurrenceStartAt)
+    }
+
+    @Test
+    fun `a split needs a series of the own stable by the same creator or the admin`() {
+        val old = series()
+        val single = series(recurrence = null)
+        val othersSeries = eventService.createEvent(
+            otherTeacher, "X", "", first, first.plusSeconds(3600), listOf(blitz.id), emptyList(), recurrence = weekly,
+        )
+
+        assertStatus(HttpStatus.BAD_REQUEST) { splitOff(from = single) }
+        assertStatus(HttpStatus.BAD_REQUEST) { splitOff(from = othersSeries) }
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            eventService.createEvent(
+                teacher, "X", "", second, second.plusSeconds(3600), listOf(blitz.id), emptyList(),
+                recurrence = weekly, splitFrom = EventSplit(ObjectId.get(), second),
+            )
+        }
+        eventService.deleteEvent(teacher, old.id)
+        assertStatus(HttpStatus.BAD_REQUEST) { splitOff(from = old) }
+
+        val adminSplit = splitOff(by = admin, from = othersSeries)
+        assertEquals(othersSeries.id, adminSplit.splitFromEventId)
+    }
+
+    @Test
+    fun `invitees take their answers from the split date on over to the new series without pushes`() {
+        val old = series(invitees = listOf(anna.id))
+        val oldInvitation = invitationOf(old, anna)
+        service.answer(anna, oldInvitation.id, first, accepted = false)
+        val secondAnswer = service.answer(anna, oldInvitation.id, second, accepted = false)
+        clock.advance(Duration.ofHours(1))
+        service.answer(anna, oldInvitation.id, third, accepted = true)
+        val split = splitOff(from = old)
+        published.clear()
+
+        eventService.invite(teacher, split.id, listOf(anna.id, ben.id))
+
+        val newInvitation = invitationOf(split, anna)
+        val copied = answerRepository.findByInvitationIdAndDeletedFalse(newInvitation.id).sortedBy { it.occurrenceStartAt }
+        assertEquals(listOf(second, third), copied.map { it.occurrenceStartAt })
+        assertEquals(listOf(InvitationStatus.DECLINED, InvitationStatus.ACCEPTED), copied.map { it.status })
+        assertEquals(secondAnswer.respondedAt, copied[0].respondedAt)
+        assertEquals(split.id, copied[0].eventId)
+        assertTrue(copied.all { it.version > 0 })
+        assertEquals(
+            listOf(com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, split.id, listOf(ben.id), null)),
+            announced(),
+        )
+    }
+
+    @Test
+    fun `invitees given on the split create also take their answers over`() {
+        val old = series(invitees = listOf(anna.id))
+        service.answer(anna, invitationOf(old, anna).id, second, accepted = false)
+        published.clear()
+
+        val split = splitOff(from = old, invitees = listOf(anna.id))
+
+        val copied = answerRepository.findByInvitationIdAndDeletedFalse(invitationOf(split, anna).id)
+        assertEquals(listOf(InvitationStatus.DECLINED), copied.map { it.status })
+        assertEquals(emptyList(), announced())
+    }
+
+    @Test
+    fun `a stand-in takes the answer to their date over`() {
+        val old = series(invitees = listOf(anna.id))
+        val oldDate = eventService.invite(teacher, old.id, listOf(clara.id), occurrenceStartAt = third).single { it.userId == clara.id }
+        val answered = eventService.respond(clara, oldDate.id, true)
+        val split = splitOff(from = old)
+        published.clear()
+
+        val newDate = eventService.invite(teacher, split.id, listOf(clara.id), occurrenceStartAt = third).single { it.userId == clara.id }
+
+        assertEquals(InvitationStatus.ACCEPTED, newDate.status)
+        assertEquals(answered.respondedAt, newDate.respondedAt)
         assertEquals(emptyList(), announced())
     }
 }

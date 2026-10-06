@@ -30,7 +30,13 @@ data class Event(
     val version: Long = 0,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
+    /** Set when the client split this series off [splitFromEventId] ("Diesen und alle folgenden"), see [EventSplit]. */
+    val splitFromEventId: ObjectId? = null,
+    val splitFromOccurrenceStartAt: Instant? = null,
 )
+
+/** Invitees of the old series take their answers from [occurrenceStartAt] on over to the new one. */
+data class EventSplit(val eventId: ObjectId, val occurrenceStartAt: Instant)
 
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED }
 

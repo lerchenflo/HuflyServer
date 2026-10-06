@@ -544,12 +544,14 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "updatedAt: Instant",
     "updatedBy: ObjectId",
     "deleted: Boolean",
-    "version: Long"
+    "version: Long",
+    "splitFromEventId: ObjectId?",
+    "splitFromOccurrenceStartAt: Instant?"
    ],
    "id": "event",
    "kind": "class",
    "name": "Event",
-   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. With recurrence it is a series (EVT-10): startAt/endAt are the first date, each date lasts endAt - startAt, dates are keyed by their original start (occurrenceStartAt). Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`.",
+   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. With recurrence it is a series (EVT-10): startAt/endAt are the first date, each date lasts endAt - startAt, dates are keyed by their original start (occurrenceStartAt). Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. Split series (\"Diesen und alle folgenden\"): splitFromEventId/splitFromOccurrenceStartAt name the old series and the first date taken over; invitations to the new series copy the user's old answers from that date on, without a fresh push for users of the old series.",
    "pkg": "event",
    "x": 395,
    "y": 520
