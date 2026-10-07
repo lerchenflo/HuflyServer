@@ -4,7 +4,6 @@ Open work only; finished items live in git history. Client-side product TODOs li
 
 ## Operator website
 - [ ] Delete a stable (Stall) from the operator website, with its users and data.
-- [ ] Task view on the website should look like the in-app task view.
 
 ## Push notifications
 - [ ] Configure for real: Firebase project + service account JSON, APNs key (.p8), team id, key id, bundle id (`.env`, `push-secrets/`). Until then both senders log "off" and drop pushes.

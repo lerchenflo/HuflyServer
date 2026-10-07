@@ -122,21 +122,38 @@ p { margin: 0; text-wrap: pretty; }
 .board-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
 .board-head h2 { font-size: 22px; }
 .board-head span { font-size: 14px; color: var(--on-surface-variant); }
-.slot { display: grid; grid-template-columns: 56px 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid var(--outline-variant); }
-.slot time { font: 600 15px var(--display); color: var(--on-surface-variant); padding-top: 2px; }
-.slot h3 { font: 600 16px var(--body); letter-spacing: 0; }
-.slot p { font-size: 14px; color: var(--on-surface-variant); margin-top: 2px; }
+.board-label { font: 600 14px var(--body); color: var(--on-surface-variant); margin: 4px 0 2px; }
+/* Rows like the app's CompactItemRow: category badge with a corner checkbox, title, chips, time on the right */
+.item { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; }
+.item.done { opacity: .5; }
+.item.done h3 { text-decoration: line-through; }
+.badge { position: relative; width: 48px; height: 48px; }
+.badge svg { width: 42px; height: 42px; padding: 9px; border-radius: 50%; background: var(--c); fill: #fff; }
+.box { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; border-radius: 6px; background: var(--surface); border: 2px solid var(--on-surface-variant); }
+.box.on { background: var(--primary); border-color: var(--primary); }
+.box.on::after { content: ""; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid var(--on-primary); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.item h3 { font: 600 18px var(--body); letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item > div { min-width: 0; }
+.item p { font-size: 14px; color: var(--on-surface-variant); }
+.item time { font: 600 16px var(--display); align-self: start; padding-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 3px; border-radius: 999px; font: 500 13px/1 var(--body); background: var(--secondary-container); color: var(--on-surface); }
+.chip .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--display); background: var(--surface); color: var(--on-surface-variant); }
+.chip.horse { background: var(--primary-container); color: var(--on-primary-container); }
+.chip.me { background: var(--primary); color: var(--on-primary); }
+.chips .tag { border-radius: 999px; padding: 6px 10px; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .tag { font-size: 13px; line-height: 1; padding: 6px 10px; border-radius: 8px; background: var(--secondary-container); color: var(--on-surface); }
 .tag.yes { background: var(--primary-container); color: var(--on-primary-container); }
 .tag.warn { background: var(--tertiary-container); color: var(--on-tertiary-container); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .board .slot { animation: slot-in .5s cubic-bezier(.2, .7, .2, 1) both; }
-  .board .slot:nth-of-type(2) { animation-delay: .08s; }
-  .board .slot:nth-of-type(3) { animation-delay: .16s; }
-  .board .slot:nth-of-type(4) { animation-delay: .24s; }
-  .board .slot:nth-of-type(5) { animation-delay: .32s; }
+  .board .item { animation: slot-in .5s cubic-bezier(.2, .7, .2, 1) both; }
+  .board .item:nth-of-type(3) { animation-delay: .08s; }
+  .board .item:nth-of-type(4) { animation-delay: .16s; }
+  .board .item:nth-of-type(5) { animation-delay: .24s; }
+  .board .item:nth-of-type(6) { animation-delay: .32s; }
   @keyframes slot-in { from { opacity: 0; transform: translateY(8px); } }
 }
 
@@ -239,7 +256,8 @@ p { margin: 0; text-wrap: pretty; }
   .hero .lead { max-width: none; }
   .hero .actions .button, .contact-actions .button { flex: 1 1 100%; }
   .board { border-radius: 22px; padding: 18px 16px 6px; }
-  .slot { grid-template-columns: 48px 1fr; gap: 10px; }
+  .item { gap: 10px; }
+  .item h3 { font-size: 16px; }
   .panel { padding: 18px 16px; }
   .record-row { flex-direction: column; gap: 2px; }
   .record-row span:last-child { text-align: left; }
