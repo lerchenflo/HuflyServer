@@ -36,11 +36,15 @@ class ApnsPushSender(
     private val client: ApnsClient? = if (listOf(keyFile, teamId, keyId, bundleId).any { it.isBlank() } || !File(keyFile).isFile) {
         log.warn("APNs off: push.apns.key-file, team-id, key-id and bundle-id are needed")
         null
-    } else {
+    } else try {
         ApnsClientBuilder()
             .setApnsServer(if (production) ApnsClientBuilder.PRODUCTION_APNS_HOST else ApnsClientBuilder.DEVELOPMENT_APNS_HOST)
             .setSigningKey(ApnsSigningKey.loadFromPkcs8File(File(keyFile), teamId, keyId))
             .build()
+            .also { log.info("APNs loaded (bundle {}, {})", bundleId, if (production) "production" else "sandbox") }
+    } catch (e: Exception) {
+        log.error("APNs off: loading {} failed: {}", keyFile, e.message)
+        null
     }
 
     override fun send(token: String, message: PushMessage): PushResult {

@@ -29,10 +29,13 @@ class FcmPushSender(@Value("\${push.fcm.credentials-file:}") credentialsFile: St
     private val messaging: FirebaseMessaging? = if (credentialsFile.isBlank() || !File(credentialsFile).isFile) {
         log.warn("FCM off: no credentials file (push.fcm.credentials-file)")
         null
-    } else {
+    } else try {
         val options = File(credentialsFile).inputStream().use { FirebaseOptions.builder().setCredentials(GoogleCredentials.fromStream(it)).build() }
         val app = FirebaseApp.getApps().firstOrNull { it.name == APP_NAME } ?: FirebaseApp.initializeApp(options, APP_NAME)
-        FirebaseMessaging.getInstance(app)
+        FirebaseMessaging.getInstance(app).also { log.info("FCM loaded (project {})", options.projectId) }
+    } catch (e: Exception) {
+        log.error("FCM off: loading {} failed: {}", credentialsFile, e.message)
+        null
     }
 
     override fun send(token: String, message: PushMessage): PushResult {
