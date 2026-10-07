@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
 
 interface PaddockRepository : Repository<Paddock, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(paddock: Paddock): Paddock
     fun findById(id: ObjectId): Paddock?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Paddock?
@@ -17,6 +18,7 @@ interface PaddockRepository : Repository<Paddock, ObjectId> {
 }
 
 interface HorseGroupRepository : Repository<HorseGroup, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(group: HorseGroup): HorseGroup
     fun findById(id: ObjectId): HorseGroup?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): HorseGroup?
@@ -24,6 +26,7 @@ interface HorseGroupRepository : Repository<HorseGroup, ObjectId> {
 }
 
 interface HorseConflictRepository : Repository<HorseConflict, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(conflict: HorseConflict): HorseConflict
     fun findById(id: ObjectId): HorseConflict?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): HorseConflict?
@@ -31,6 +34,7 @@ interface HorseConflictRepository : Repository<HorseConflict, ObjectId> {
 }
 
 interface PaddockAssignmentRepository : Repository<PaddockAssignment, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(assignment: PaddockAssignment): PaddockAssignment
     fun findById(id: ObjectId): PaddockAssignment?
     fun findByPaddockIdAndDeletedFalse(paddockId: ObjectId): List<PaddockAssignment>

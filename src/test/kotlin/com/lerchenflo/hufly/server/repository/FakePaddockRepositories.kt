@@ -10,6 +10,8 @@ import org.springframework.data.domain.Limit
 class FakePaddockRepository : PaddockRepository {
     val paddocks = mutableListOf<Paddock>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = paddocks.count { it.stableId == stableId }.toLong().also { paddocks.removeIf { it.stableId == stableId } }
+
     override fun save(paddock: Paddock): Paddock {
         paddocks.requireUniqueClientId(paddock, { it.id }, { it.stableId }, { it.clientId })
         paddocks.removeIf { it.id == paddock.id }
@@ -28,6 +30,8 @@ class FakePaddockRepository : PaddockRepository {
 
 class FakeHorseGroupRepository : HorseGroupRepository {
     val groups = mutableListOf<HorseGroup>()
+
+    override fun deleteByStableId(stableId: ObjectId): Long = groups.count { it.stableId == stableId }.toLong().also { groups.removeIf { it.stableId == stableId } }
 
     override fun save(group: HorseGroup): HorseGroup {
         groups.requireUniqueClientId(group, { it.id }, { it.stableId }, { it.clientId })
@@ -48,6 +52,8 @@ class FakeHorseGroupRepository : HorseGroupRepository {
 class FakeHorseConflictRepository : HorseConflictRepository {
     val conflicts = mutableListOf<HorseConflict>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = conflicts.count { it.stableId == stableId }.toLong().also { conflicts.removeIf { it.stableId == stableId } }
+
     override fun save(conflict: HorseConflict): HorseConflict {
         conflicts.requireUniqueClientId(conflict, { it.id }, { it.stableId }, { it.clientId })
         conflicts.removeIf { it.id == conflict.id }
@@ -66,6 +72,8 @@ class FakeHorseConflictRepository : HorseConflictRepository {
 
 class FakePaddockAssignmentRepository : PaddockAssignmentRepository {
     val assignments = mutableListOf<PaddockAssignment>()
+
+    override fun deleteByStableId(stableId: ObjectId): Long = assignments.count { it.stableId == stableId }.toLong().also { assignments.removeIf { it.stableId == stableId } }
 
     override fun save(assignment: PaddockAssignment): PaddockAssignment {
         assignments.requireUniqueClientId(assignment, { it.id }, { it.stableId }, { it.clientId })

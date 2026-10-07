@@ -7,6 +7,8 @@ import org.springframework.data.domain.Limit
 class FakeHorseLogRepository : HorseLogRepository {
     val entries = mutableListOf<HorseLogEntry>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = entries.count { it.stableId == stableId }.toLong().also { entries.removeIf { it.stableId == stableId } }
+
     override fun save(entry: HorseLogEntry): HorseLogEntry {
         entries.requireUniqueClientId(entry, { it.id }, { it.stableId }, { it.clientId })
         entries.removeIf { it.id == entry.id }

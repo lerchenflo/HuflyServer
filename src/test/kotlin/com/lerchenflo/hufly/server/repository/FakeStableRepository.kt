@@ -6,6 +6,8 @@ import org.bson.types.ObjectId
 class FakeStableRepository : StableRepository {
     val stables = mutableListOf<Stable>()
 
+    override fun deleteById(id: ObjectId) { stables.removeIf { it.id == id } }
+
     override fun save(stable: Stable): Stable {
         stables.removeIf { it.id == stable.id }
         stables += stable

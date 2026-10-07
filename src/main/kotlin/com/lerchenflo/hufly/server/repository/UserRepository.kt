@@ -5,6 +5,8 @@ import org.bson.types.ObjectId
 import org.springframework.data.repository.Repository
 
 interface UserRepository : Repository<User, ObjectId> {
+    fun findByStableId(stableId: ObjectId): List<User>
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(user: User): User
     fun findById(id: ObjectId): User?
     fun findByEmail(email: String): User?

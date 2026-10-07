@@ -67,6 +67,7 @@ th { text-align: left; font-weight: 500; color: var(--on-surface-variant); font-
 td { border-top: 1px solid var(--outline-variant); padding: 10px 12px 10px 0; }
 .chip { font-size: 12px; padding: 2px 10px; border-radius: 8px; border: 1px solid var(--outline); white-space: nowrap; }
 .empty { color: var(--on-surface-variant); }
+button.danger { background: transparent; color: var(--error, #BA1A1A); border: 1px solid currentColor; padding: 4px 14px; font-size: 14px; }
 @media (max-width: 600px) {
   form { grid-template-columns: 1fr; }
   th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { display: none; }
@@ -76,7 +77,7 @@ td { border-top: 1px solid var(--outline-variant); padding: 10px 12px 10px 0; }
 <body>
 <main>
   <h1><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#6750A4"/><path d="M19 14v18a13 13 0 0 0 26 0V14" fill="none" stroke="#EADDFF" stroke-width="8" stroke-linecap="round"/><g fill="#6750A4"><circle cx="19" cy="24" r="2.4"/><circle cx="45" cy="24" r="2.4"/><circle cx="22" cy="38" r="2.4"/><circle cx="42" cy="38" r="2.4"/></g></svg>Hufly Ställe</h1>
-  <p class="subtitle">Neuen Stall mit seinem Admin anlegen.</p>
+  <p class="subtitle">Ställe mit ihrem Admin anlegen und löschen.</p>
 
   <section class="card">
     <h2>Neuer Stall</h2>
@@ -98,8 +99,8 @@ td { border-top: 1px solid var(--outline-variant); padding: 10px 12px 10px 0; }
   <section class="card">
     <h2>Ställe</h2>
     <table>
-      <thead><tr><th>Stall</th><th>Admin</th><th>Abo</th><th>Angelegt</th></tr></thead>
-      <tbody id="stables"><tr><td colspan="4" class="empty">Lädt …</td></tr></tbody>
+      <thead><tr><th>Stall</th><th>Admin</th><th>Abo</th><th>Angelegt</th><th></th></tr></thead>
+      <tbody id="stables"><tr><td colspan="5" class="empty">Lädt …</td></tr></tbody>
     </table>
   </section>
 </main>
@@ -113,6 +114,28 @@ function cell(text) {
   return td;
 }
 
+function deleteCell(stable) {
+  const td = cell('');
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'danger'; button.textContent = 'Löschen';
+  button.addEventListener('click', async () => {
+    if (!confirm(`Stall „${stable.name}“ wirklich löschen?\n\nAlle Benutzer, Pferde, Termine, Aufgaben und Bilder dieses Stalls werden endgültig entfernt.`)) return;
+    const name = prompt('Zum Bestätigen den Namen des Stalls eingeben:');
+    if (name === null) return;
+    if (name !== stable.name) { alert('Name stimmt nicht überein. Nichts gelöscht.'); return; }
+    if (!confirm(`Letzte Warnung: „${stable.name}“ jetzt endgültig löschen? Das kann nicht rückgängig gemacht werden.`)) return;
+    button.disabled = true;
+    const response = await fetch(`${api}/${stable.id}`, {
+      method: 'DELETE', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmName: name })
+    });
+    if (!response.ok) { alert('Löschen fehlgeschlagen.'); button.disabled = false; return; }
+    loadStables();
+  });
+  td.append(button);
+  return td;
+}
+
 async function loadStables() {
   const body = document.getElementById('stables');
   const response = await fetch(api, { credentials: 'same-origin' });
@@ -121,7 +144,7 @@ async function loadStables() {
   if (stables.length === 0) {
     const row = document.createElement('tr');
     const td = cell(response.ok ? 'Noch keine Ställe.' : 'Laden fehlgeschlagen.');
-    td.colSpan = 4; td.className = 'empty';
+    td.colSpan = 5; td.className = 'empty';
     row.append(td); body.append(row);
     return;
   }
@@ -132,7 +155,7 @@ async function loadStables() {
     chip.className = 'chip'; chip.textContent = statusText[stable.subscriptionStatus] ?? stable.subscriptionStatus;
     status.append(chip);
     row.append(cell(stable.name), cell(stable.adminEmail ?? '–'), status,
-      cell(new Date(stable.createdAt).toLocaleDateString('de-AT')));
+      cell(new Date(stable.createdAt).toLocaleDateString('de-AT')), deleteCell(stable));
     body.append(row);
   }
 }

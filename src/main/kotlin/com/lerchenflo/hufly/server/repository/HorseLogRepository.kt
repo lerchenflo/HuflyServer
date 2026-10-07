@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
 
 interface HorseLogRepository : Repository<HorseLogEntry, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(entry: HorseLogEntry): HorseLogEntry
     fun findById(id: ObjectId): HorseLogEntry?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): HorseLogEntry?

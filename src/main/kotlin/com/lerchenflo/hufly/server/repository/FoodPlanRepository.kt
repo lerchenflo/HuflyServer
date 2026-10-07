@@ -5,6 +5,7 @@ import org.bson.types.ObjectId
 import org.springframework.data.repository.Repository
 
 interface FoodPlanRepository : Repository<FoodPlan, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(plan: FoodPlan): FoodPlan
     fun findById(id: ObjectId): FoodPlan?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): FoodPlan?

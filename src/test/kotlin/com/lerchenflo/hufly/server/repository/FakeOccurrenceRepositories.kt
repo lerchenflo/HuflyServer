@@ -11,6 +11,8 @@ import java.time.Instant
 class FakeEventOccurrenceRepository : EventOccurrenceRepository {
     val occurrences = mutableListOf<EventOccurrence>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = occurrences.count { it.stableId == stableId }.toLong().also { occurrences.removeIf { it.stableId == stableId } }
+
     override fun save(occurrence: EventOccurrence): EventOccurrence {
         if (occurrences.any { it.id != occurrence.id && it.eventId == occurrence.eventId && it.occurrenceStartAt == occurrence.occurrenceStartAt }) {
             throw DuplicateKeyException("eventId_occurrenceStartAt")
@@ -34,6 +36,8 @@ class FakeEventOccurrenceRepository : EventOccurrenceRepository {
 
 class FakeEventOccurrenceAnswerRepository : EventOccurrenceAnswerRepository {
     val answers = mutableListOf<EventOccurrenceAnswer>()
+
+    override fun deleteByStableId(stableId: ObjectId): Long = answers.count { it.stableId == stableId }.toLong().also { answers.removeIf { it.stableId == stableId } }
 
     override fun save(answer: EventOccurrenceAnswer): EventOccurrenceAnswer {
         if (answers.any { it.id != answer.id && it.invitationId == answer.invitationId && it.occurrenceStartAt == answer.occurrenceStartAt }) {
@@ -61,6 +65,8 @@ class FakeEventOccurrenceAnswerRepository : EventOccurrenceAnswerRepository {
 
 class FakeTaskOccurrenceRepository : TaskOccurrenceRepository {
     val occurrences = mutableListOf<TaskOccurrence>()
+
+    override fun deleteByStableId(stableId: ObjectId): Long = occurrences.count { it.stableId == stableId }.toLong().also { occurrences.removeIf { it.stableId == stableId } }
 
     override fun save(occurrence: TaskOccurrence): TaskOccurrence {
         if (occurrences.any { it.id != occurrence.id && it.taskId == occurrence.taskId && it.occurrenceDueAt == occurrence.occurrenceDueAt }) {

@@ -7,6 +7,8 @@ import org.springframework.data.domain.Limit
 class FakeTaskRepository : TaskRepository {
     val tasks = mutableListOf<StableTask>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = tasks.count { it.stableId == stableId }.toLong().also { tasks.removeIf { it.stableId == stableId } }
+
     override fun save(task: StableTask): StableTask {
         tasks.requireUniqueClientId(task, { it.id }, { it.stableId }, { it.clientId })
         tasks.removeIf { it.id == task.id }

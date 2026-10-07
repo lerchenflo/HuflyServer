@@ -10,6 +10,7 @@ import org.springframework.data.repository.Repository
 import java.time.Instant
 
 interface RefreshTokenRepository : Repository<RefreshToken, ObjectId> {
+    fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long
     fun save(token: RefreshToken): RefreshToken
     fun findById(id: ObjectId): RefreshToken?
     fun findByUserId(userId: ObjectId): List<RefreshToken>

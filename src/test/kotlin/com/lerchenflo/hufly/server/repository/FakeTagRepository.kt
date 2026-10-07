@@ -6,6 +6,8 @@ import org.bson.types.ObjectId
 class FakeTagRepository : TagRepository {
     val tags = mutableListOf<Tag>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = tags.count { it.stableId == stableId }.toLong().also { tags.removeIf { it.stableId == stableId } }
+
     override fun save(tag: Tag): Tag {
         tags.requireUniqueClientId(tag, { it.id }, { it.stableId }, { it.clientId })
         tags.removeIf { it.id == tag.id }

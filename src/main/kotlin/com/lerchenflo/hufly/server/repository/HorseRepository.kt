@@ -5,6 +5,8 @@ import org.bson.types.ObjectId
 import org.springframework.data.repository.Repository
 
 interface HorseRepository : Repository<Horse, ObjectId> {
+    fun findByStableId(stableId: ObjectId): List<Horse>
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(horse: Horse): Horse
     fun findById(id: ObjectId): Horse?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Horse?

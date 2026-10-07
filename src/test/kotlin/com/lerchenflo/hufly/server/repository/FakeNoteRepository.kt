@@ -9,6 +9,8 @@ import java.time.LocalDate
 class FakeNoteRepository : NoteRepository {
     val notes = mutableListOf<StableNote>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = notes.count { it.stableId == stableId }.toLong().also { notes.removeIf { it.stableId == stableId } }
+
     override fun save(note: StableNote): StableNote {
         notes.requireUniqueClientId(note, { it.id }, { it.stableId }, { it.clientId })
         notes.removeIf { it.id == note.id }

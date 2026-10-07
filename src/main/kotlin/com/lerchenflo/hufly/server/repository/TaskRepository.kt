@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
 
 interface TaskRepository : Repository<StableTask, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(task: StableTask): StableTask
     fun findById(id: ObjectId): StableTask?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): StableTask?

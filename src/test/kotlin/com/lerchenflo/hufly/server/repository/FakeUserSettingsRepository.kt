@@ -8,6 +8,8 @@ import java.time.Instant
 class FakeUserSettingsRepository : UserSettingsRepository {
     val settings = mutableMapOf<ObjectId, UserSettings>()
 
+    override fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long = userIds.count { settings.remove(it) != null }.toLong()
+
     override fun save(settings: UserSettings): UserSettings {
         this.settings[settings.userId] = settings
         return settings

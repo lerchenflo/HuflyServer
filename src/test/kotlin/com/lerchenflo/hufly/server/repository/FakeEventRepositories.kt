@@ -8,6 +8,8 @@ import org.springframework.data.domain.Limit
 class FakeEventRepository : EventRepository {
     val events = mutableListOf<Event>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = events.count { it.stableId == stableId }.toLong().also { events.removeIf { it.stableId == stableId } }
+
     override fun save(event: Event): Event {
         events.requireUniqueClientId(event, { it.id }, { it.stableId }, { it.clientId })
         events.removeIf { it.id == event.id }
@@ -31,6 +33,8 @@ class FakeEventRepository : EventRepository {
 
 class FakeEventInvitationRepository : EventInvitationRepository {
     val invitations = mutableListOf<EventInvitation>()
+
+    override fun deleteByStableId(stableId: ObjectId): Long = invitations.count { it.stableId == stableId }.toLong().also { invitations.removeIf { it.stableId == stableId } }
 
     override fun save(invitation: EventInvitation): EventInvitation {
         invitations.removeIf { it.id == invitation.id }

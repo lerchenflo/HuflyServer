@@ -10,6 +10,7 @@ import java.time.Instant
 import java.time.LocalDate
 
 interface NoteRepository : Repository<StableNote, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(note: StableNote): StableNote
     fun findById(id: ObjectId): StableNote?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): StableNote?

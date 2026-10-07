@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
 
 interface AbsenceRepository : Repository<Absence, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(absence: Absence): Absence
     fun findById(id: ObjectId): Absence?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Absence?

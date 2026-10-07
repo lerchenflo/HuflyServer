@@ -7,6 +7,8 @@ import java.time.Instant
 class FakeDigestItemRepository : DigestItemRepository {
     val items = mutableListOf<DigestItem>()
 
+    override fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long = items.count { it.userId in userIds }.toLong().also { items.removeIf { it.userId in userIds } }
+
     override fun save(item: DigestItem): DigestItem {
         items.removeIf { it.id == item.id }
         items += item

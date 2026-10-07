@@ -6,6 +6,8 @@ import org.bson.types.ObjectId
 class FakeFoodPlanRepository : FoodPlanRepository {
     val plans = mutableListOf<FoodPlan>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = plans.count { it.stableId == stableId }.toLong().also { plans.removeIf { it.stableId == stableId } }
+
     override fun save(plan: FoodPlan): FoodPlan {
         plans.requireUniqueClientId(plan, { it.id }, { it.stableId }, { it.clientId })
         plans.removeIf { it.id == plan.id }

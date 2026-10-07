@@ -6,6 +6,9 @@ import org.bson.types.ObjectId
 class FakeHorseRepository : HorseRepository {
     val horses = mutableListOf<Horse>()
 
+    override fun findByStableId(stableId: ObjectId): List<Horse> = horses.filter { it.stableId == stableId }
+    override fun deleteByStableId(stableId: ObjectId): Long = horses.count { it.stableId == stableId }.toLong().also { horses.removeIf { it.stableId == stableId } }
+
     override fun save(horse: Horse): Horse {
         horses.requireUniqueClientId(horse, { it.id }, { it.stableId }, { it.clientId })
         horses.removeIf { it.id == horse.id }

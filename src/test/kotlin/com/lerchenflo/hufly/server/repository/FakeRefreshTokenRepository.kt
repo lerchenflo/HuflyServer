@@ -9,6 +9,8 @@ import java.time.Instant
 class FakeRefreshTokenRepository : RefreshTokenRepository {
     val tokens = mutableListOf<RefreshToken>()
 
+    override fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long = tokens.count { it.userId in userIds }.toLong().also { tokens.removeIf { it.userId in userIds } }
+
     override fun save(token: RefreshToken): RefreshToken {
         tokens.removeIf { it.id == token.id }
         tokens += token

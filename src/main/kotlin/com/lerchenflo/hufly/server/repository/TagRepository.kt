@@ -5,6 +5,7 @@ import org.bson.types.ObjectId
 import org.springframework.data.repository.Repository
 
 interface TagRepository : Repository<Tag, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(tag: Tag): Tag
     fun findById(id: ObjectId): Tag?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Tag?

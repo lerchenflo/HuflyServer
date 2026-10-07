@@ -7,6 +7,8 @@ import org.springframework.data.domain.Limit
 class FakeAbsenceRepository : AbsenceRepository {
     val absences = mutableListOf<Absence>()
 
+    override fun deleteByStableId(stableId: ObjectId): Long = absences.count { it.stableId == stableId }.toLong().also { absences.removeIf { it.stableId == stableId } }
+
     override fun save(absence: Absence): Absence {
         absences.requireUniqueClientId(absence, { it.id }, { it.stableId }, { it.clientId })
         absences.removeIf { it.id == absence.id }

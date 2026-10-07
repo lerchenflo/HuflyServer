@@ -8,6 +8,7 @@ import org.springframework.data.repository.Repository
 import java.time.Instant
 
 interface UserSettingsRepository : Repository<UserSettings, ObjectId> {
+    fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long
     fun save(settings: UserSettings): UserSettings
     fun findById(userId: ObjectId): UserSettings?
 

@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
 
 interface EventRepository : Repository<Event, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(event: Event): Event
     fun findById(id: ObjectId): Event?
     fun findByStableIdAndClientId(stableId: ObjectId, clientId: String): Event?
@@ -18,6 +19,7 @@ interface EventRepository : Repository<Event, ObjectId> {
 }
 
 interface EventInvitationRepository : Repository<EventInvitation, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(invitation: EventInvitation): EventInvitation
     fun findById(id: ObjectId): EventInvitation?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventInvitation>

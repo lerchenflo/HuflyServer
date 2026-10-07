@@ -6,6 +6,9 @@ import org.bson.types.ObjectId
 class FakeUserRepository : UserRepository {
     val users = mutableListOf<User>()
 
+    override fun findByStableId(stableId: ObjectId): List<User> = users.filter { it.stableId == stableId }
+    override fun deleteByStableId(stableId: ObjectId): Long = users.count { it.stableId == stableId }.toLong().also { users.removeIf { it.stableId == stableId } }
+
     override fun save(user: User): User {
         users.removeIf { it.id == user.id }
         users += user

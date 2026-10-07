@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.springframework.beans.factory.annotation.Autowired
@@ -12,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
@@ -136,5 +138,35 @@ class OperatorControllerTest {
             status { isOk() }
             content { contentTypeCompatibleWith(MediaType.TEXT_HTML) }
         }
+    }
+
+    @Test
+    fun `operator deletes a stable after typing its name`() {
+        mockMvc.delete("/office-t3st/api/stables/${STABLE_ID.toHexString()}") {
+            header("Authorization", basic())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"confirmName":"Teststall"}"""
+        }.andExpect { status { isNoContent() } }
+
+        mockMvc.get("/office-t3st/api/stables") { header("Authorization", basic()) }
+            .andExpect { jsonPath("$.length()") { value(0) } }
+        kotlin.test.assertNull(userRepository.findById(stableAdmin.id))
+    }
+
+    @Test
+    fun `deleting with the wrong name answers 400`() {
+        mockMvc.delete("/office-t3st/api/stables/${STABLE_ID.toHexString()}") {
+            header("Authorization", basic())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"confirmName":"Falsch"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `deleting needs operator credentials`() {
+        mockMvc.delete("/office-t3st/api/stables/${STABLE_ID.toHexString()}") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"confirmName":"Teststall"}"""
+        }.andExpect { status { isUnauthorized() } }
     }
 }

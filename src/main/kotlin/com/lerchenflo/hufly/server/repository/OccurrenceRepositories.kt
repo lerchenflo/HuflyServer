@@ -10,6 +10,7 @@ import org.springframework.data.repository.Repository
 import java.time.Instant
 
 interface EventOccurrenceRepository : Repository<EventOccurrence, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(occurrence: EventOccurrence): EventOccurrence
     fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Instant): EventOccurrence?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrence>
@@ -19,6 +20,7 @@ interface EventOccurrenceRepository : Repository<EventOccurrence, ObjectId> {
 }
 
 interface EventOccurrenceAnswerRepository : Repository<EventOccurrenceAnswer, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(answer: EventOccurrenceAnswer): EventOccurrenceAnswer
     fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Instant): EventOccurrenceAnswer?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrenceAnswer>
@@ -29,6 +31,7 @@ interface EventOccurrenceAnswerRepository : Repository<EventOccurrenceAnswer, Ob
 }
 
 interface TaskOccurrenceRepository : Repository<TaskOccurrence, ObjectId> {
+    fun deleteByStableId(stableId: ObjectId): Long
     fun save(occurrence: TaskOccurrence): TaskOccurrence
     fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Instant): TaskOccurrence?
     fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence>
