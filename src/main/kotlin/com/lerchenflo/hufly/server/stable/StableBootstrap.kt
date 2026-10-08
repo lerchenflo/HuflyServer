@@ -29,7 +29,7 @@ class StableBootstrap(
     fun run(stableName: String, adminEmail: String, adminPassword: String) {
         if (stableName.isBlank() || adminEmail.isBlank() || adminPassword.isBlank()) return
         if (userRepository.findByEmail(normalizeEmail(adminEmail)) != null) return
-        onboarding.createStable(stableName, adminEmail, "Admin", adminPassword)
+        onboarding.createStable(stableName, adminEmail, "Admin", adminPassword, mustChangePassword = false)
         log.info("Bootstrapped stable '{}' with admin {}", stableName, normalizeEmail(adminEmail))
     }
 }

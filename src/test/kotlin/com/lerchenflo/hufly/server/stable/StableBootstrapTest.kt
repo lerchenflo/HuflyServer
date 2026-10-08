@@ -9,6 +9,7 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.stable.model.SubscriptionStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Local first stable until the onboarding website exists (BIZ-1, BIZ-2). */
@@ -32,6 +33,7 @@ class StableBootstrapTest {
         assertEquals(SubscriptionStatus.TRIAL, stable.subscriptionStatus)
         assertTrue(hashEncoder.matches("Secret123", admin.hashedPassword))
         assertTrue(accessService.isAdmin(admin))
+        assertFalse(admin.mustChangePassword, "the dev admin is not prompted on every fresh database")
     }
 
     @Test

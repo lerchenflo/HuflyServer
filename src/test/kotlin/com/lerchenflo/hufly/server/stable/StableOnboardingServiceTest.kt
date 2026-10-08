@@ -38,6 +38,13 @@ class StableOnboardingServiceTest {
     }
 
     @Test
+    fun `the new admin must choose an own password, like members the admin creates`() {
+        onboarding.createStable("Hof Lerchenfeld", "chef@hufly.test", "Chef", "Secret123")
+
+        assertTrue(userRepository.findByEmail("chef@hufly.test")!!.mustChangePassword)
+    }
+
+    @Test
     fun `an email used in any stable conflicts`() {
         userRepository.save(testUser(email = "chef@hufly.test"))
 

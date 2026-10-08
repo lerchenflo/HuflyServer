@@ -23,7 +23,14 @@ class StableOnboardingService(
 ) {
     data class CreatedStable(val stable: Stable, val admin: User)
 
-    fun createStable(stableName: String, adminEmail: String, adminDisplayName: String, adminPassword: String): CreatedStable {
+    /** The operator sets the admin's first password, so the admin replaces it like every member; the dev bootstrap opts out. */
+    fun createStable(
+        stableName: String,
+        adminEmail: String,
+        adminDisplayName: String,
+        adminPassword: String,
+        mustChangePassword: Boolean = true,
+    ): CreatedStable {
         val email = normalizeEmail(adminEmail)
         if (userRepository.findByEmail(email) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Email already in use")
 
@@ -43,6 +50,7 @@ class StableOnboardingService(
                 createdAt = now,
                 updatedAt = now,
                 updatedBy = adminId,
+                mustChangePassword = mustChangePassword,
             )
         )
         val stable = stableRepository.save(
