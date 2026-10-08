@@ -31,6 +31,10 @@
   --on-surface: #191C1F;
   --on-surface-variant: #41474F;
   --outline-variant: #C1C7D0;
+  --error: #BA1A1A;
+  --on-error: #FFFFFF;
+  --error-container: #FFDAD6;
+  --on-error-container: #93000A;
   --display: "Bricolage Grotesque", system-ui, sans-serif;
   --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --gutter: clamp(16px, 5vw, 48px);
@@ -52,6 +56,10 @@
     --on-surface: #E1E2E7;
     --on-surface-variant: #C1C7D0;
     --outline-variant: #41474F;
+    --error: #FFB4AB;
+    --on-error: #690005;
+    --error-container: #93000A;
+    --on-error-container: #FFDAD6;
   }
 }
 
@@ -230,7 +238,7 @@ p { margin: 0; text-wrap: pretty; }
 /* Footer */
 .site-footer { border-top: 1px solid var(--outline-variant); padding: 28px 0 40px; font-size: 15px; color: var(--on-surface-variant); }
 .site-footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.site-footer nav { display: flex; gap: 22px; }
+.site-footer nav { display: flex; flex-wrap: wrap; gap: 0 22px; }
 .site-footer a { color: inherit; display: inline-flex; align-items: center; min-height: 44px; }
 
 /* Legal pages */
@@ -239,6 +247,28 @@ p { margin: 0; text-wrap: pretty; }
 .legal h1 { font-size: clamp(34px, 5vw, 48px); margin-bottom: 24px; }
 .legal h2 { font-size: 22px; margin: 32px 0 8px; }
 .legal p { margin-top: 10px; color: var(--on-surface-variant); }
+
+.legal ul { margin: 10px 0 0; padding-left: 22px; color: var(--on-surface-variant); }
+.legal li + li { margin-top: 4px; }
+
+/* Account deletion */
+.delete-card { margin-top: 32px; padding: 24px; border-radius: 24px; background: var(--surface-low); }
+.delete-card h2 { margin-top: 0; }
+.field { display: grid; gap: 6px; margin-top: 16px; font-weight: 600; font-size: 15px; }
+.field input {
+  min-height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--outline-variant);
+  background: var(--surface); color: var(--on-surface); font: 16px var(--body);
+}
+.field input:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
+.check { display: flex; gap: 12px; align-items: flex-start; margin-top: 16px; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 3px 0 0; flex: none; accent-color: var(--error); }
+.form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.button.danger { background: var(--error); color: var(--on-error); }
+.button.danger:hover { background: color-mix(in srgb, var(--error) 88%, var(--on-error)); }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.form-message { margin-top: 16px; padding: 12px 16px; border-radius: 12px; background: var(--error-container); color: var(--on-error-container); }
+.form-message.ok { background: var(--primary-container); color: var(--on-primary-container); }
+.form-message:empty { display: none; }
 
 /* Tablet */
 @media (max-width: 960px) {
@@ -254,7 +284,8 @@ p { margin: 0; text-wrap: pretty; }
   body { font-size: 16px; }
   .site-nav a:not(.button) { display: none; }
   .hero .lead { max-width: none; }
-  .hero .actions .button, .contact-actions .button { flex: 1 1 100%; }
+  .hero .actions .button, .contact-actions .button, .form-actions .button { flex: 1 1 100%; }
+  .delete-card { padding: 20px 16px; }
   .board { border-radius: 22px; padding: 18px 16px 6px; }
   .item { gap: 10px; }
   .item h3 { font-size: 16px; }

@@ -89,7 +89,7 @@ class SecurityConfig(
             auth
                 .requestMatchers("/auth/**").permitAll()
                 // Public sales website from resources/static
-                .requestMatchers("/", "/index.html", "/impressum.html", "/datenschutz.html", "/assets/**", "/favicon.svg").permitAll()
+                .requestMatchers("/", "/index.html", "/impressum.html", "/datenschutz.html", "/konto-loeschen.html", "/assets/**", "/favicon.svg").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
         }

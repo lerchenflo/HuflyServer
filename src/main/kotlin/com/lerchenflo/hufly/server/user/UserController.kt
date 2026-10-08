@@ -29,8 +29,10 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 
 @RestController
@@ -65,6 +67,10 @@ class UserController(
     data class ChangePasswordRequest(
         @field:NotBlank @field:Size(max = 200) val oldPassword: String,
         @field:Size(min = 8, max = 200) val newPassword: String,
+    )
+
+    data class DeleteOwnAccountRequest(
+        @field:NotBlank @field:Size(max = 200) val password: String,
     )
 
     @GetMapping("/me")
@@ -134,6 +140,13 @@ class UserController(
     fun changePassword(@Valid @RequestBody request: ChangePasswordRequest) {
         val requester = accessService.requester(requireAuth())
         userService.changePassword(requester, request.oldPassword, request.newPassword, currentSessionId())
+    }
+
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteOwnAccount(@Valid @RequestBody request: DeleteOwnAccountRequest) {
+        val requester = accessService.requester(requireAuth())
+        userService.deleteOwnAccount(requester, request.password)
     }
 
     @PostMapping

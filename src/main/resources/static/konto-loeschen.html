@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konto löschen – Hufly</title>
+<meta name="description" content="Lösche dein Hufly-Konto und deine persönlichen Daten.">
+<meta name="theme-color" content="#F8F9FE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111417" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Hufly Startseite">
+      <img src="/favicon.svg" alt="" width="34" height="34">
+      Hufly
+    </a>
+    <nav class="site-nav" aria-label="Hauptnavigation">
+      <a class="button small" href="/#kontakt">Demo anfragen</a>
+    </nav>
+  </div>
+</header>
+<main class="legal">
+  <div class="wrap">
+    <h1>Konto löschen</h1>
+    <p>Hier löschst du dein Hufly-Konto endgültig. Das lässt sich nicht rückgängig machen.</p>
+
+    <h2>Was gelöscht wird</h2>
+    <ul>
+      <li>Name, E-Mail-Adresse, Telefonnummer und Profilbild</li>
+      <li>Passwort, alle Anmeldungen auf deinen Geräten und deine Einstellungen</li>
+      <li>Deine Abwesenheiten und gesammelte Benachrichtigungen</li>
+    </ul>
+
+    <h2>Was im Stall bleibt</h2>
+    <p>Einträge, die du für deinen Stall angelegt hast, etwa im Pferdetagebuch, bei Aufgaben, Terminen oder Notizen, gehören zum Stall und bleiben erhalten. Sie zeigen statt deines Namens „Gelöschter Nutzer“.</p>
+
+    <h2>Stall-Admins</h2>
+    <p>Als Admin eines Stalls kannst du dein Konto nicht selbst löschen, weil der Stall an dir hängt. Schreib uns an <a href="mailto:kontakt@hufly.app?subject=Stall%20l%C3%B6schen">kontakt@hufly.app</a>, dann löschen wir den Stall mit allen Daten.</p>
+
+    <form class="delete-card" id="login-step" novalidate>
+      <h2>Anmelden</h2>
+      <p>Melde dich mit deinem Hufly-Konto an, um es zu löschen.</p>
+      <label class="field">E-Mail
+        <input type="email" name="email" autocomplete="username" required maxlength="254">
+      </label>
+      <label class="field">Passwort
+        <input type="password" name="password" autocomplete="current-password" required maxlength="200">
+      </label>
+      <p class="form-message" role="alert" id="login-message"></p>
+      <div class="form-actions">
+        <button class="button" type="submit">Weiter</button>
+      </div>
+    </form>
+
+    <form class="delete-card" id="confirm-step" hidden>
+      <h2>Wirklich löschen?</h2>
+      <p>Angemeldet als <strong id="confirm-email"></strong>.</p>
+      <label class="check">
+        <input type="checkbox" name="understood" required>
+        <span>Ich verstehe, dass mein Konto und meine persönlichen Daten endgültig gelöscht werden.</span>
+      </label>
+      <p class="form-message" role="alert" id="confirm-message"></p>
+      <div class="form-actions">
+        <button class="button danger" type="submit" disabled>Konto endgültig löschen</button>
+        <button class="button quiet" type="button" id="cancel">Abbrechen</button>
+      </div>
+    </form>
+
+    <div class="delete-card" id="done-step" hidden>
+      <h2>Konto gelöscht</h2>
+      <p>Dein Hufly-Konto ist gelöscht. Auf deinen Geräten wirst du beim nächsten Öffnen der App abgemeldet.</p>
+    </div>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Hufly</span>
+    <nav aria-label="Rechtliches">
+      <a href="/impressum.html">Impressum</a>
+      <a href="/datenschutz.html">Datenschutz</a>
+      <a href="/konto-loeschen.html">Konto löschen</a>
+    </nav>
+  </div>
+</footer>
+<script>
+(() => {
+  const loginStep = document.getElementById("login-step");
+  const confirmStep = document.getElementById("confirm-step");
+  const doneStep = document.getElementById("done-step");
+  const loginMessage = document.getElementById("login-message");
+  const confirmMessage = document.getElementById("confirm-message");
+  const deleteButton = confirmStep.querySelector("button[type=submit]");
+  let session = null;
+
+  const json = (method, path, body, token) => fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+    body: JSON.stringify(body),
+  });
+
+  const errorCode = async (response) => {
+    try { return (await response.json()).code; } catch { return null; }
+  };
+
+  const show = (step) => {
+    for (const s of [loginStep, confirmStep, doneStep]) s.hidden = s !== step;
+    step.querySelector("input, h2")?.focus();
+  };
+
+  const endSession = () => {
+    if (session) json("POST", "/auth/logout", { refreshToken: session.refreshToken }).catch(() => {});
+    session = null;
+  };
+
+  const backToLogin = (message) => {
+    endSession();
+    confirmStep.reset();
+    deleteButton.disabled = true;
+    loginStep.password.value = "";
+    loginMessage.textContent = message || "";
+    show(loginStep);
+  };
+
+  loginStep.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    loginMessage.textContent = "";
+    const email = loginStep.email.value.trim();
+    const password = loginStep.password.value;
+    if (!email || !password) {
+      loginMessage.textContent = "Bitte E-Mail und Passwort eingeben.";
+      return;
+    }
+    const button = loginStep.querySelector("button");
+    button.disabled = true;
+    try {
+      const response = await json("POST", "/auth/login", { email, password, deviceName: "Website (Konto löschen)", deviceType: "WEB" });
+      if (response.status === 401) loginMessage.textContent = "E-Mail oder Passwort ist falsch.";
+      else if (response.status === 429) loginMessage.textContent = "Zu viele Versuche. Bitte warte ein paar Minuten.";
+      else if (!response.ok) loginMessage.textContent = "Anmelden hat nicht geklappt. Bitte versuch es später noch einmal.";
+      else {
+        session = { ...(await response.json()), password };
+        document.getElementById("confirm-email").textContent = email;
+        show(confirmStep);
+      }
+    } catch {
+      loginMessage.textContent = "Keine Verbindung zum Server. Bitte versuch es später noch einmal.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  confirmStep.understood.addEventListener("change", () => {
+    deleteButton.disabled = !confirmStep.understood.checked;
+  });
+
+  document.getElementById("cancel").addEventListener("click", () => backToLogin());
+
+  confirmStep.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!session || !confirmStep.understood.checked) return;
+    confirmMessage.textContent = "";
+    deleteButton.disabled = true;
+    try {
+      const response = await json("DELETE", "/users/me", { password: session.password }, session.accessToken);
+      if (response.status === 204) {
+        session = null;
+        loginStep.reset();
+        show(doneStep);
+        return;
+      }
+      const code = await errorCode(response);
+      if (code === "STABLE_ADMIN") {
+        backToLogin("Als Admin eines Stalls kannst du dein Konto nicht selbst löschen. Schreib uns an kontakt@hufly.app.");
+      } else if (response.status === 401 || code === "WRONG_PASSWORD") {
+        backToLogin("Deine Anmeldung ist abgelaufen. Bitte melde dich noch einmal an.");
+      } else {
+        confirmMessage.textContent = "Löschen hat nicht geklappt. Bitte versuch es später noch einmal.";
+        deleteButton.disabled = false;
+      }
+    } catch {
+      confirmMessage.textContent = "Keine Verbindung zum Server. Bitte versuch es später noch einmal.";
+      deleteButton.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

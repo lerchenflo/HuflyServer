@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.absence.AbsenceService
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
+import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
@@ -9,10 +10,12 @@ import com.lerchenflo.hufly.server.core.picture.pictureUrl
 import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.generatePassword
+import com.lerchenflo.hufly.server.repository.DigestItemRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
 import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
+import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
@@ -21,12 +24,16 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
+const val DELETED_USER_NAME = "Gelöschter Nutzer"
+
 @Service
 class UserService(
     private val userRepository: UserRepository,
     private val tagRepository: TagRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val horseRepository: HorseRepository,
+    private val userSettingsRepository: UserSettingsRepository,
+    private val digestItemRepository: DigestItemRepository,
     private val absenceService: AbsenceService,
     private val pictureStore: PictureStore,
     private val accessService: AccessService,
@@ -92,14 +99,44 @@ class UserService(
     fun deleteUser(requester: User, userId: ObjectId) {
         accessService.requireAdmin(requester)
         if (userId == requester.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The admin cannot be deleted")
-        val target = stableMember(requester, userId)
-        val now = clock.instant()
-        userRepository.save(target.copy(deleted = true, profilePictureUrl = null, updatedAt = now, updatedBy = requester.id))
-        refreshTokenRepository.deleteByUserId(target.id)
-        horseRepository.findByStableIdAndDeletedFalse(requester.stableId).filter { target.id in it.coRiderUserIds }.forEach {
-            horseRepository.save(it.copy(coRiderUserIds = it.coRiderUserIds - target.id, updatedAt = now, updatedBy = requester.id))
+        erase(stableMember(requester, userId), requester.id)
+    }
+
+    /** Self-service deletion (app and website). The admin owns the stable, so only the operator can remove them. */
+    fun deleteOwnAccount(requester: User, password: String) {
+        if (!hashEncoder.matches(password, requester.hashedPassword)) {
+            throw CodedException(HttpStatus.BAD_REQUEST, "WRONG_PASSWORD", "Password is wrong")
         }
-        absenceService.removeUser(target.id, requester.id)
+        if (accessService.isAdmin(requester)) {
+            throw CodedException(HttpStatus.CONFLICT, "STABLE_ADMIN", "The stable admin cannot delete the own account")
+        }
+        erase(requester, requester.id)
+    }
+
+    /** The row stays (soft delete) so old entries still resolve, but nothing personal is kept and the email is free again. */
+    private fun erase(target: User, actorId: ObjectId) {
+        val now = clock.instant()
+        userRepository.save(
+            target.copy(
+                email = "deleted-${target.id.toHexString()}@deleted.invalid",
+                displayName = DELETED_USER_NAME,
+                phoneNumber = null,
+                profilePictureUrl = null,
+                hashedPassword = "",
+                roleTagIds = emptyList(),
+                mustChangePassword = false,
+                deleted = true,
+                updatedAt = now,
+                updatedBy = actorId,
+            )
+        )
+        refreshTokenRepository.deleteByUserId(target.id)
+        userSettingsRepository.deleteByUserIdIn(listOf(target.id))
+        digestItemRepository.deleteByUserIdIn(listOf(target.id))
+        horseRepository.findByStableIdAndDeletedFalse(target.stableId).filter { target.id in it.coRiderUserIds }.forEach {
+            horseRepository.save(it.copy(coRiderUserIds = it.coRiderUserIds - target.id, updatedAt = now, updatedBy = actorId))
+        }
+        absenceService.removeUser(target.id, actorId)
         pictureStore.delete(PictureKind.USER, target.id)
     }
 

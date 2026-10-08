@@ -34,6 +34,7 @@ class PublicWebsiteTest {
     fun `legal pages and assets are public`() {
         mockMvc.get("/impressum.html").andExpect { status { isOk() } }
         mockMvc.get("/datenschutz.html").andExpect { status { isOk() } }
+        mockMvc.get("/konto-loeschen.html").andExpect { status { isOk() } }
         mockMvc.get("/assets/site.css").andExpect { status { isOk() } }
     }
 

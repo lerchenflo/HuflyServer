@@ -43,8 +43,11 @@ class UserServiceTest {
         absenceRepository, userRepository, accessService,
         com.lerchenflo.hufly.server.core.sync.VersionCounterService(com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()), clock,
     )
+    private val userSettingsRepository = com.lerchenflo.hufly.server.repository.FakeUserSettingsRepository()
+    private val digestItemRepository = com.lerchenflo.hufly.server.repository.FakeDigestItemRepository()
     private val userService = UserService(
-        userRepository, tagRepository, refreshTokenRepository, horseRepository, absenceService, pictureStore, accessService, hashEncoder, clock,
+        userRepository, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
+        absenceService, pictureStore, accessService, hashEncoder, clock,
     )
 
     private val admin = testUser(email = "admin@hufly.test")
@@ -171,6 +174,57 @@ class UserServiceTest {
         assertTrue(user.deleted)
         assertEquals(clock.instant(), user.updatedAt)
         assertEquals(listOf(adminSession), refreshTokenRepository.tokens)
+    }
+
+    @Test
+    fun `a deleted user's personal data is wiped and the email freed`() {
+        userSettingsRepository.save(com.lerchenflo.hufly.server.user.model.UserSettings(rider.id, mapOf("a" to "b"), Instant.EPOCH))
+        digestItemRepository.save(com.lerchenflo.hufly.server.notification.model.DigestItem(userId = rider.id, title = "t", body = "b", createdAt = Instant.EPOCH))
+        pictureStore.save(com.lerchenflo.hufly.server.core.picture.PictureKind.USER, rider.id, byteArrayOf(1))
+
+        userService.deleteUser(admin, rider.id)
+
+        val user = stored(rider.id)
+        assertEquals("deleted-${rider.id.toHexString()}@deleted.invalid", user.email)
+        assertEquals(DELETED_USER_NAME, user.displayName)
+        assertEquals(null, user.phoneNumber)
+        assertEquals(emptyList(), user.roleTagIds)
+        assertTrue(!hashEncoder.matches("OldSecret1", user.hashedPassword))
+        assertEquals(null, userSettingsRepository.findById(rider.id))
+        assertTrue(digestItemRepository.items.isEmpty())
+        assertEquals(null, pictureStore.load(com.lerchenflo.hufly.server.core.picture.PictureKind.USER, rider.id))
+        userService.createUser(admin, "rider@hufly.test", "Neu", null, emptyList())
+    }
+
+    @Test
+    fun `member deletes the own account with the password`() {
+        session(rider.id)
+        val adminSession = session(admin.id)
+
+        userService.deleteOwnAccount(rider, "OldSecret1")
+
+        val user = stored(rider.id)
+        assertTrue(user.deleted)
+        assertEquals(rider.id, user.updatedBy)
+        assertEquals(DELETED_USER_NAME, user.displayName)
+        assertEquals(listOf(adminSession), refreshTokenRepository.tokens)
+    }
+
+    @Test
+    fun `own account deletion with a wrong password is rejected without 401`() {
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(rider, "wrong") }
+        assertEquals(HttpStatus.BAD_REQUEST, e.statusCode)
+        assertEquals("WRONG_PASSWORD", e.code)
+        assertTrue(!stored(rider.id).deleted)
+    }
+
+    @Test
+    fun `the stable admin cannot delete the own account`() {
+        val adminWithPassword = userRepository.save(admin.copy(hashedPassword = hashEncoder.encode("AdminSecret1")))
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(adminWithPassword, "AdminSecret1") }
+        assertEquals(HttpStatus.CONFLICT, e.statusCode)
+        assertEquals("STABLE_ADMIN", e.code)
+        assertTrue(!stored(admin.id).deleted)
     }
 
     @Test

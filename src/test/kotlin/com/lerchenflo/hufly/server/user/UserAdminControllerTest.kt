@@ -119,6 +119,28 @@ class UserAdminControllerTest {
     }
 
     @Test
+    fun `own account deletion answers 204, a wrong password 400 with a code`() {
+        call(HttpMethod.DELETE, "/users/me", """{"password":"wrong"}""", userId = rider.id).andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("WRONG_PASSWORD") }
+        }
+        call(HttpMethod.DELETE, "/users/me", """{"password":""}""", userId = rider.id).andExpect { status { isBadRequest() } }
+
+        call(HttpMethod.DELETE, "/users/me", """{"password":"OldSecret1"}""", userId = rider.id).andExpect { status { isNoContent() } }
+
+        assertTrue(userRepository.findById(rider.id)!!.deleted)
+        call(HttpMethod.GET, "/users/me", userId = rider.id).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `own account deletion without a token answers 401`() {
+        mockMvc.delete("/users/me") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"OldSecret1"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
     fun `password reset answers with the new password`() {
         call(HttpMethod.POST, "/users/${rider.id.toHexString()}/password-reset").andExpect {
             status { isOk() }
