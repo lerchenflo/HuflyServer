@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.hamcrest.Matchers.containsString
+import org.hamcrest.Matchers.not
 import kotlin.test.Test
 
 /** The public sales website needs no login; the API still does. */
@@ -66,5 +68,29 @@ class PublicWebsiteTest {
     @Test
     fun `the API stays protected`() {
         mockMvc.get("/users/me").andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `pages show the configured contact email instead of a placeholder`() {
+        for (page in listOf("/index.html", "/konto-loeschen.html")) {
+            mockMvc.get(page).andExpect {
+                status { isOk() }
+                content { string(containsString("mailto:test-contact@example.org")) }
+                content { string(not(containsString("{{CONTACT_EMAIL}}"))) }
+                content { string(not(containsString("kontakt@hufly.app"))) }
+            }
+        }
+        mockMvc.get("/").andExpect { forwardedUrl("index.html") }
+    }
+
+    @Test
+    fun `every page has the theme toggle`() {
+        for (page in listOf("/index.html", "/impressum.html", "/datenschutz.html", "/konto-loeschen.html")) {
+            mockMvc.get(page).andExpect {
+                content { string(containsString("""src="/assets/theme.js"""")) }
+                content { string(containsString("""class="theme-toggle"""")) }
+            }
+        }
+        mockMvc.get("/assets/theme.js").andExpect { status { isOk() } }
     }
 }

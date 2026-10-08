@@ -3,7 +3,6 @@
 Open work only; finished items live in git history. Client-side product TODOs live in the Hufly app repo (`../Hufly/TODO.md`). Requirements: `../Hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
 ## Push notifications
-- [ ] Configure for real: Firebase project + service account JSON, APNs key (.p8), team id, key id, bundle id (`.env`, `push-secrets/`). Until then both senders log "off" and drop pushes.
 - [ ] Not built (user chose instant + answers + digest): due reminders for tasks and horse care (needs a scheduler and a sent-once record), per-type muting.
 - [ ] Anyone who knows another install's push token could register it on their own session (the token moves). Tokens are not public, so accepted for now.
 

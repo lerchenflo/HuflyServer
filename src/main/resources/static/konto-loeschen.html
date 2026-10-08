@@ -10,6 +10,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/theme.js"></script>
 </head>
 <body>
 <header class="site-header">
@@ -20,6 +21,10 @@
     </a>
     <nav class="site-nav" aria-label="Hauptnavigation">
       <a class="button small" href="/#kontakt">Demo anfragen</a>
+      <button class="theme-toggle" type="button" aria-label="Dunkles Design" title="Dunkles Design">
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM2 13h2a1 1 0 0 0 0-2H2a1 1 0 0 0 0 2zm18 0h2a1 1 0 0 0 0-2h-2a1 1 0 0 0 0 2zM11 2v2a1 1 0 0 0 2 0V2a1 1 0 0 0-2 0zm0 18v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-2 0zM5.99 4.58a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41L5.99 4.58zm12.37 12.37a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41l-1.06-1.06zm1.06-10.96a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41l1.06-1.06zM7.05 18.36a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41l1.06-1.06z"/></svg>
+      </button>
     </nav>
   </div>
 </header>
@@ -39,7 +44,7 @@
     <p>Einträge, die du für deinen Stall angelegt hast, etwa im Pferdetagebuch, bei Aufgaben, Terminen oder Notizen, gehören zum Stall und bleiben erhalten. Sie zeigen statt deines Namens „Gelöschter Nutzer“.</p>
 
     <h2>Stall-Admins</h2>
-    <p>Als Admin eines Stalls kannst du dein Konto nicht selbst löschen, weil der Stall an dir hängt. Schreib uns an <a href="mailto:kontakt@hufly.app?subject=Stall%20l%C3%B6schen">kontakt@hufly.app</a>, dann löschen wir den Stall mit allen Daten.</p>
+    <p>Als Admin eines Stalls kannst du dein Konto nicht selbst löschen, weil der Stall an dir hängt. Schreib uns an <a href="mailto:{{CONTACT_EMAIL}}?subject=Stall%20l%C3%B6schen">{{CONTACT_EMAIL}}</a>, dann löschen wir den Stall mit allen Daten.</p>
 
     <form class="delete-card" id="login-step" novalidate>
       <h2>Anmelden</h2>
@@ -174,7 +179,7 @@
       }
       const code = await errorCode(response);
       if (code === "STABLE_ADMIN") {
-        backToLogin("Als Admin eines Stalls kannst du dein Konto nicht selbst löschen. Schreib uns an kontakt@hufly.app.");
+        backToLogin("Als Admin eines Stalls kannst du dein Konto nicht selbst löschen. Schreib uns an {{CONTACT_EMAIL}}.");
       } else if (response.status === 401 || code === "WRONG_PASSWORD") {
         backToLogin("Deine Anmeldung ist abgelaufen. Bitte melde dich noch einmal an.");
       } else {
