@@ -30,13 +30,53 @@
 <main class="legal">
   <div class="wrap">
     <h1>Datenschutz</h1>
-      <!-- TODO: complete privacy policy (DSGVO) before going live -->
-      <h2>Kurz gesagt</h2>
-      <p>Diese Website setzt keine Cookies, lädt keine Inhalte von fremden Servern und verwendet kein Tracking. Schriften werden von diesem Server geladen.</p>
-      <h2>App</h2>
-      <p>Die vollständige Datenschutzerklärung für die Hufly-App wird vor dem Start hier veröffentlicht.</p>
-      <h2>Konto löschen</h2>
-      <p>Du kannst dein Hufly-Konto jederzeit selbst <a href="/konto-loeschen.html">auf dieser Seite löschen</a>.</p>
+    <p>Hier erfährst du, welche Daten die Website und die App Hufly verarbeiten, wozu und wie lange. Stand: Oktober 2026.</p>
+
+    <h2>Verantwortlich</h2>
+    <p>{{IMPRINT_NAME}}, {{IMPRINT_STREET}}, {{IMPRINT_CITY}}, Österreich<br>
+      E-Mail: <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a></p>
+    <p>Daten, die ein Stall über seine Mitglieder und Pferde in Hufly einträgt, werden im Auftrag dieses Stalls verarbeitet (Art. 28 DSGVO). Für diese Daten ist der Stall verantwortlich, an den du dich auch zuerst wenden kannst. Für die Website, die Anmeldung und den Betrieb von Hufly ist der Betreiber von Hufly verantwortlich.</p>
+
+    <h2>Website</h2>
+    <p>Die Website setzt keine Cookies, verwendet kein Tracking und lädt keine Inhalte von fremden Servern. Schriften werden von diesem Server geladen.</p>
+    <p>Wenn du das helle oder dunkle Design auswählst, speichert dein Browser diese Wahl lokal. Sie wird nicht an den Server übertragen.</p>
+    <p>Auf der Seite <a href="/konto-loeschen.html">Konto löschen</a> werden E-Mail-Adresse und Passwort nur verwendet, um dich anzumelden und dein Konto zu löschen.</p>
+
+    <h2>Server und Hosting</h2>
+    <p>Website, App-Server und Datenbank laufen auf einem eigenen Server in Österreich. Es ist kein Hosting-Anbieter beteiligt.</p>
+    <p>Zum Schutz vor dem Erraten von Passwörtern merkt sich der Server fehlgeschlagene Anmeldungen mit E-Mail-Adresse und IP-Adresse für 15 Minuten, nur im Arbeitsspeicher. Rechtsgrundlage ist das berechtigte Interesse an einem sicheren Betrieb (Art. 6 Abs. 1 lit. f DSGVO).</p>
+
+    <h2>Daten in der App</h2>
+    <p>Dein Konto legt der Admin deines Stalls an. Verarbeitet werden:</p>
+    <ul>
+      <li>Kontodaten: E-Mail-Adresse, Name, freiwillig eine Telefonnummer und ein Profilbild, deine Rollen im Stall und dein Passwort (nur als sicherer Hash gespeichert)</li>
+      <li>Anmeldungen: pro Gerät Gerätename und -typ, Zeitpunkt der Anmeldung und der letzten Nutzung</li>
+      <li>Inhalte des Stalls: Pferde mit Bildern, Futterplänen, Medikamenten und Pferdetagebuch, Koppelpläne, Termine mit Zu- und Absagen, Aufgaben, Notizen mit Lesebestätigung und Abwesenheiten</li>
+      <li>Einstellungen, etwa für Benachrichtigungen und deine Zeitzone</li>
+    </ul>
+    <p>Diese Daten sind nur für Mitglieder deines Stalls sichtbar, je nach den Rechten, die der Stall vergibt. Damit die App ohne Netz funktioniert, liegt eine Kopie auf deinem Gerät. Rechtsgrundlage ist die Nutzung von Hufly durch deinen Stall (Art. 6 Abs. 1 lit. b DSGVO).</p>
+
+    <h2>Kamera und Fotos</h2>
+    <p>Die App greift nur auf Kamera und Fotos zu, wenn du selbst ein Bild für ein Pferd oder dein Profil aufnimmst oder auswählst. Hochgeladen wird nur dieses eine Bild, verkleinert und ohne Standortdaten.</p>
+
+    <h2>Push-Benachrichtigungen</h2>
+    <p>Wenn du Benachrichtigungen erlaubst, erhält der Server eine Push-Kennung deines Geräts. Benachrichtigungen, etwa über neue Notizen, Termineinladungen oder Aufgaben, werden mit Titel und kurzem Text über Firebase Cloud Messaging (Google Ireland Limited, Irland) auf Android und den Apple Push Notification Service (Apple Distribution International Ltd., Irland) auf iPhones zugestellt. Dabei können Daten in die USA übertragen werden; beide Unternehmen sind nach dem EU-US Data Privacy Framework zertifiziert. Du kannst Benachrichtigungen jederzeit in der App oder in den Einstellungen deines Geräts abschalten.</p>
+
+    <h2>Speicherdauer</h2>
+    <ul>
+      <li>Kontodaten, bis dein Konto gelöscht wird</li>
+      <li>Anmeldungen bis zur Abmeldung, höchstens 30 Tage nach der letzten Nutzung</li>
+      <li>Gesammelte Benachrichtigungen für die tägliche Zusammenfassung, bis sie verschickt sind</li>
+      <li>Inhalte des Stalls, solange der Stall Hufly nutzt; endet die Nutzung, werden alle Daten des Stalls gelöscht</li>
+    </ul>
+    <p>Wenn dein Konto gelöscht wird, werden sofort Name, E-Mail-Adresse, Telefonnummer, Profilbild, Passwort, Anmeldungen, Einstellungen und Abwesenheiten entfernt. Einträge, die du für den Stall angelegt hast, bleiben dem Stall erhalten und zeigen „Gelöschter Nutzer“.</p>
+
+    <h2>Konto löschen</h2>
+    <p>Du kannst dein Konto jederzeit selbst <a href="/konto-loeschen.html">auf dieser Seite löschen</a>. Admins eines Stalls schreiben an <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a>.</p>
+
+    <h2>Deine Rechte</h2>
+    <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Schreib dafür an <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a>.</p>
+    <p>Wenn du meinst, dass deine Daten nicht richtig verarbeitet werden, kannst du dich bei der Österreichischen Datenschutzbehörde beschweren: Barichgasse 40–42, 1030 Wien, <a href="https://www.dsb.gv.at">www.dsb.gv.at</a>.</p>
   </div>
 </main>
 <footer class="site-footer">

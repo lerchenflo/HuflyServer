@@ -11,6 +11,8 @@ import org.springframework.test.web.servlet.get
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertFalse
 
 /** The public sales website needs no login; the API still does. */
 @SpringBootTest
@@ -72,7 +74,7 @@ class PublicWebsiteTest {
 
     @Test
     fun `pages show the configured contact email instead of a placeholder`() {
-        for (page in listOf("/index.html", "/konto-loeschen.html")) {
+        for (page in listOf("/index.html", "/konto-loeschen.html", "/impressum.html", "/datenschutz.html")) {
             mockMvc.get(page).andExpect {
                 status { isOk() }
                 content { string(containsString("mailto:test-contact@example.org")) }
@@ -92,5 +94,20 @@ class PublicWebsiteTest {
             }
         }
         mockMvc.get("/assets/theme.js").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `legal pages show the configured operator details, html-escaped`() {
+        for (page in listOf("/impressum.html", "/datenschutz.html")) {
+            mockMvc.get(page).andExpect {
+                content { string(containsString("Anna &lt;Test&gt; &amp; Co")) }
+                content { string(containsString("6900 Bregenz")) }
+                content { string(not(containsString("{{IMPRINT_"))) }
+                content { string(not(containsString("PLATZHALTER"))) }
+            }
+        }
+        val impressum = mockMvc.get("/impressum.html").andReturn().response.getContentAsString(Charsets.UTF_8)
+        assertContains(impressum, "Teststraße 1")
+        assertFalse(impressum.contains("Gewerbe"))
     }
 }

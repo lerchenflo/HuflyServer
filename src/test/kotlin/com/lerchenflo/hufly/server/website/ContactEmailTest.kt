@@ -17,4 +17,12 @@ class ContactEmailTest {
     fun `a valid contact email is kept trimmed`() {
         assertEquals("kontakt@hufly.at", requireContactEmail(" kontakt@hufly.at "))
     }
+
+    @Test
+    fun `operator details must be set, single-line and short`() {
+        for (bad in listOf("", "   ", "line\nbreak", "x".repeat(201))) {
+            assertFailsWith<IllegalStateException>(bad) { requireImprintValue("website.imprint-name", bad) }
+        }
+        assertEquals("Anna Muster", requireImprintValue("website.imprint-name", " Anna Muster "))
+    }
 }
