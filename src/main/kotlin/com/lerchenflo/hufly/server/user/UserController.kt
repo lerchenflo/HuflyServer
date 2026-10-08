@@ -89,7 +89,7 @@ class UserController(
     fun sync(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
         @RequestParam(value = "page_size", defaultValue = "400") pageSize: Int,
-        @Valid @RequestBody clientEntries: List<@Valid IdTimeStamp>,
+        @RequestBody clientEntries: List<IdTimeStamp>,
     ): SyncResponse<UserResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)

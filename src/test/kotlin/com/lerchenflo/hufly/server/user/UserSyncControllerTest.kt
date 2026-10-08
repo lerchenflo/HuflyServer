@@ -111,6 +111,16 @@ class UserSyncControllerTest {
     }
 
     @Test
+    fun `every id-timestamp sync validates each client entry`() {
+        val endpoints = listOf("/users/sync", "/tags/sync", "/horses/sync", "/foodplans/sync", "/paddocks/sync", "/horsegroups/sync", "/horseconflicts/sync")
+        listOf("""[{"id":"","timeStamp":0}]""", """[{"id":"${"x".repeat(101)}","timeStamp":0}]""").forEach { body ->
+            endpoints.forEach { endpoint ->
+                sync(endpoint, body).andExpect { status { isBadRequest() } }
+            }
+        }
+    }
+
+    @Test
     fun `user sync without token answers 401`() {
         mockMvc.post("/users/sync") {
             contentType = MediaType.APPLICATION_JSON

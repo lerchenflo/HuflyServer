@@ -1,13 +1,12 @@
 package com.lerchenflo.hufly.server.core.sync
 
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 
 /** What the client already has: an entity id and its `updatedAt` in epoch milliseconds. */
 data class IdTimeStamp(
-    @field:NotBlank @field:Size(max = 100) val id: String,
+    /** Not blank, at most [MAX_SYNC_ID_LENGTH] chars; checked by [requireValidSyncRequest]. */
+    val id: String,
     val timeStamp: Long,
 )
 
@@ -28,7 +27,12 @@ fun requireValidSyncRequest(page: Int, pageSize: Int, clientEntries: List<IdTime
     if (clientEntries.size > MAX_SYNC_CLIENT_ENTRIES) {
         throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Too many sync entries")
     }
+    if (clientEntries.any { it.id.isBlank() || it.id.length > MAX_SYNC_ID_LENGTH }) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid sync entry id")
+    }
 }
+
+const val MAX_SYNC_ID_LENGTH = 100
 
 /** [serverEntries] must already be limited to the requester's stable and exclude soft-deleted rows. */
 fun <E, R> deltaSync(

@@ -105,7 +105,7 @@ class PaddockController(
     fun syncPaddocks(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
         @RequestParam(value = "page_size", defaultValue = "400") pageSize: Int,
-        @Valid @RequestBody clientEntries: List<@Valid IdTimeStamp>,
+        @RequestBody clientEntries: List<IdTimeStamp>,
     ): SyncResponse<PaddockResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
@@ -140,7 +140,7 @@ class PaddockController(
     fun syncGroups(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
         @RequestParam(value = "page_size", defaultValue = "400") pageSize: Int,
-        @Valid @RequestBody clientEntries: List<@Valid IdTimeStamp>,
+        @RequestBody clientEntries: List<IdTimeStamp>,
     ): SyncResponse<HorseGroupResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
@@ -176,7 +176,7 @@ class PaddockController(
     fun syncConflicts(
         @RequestParam(value = "page", defaultValue = "0") page: Int,
         @RequestParam(value = "page_size", defaultValue = "400") pageSize: Int,
-        @Valid @RequestBody clientEntries: List<@Valid IdTimeStamp>,
+        @RequestBody clientEntries: List<IdTimeStamp>,
     ): SyncResponse<HorseConflictResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
