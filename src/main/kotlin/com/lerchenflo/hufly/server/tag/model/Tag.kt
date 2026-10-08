@@ -5,7 +5,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 enum class TagType { USER_ROLE, FOOD, ACTIVITY, TASK_CATEGORY }
 
@@ -44,7 +43,7 @@ data class Tag(
     val defaultIntervalDays: Int? = null,
     /** Icon key the client draws; never interpreted here, null means the client's default. */
     val icon: String? = null,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */

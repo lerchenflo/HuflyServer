@@ -96,7 +96,7 @@ class UserSettingsControllerTest {
     @Test
     fun `an outdated expectedUpdatedAt answers 409 with the current settings`() {
         call(HttpMethod.PUT, """{"values":{"theme":"dark"},"expectedUpdatedAt":null}""").andExpect { status { isOk() } }
-        val stored = settingsRepository.findById(anna.id)!!.updatedAt.toEpochMilli()
+        val stored = settingsRepository.findById(anna.id)!!.updatedAt
 
         call(HttpMethod.PUT, """{"values":{"theme":"light"},"expectedUpdatedAt":${stored - 1}}""").andExpect {
             status { isConflict() }

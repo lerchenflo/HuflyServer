@@ -1,11 +1,10 @@
 package com.lerchenflo.hufly.server.core.security
 
+import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.MILLIS_PER_SECOND
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -14,13 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class FailureLimiter(
     private val maxFailures: Int,
-    private val window: Duration,
+    /** In milliseconds. */
+    private val window: Long,
     private val clock: Clock,
 ) {
-    private val failures = ConcurrentHashMap<String, ArrayDeque<Instant>>()
+    private val failures = ConcurrentHashMap<String, ArrayDeque<Long>>()
 
     fun recordFailure(key: String) {
-        val now = clock.instant()
+        val now = clock.millis()
         val times = failures.computeIfAbsent(key) { ArrayDeque() }
         synchronized(times) {
             times.prune(now)
@@ -29,14 +29,14 @@ class FailureLimiter(
         if (failures.size > MAX_TRACKED_KEYS) failures.entries.removeIf { (_, times) -> synchronized(times) { times.prune(now); times.isEmpty() } }
     }
 
-    /** How long [key] stays blocked, or null if it may try now. */
-    fun retryAfter(key: String): Duration? {
-        val now = clock.instant()
+    /** Milliseconds [key] stays blocked, or null if it may try now. */
+    fun retryAfter(key: String): Long? {
+        val now = clock.millis()
         val times = failures[key] ?: return null
         synchronized(times) {
             times.prune(now)
             if (times.size < maxFailures) return null
-            return Duration.between(now, times[times.size - maxFailures].plus(window))
+            return times[times.size - maxFailures] + window - now
         }
     }
 
@@ -44,8 +44,8 @@ class FailureLimiter(
         failures.remove(key)
     }
 
-    private fun ArrayDeque<Instant>.prune(now: Instant) {
-        while (isNotEmpty() && !first().plus(window).isAfter(now)) removeFirst()
+    private fun ArrayDeque<Long>.prune(now: Long) {
+        while (isNotEmpty() && first() + window <= now) removeFirst()
     }
 
     private companion object {
@@ -54,8 +54,11 @@ class FailureLimiter(
 }
 
 /** 429 with a Retry-After header in whole seconds. */
-class TooManyAttemptsException(retryAfter: Duration) : ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many attempts") {
-    private val seconds = retryAfter.toSeconds().coerceAtLeast(1)
+class TooManyAttemptsException(retryAfter: Long) : ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many attempts") {
+    private val seconds = retryAfterSeconds(retryAfter)
 
     override fun getHeaders(): HttpHeaders = HttpHeaders().apply { set(HttpHeaders.RETRY_AFTER, seconds.toString()) }
 }
+
+/** Whole seconds for a Retry-After header, at least 1. */
+fun retryAfterSeconds(retryAfterMillis: Long): Long = (retryAfterMillis / MILLIS_PER_SECOND).coerceAtLeast(1)

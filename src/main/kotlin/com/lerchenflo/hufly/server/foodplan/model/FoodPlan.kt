@@ -5,7 +5,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 enum class MealSlot { MORNING, LUNCH, DINNER, NIGHT }
 
@@ -23,7 +22,7 @@ data class FoodPlan(
     @Indexed val stableId: ObjectId,
     val name: String,
     val entries: List<FoodPlanEntry>,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */

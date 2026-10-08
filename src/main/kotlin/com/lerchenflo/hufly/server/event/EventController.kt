@@ -3,9 +3,9 @@ package com.lerchenflo.hufly.server.event
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
-import com.lerchenflo.hufly.server.core.epochMillisToInstant
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.recurrence.RecurrenceRequest
+import com.lerchenflo.hufly.server.core.requireEpochMillis
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.requireValidVersionSyncRequest
@@ -33,7 +33,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 
 @RestController
 class EventController(
@@ -64,7 +63,7 @@ class EventController(
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "splitFromEventId and splitFromOccurrenceStartAt go together")
             }
             if (splitFromEventId == null || splitFromOccurrenceStartAt == null) return null
-            return EventSplit(parseObjectId(splitFromEventId), Instant.ofEpochMilli(splitFromOccurrenceStartAt))
+            return EventSplit(parseObjectId(splitFromEventId), splitFromOccurrenceStartAt)
         }
     }
 
@@ -92,9 +91,9 @@ class EventController(
     fun createEvent(@Valid @RequestBody request: EventRequest): EventResponse {
         val requester = accessService.requester(requireAuth())
         return eventService.createEvent(
-            requester, request.title, request.description, Instant.ofEpochMilli(request.startAt), Instant.ofEpochMilli(request.endAt),
+            requester, request.title, request.description, request.startAt, request.endAt,
             request.horseIds.map(::parseObjectId), request.inviteeUserIds.map(::parseObjectId), request.clientId,
-            request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.startAt)),
+            request.recurrence?.toRecurrence(request.startAt),
             request.split(),
         ).toEventResponse()
     }
@@ -103,9 +102,9 @@ class EventController(
     fun updateEvent(@PathVariable eventId: String, @Valid @RequestBody request: EventRequest): EventResponse {
         val requester = accessService.requester(requireAuth())
         return eventService.updateEvent(
-            requester, parseObjectId(eventId), request.title, request.description, Instant.ofEpochMilli(request.startAt),
-            Instant.ofEpochMilli(request.endAt), request.horseIds.map(::parseObjectId),
-            request.recurrence?.toRecurrence(Instant.ofEpochMilli(request.startAt)),
+            requester, parseObjectId(eventId), request.title, request.description, request.startAt,
+            request.endAt, request.horseIds.map(::parseObjectId),
+            request.recurrence?.toRecurrence(request.startAt),
         ).toEventResponse()
     }
 
@@ -119,7 +118,7 @@ class EventController(
     fun invite(@PathVariable eventId: String, @Valid @RequestBody request: InviteRequest): List<EventInvitationResponse> {
         val requester = accessService.requester(requireAuth())
         return eventService.invite(
-            requester, parseObjectId(eventId), request.userIds.map(::parseObjectId), request.occurrenceStartAt?.let(::epochMillisToInstant),
+            requester, parseObjectId(eventId), request.userIds.map(::parseObjectId), request.occurrenceStartAt?.let(::requireEpochMillis),
         ).map { it.toEventInvitationResponse() }
     }
 
@@ -134,12 +133,12 @@ class EventController(
             cancelled = request.cancelled,
             title = request.title,
             description = request.description,
-            startAt = request.startAt?.let(::epochMillisToInstant),
-            endAt = request.endAt?.let(::epochMillisToInstant),
+            startAt = request.startAt?.let(::requireEpochMillis),
+            endAt = request.endAt?.let(::requireEpochMillis),
             horseIds = request.horseIds?.map(::parseObjectId),
             removedUserIds = request.removedUserIds?.map(::parseObjectId),
         )
-        return occurrenceService.putOccurrence(requester, parseObjectId(eventId), epochMillisToInstant(occurrenceStartAt), change)
+        return occurrenceService.putOccurrence(requester, parseObjectId(eventId), requireEpochMillis(occurrenceStartAt), change)
             .toEventOccurrenceResponse()
     }
 
@@ -150,7 +149,7 @@ class EventController(
         @RequestBody request: AnswerRequest,
     ): EventOccurrenceAnswerResponse {
         val requester = accessService.requester(requireAuth())
-        return occurrenceService.answer(requester, parseObjectId(invitationId), epochMillisToInstant(occurrenceStartAt), request.accepted)
+        return occurrenceService.answer(requester, parseObjectId(invitationId), requireEpochMillis(occurrenceStartAt), request.accepted)
             .toEventOccurrenceAnswerResponse()
     }
 

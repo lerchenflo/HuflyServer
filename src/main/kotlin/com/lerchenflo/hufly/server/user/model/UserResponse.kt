@@ -21,6 +21,6 @@ fun User.toUserResponse() = UserResponse(
     phoneNumber = phoneNumber,
     profilePictureUrl = profilePictureUrl,
     roleTagIds = roleTagIds.map { it.toHexString() },
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
 )

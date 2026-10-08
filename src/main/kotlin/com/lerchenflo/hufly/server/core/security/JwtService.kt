@@ -1,5 +1,8 @@
 package com.lerchenflo.hufly.server.core.security
 
+import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.MILLIS_PER_DAY
+import com.lerchenflo.hufly.server.core.MILLIS_PER_MINUTE
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
@@ -7,8 +10,6 @@ import io.jsonwebtoken.security.Keys
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import java.time.Clock
-import java.time.Duration
 import java.util.Date
 import java.util.UUID
 
@@ -17,19 +18,20 @@ class JwtService(
     @Value($$"${jwt.secret}") jwtSecret: String,
     private val clock: Clock,
 ) {
-    private enum class TokenType(val claim: String, val validity: Duration) {
-        ACCESS("access_token", Duration.ofMinutes(15)),
-        REFRESH("refresh_token", Duration.ofDays(30)),
+    private enum class TokenType(val claim: String, val validityMillis: Long) {
+        ACCESS("access_token", 15 * MILLIS_PER_MINUTE),
+        REFRESH("refresh_token", 30 * MILLIS_PER_DAY),
     }
 
     private val secretKey = Keys.hmacShaKeyFor(jwtSecret.toByteArray())
 
     private val parser = Jwts.parser()
         .verifyWith(secretKey)
-        .clock { Date.from(clock.instant()) }
+        .clock { Date(clock.millis()) }
         .build()
 
-    val refreshTokenValidity: Duration = TokenType.REFRESH.validity
+    /** In milliseconds. */
+    val refreshTokenValidity: Long = TokenType.REFRESH.validityMillis
 
     /** [sessionId] identifies the device session, so the server knows which one a request comes from. */
     fun generateAccessToken(userId: ObjectId, sessionId: ObjectId? = null): String = generate(userId, TokenType.ACCESS, sessionId)
@@ -44,14 +46,14 @@ class JwtService(
         claimsOf(token, TokenType.ACCESS)?.get("sid", String::class.java)?.takeIf(ObjectId::isValid)?.let(::ObjectId)
 
     private fun generate(userId: ObjectId, type: TokenType, sessionId: ObjectId? = null): String {
-        val now = clock.instant()
+        val now = clock.millis()
         return Jwts.builder()
             .subject(userId.toHexString())
             .id(UUID.randomUUID().toString())
             .claim("type", type.claim)
             .apply { if (sessionId != null) claim("sid", sessionId.toHexString()) }
-            .issuedAt(Date.from(now))
-            .expiration(Date.from(now.plus(type.validity)))
+            .issuedAt(Date(now))
+            .expiration(Date(now + type.validityMillis))
             .signWith(secretKey, Jwts.SIG.HS256)
             .compact()
     }

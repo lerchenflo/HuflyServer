@@ -13,6 +13,12 @@ import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.minusSeconds
+import com.lerchenflo.hufly.server.testdata.minutes
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -20,9 +26,6 @@ import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,14 +51,14 @@ class HorseLogServiceTest {
     private val rider = testUser()
     private val vaccination = testTag(type = TagType.ACTIVITY)
     private val blitz = testHorse()
-    private val start = Instant.parse("2026-10-01T08:00:00Z")
+    private val start = millis("2026-10-01T08:00:00Z")
 
     private fun data(
         horseId: ObjectId = blitz.id,
         activityTagId: ObjectId = vaccination.id,
-        endAt: Instant? = start.plusSeconds(1800),
+        endAt: Long? = start.plusSeconds(1800),
         doneByUserId: ObjectId? = rider.id,
-        nextDueAt: LocalDate? = LocalDate.of(2027, 10, 1),
+        nextDueAt: Long? = epochDay(2027, 10, 1),
     ) = HorseLogService.LogData(horseId, activityTagId, start, endAt, doneByUserId, "Influenza", nextDueAt)
 
     @BeforeTest
@@ -64,7 +67,7 @@ class HorseLogServiceTest {
         listOf(writerTag, vaccination).forEach { tagRepository.save(it) }
         horseRepository.save(blitz)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -82,8 +85,8 @@ class HorseLogServiceTest {
         assertEquals(blitz.id, stored.horseId)
         assertEquals(vaccination.id, stored.activityTagId)
         assertEquals(rider.id, stored.doneByUserId)
-        assertEquals(LocalDate.of(2027, 10, 1), stored.nextDueAt)
-        assertEquals(clock.instant(), stored.createdAt)
+        assertEquals(epochDay(2027, 10, 1), stored.nextDueAt)
+        assertEquals(clock.millis(), stored.createdAt)
         assertEquals(writer.id, stored.updatedBy)
         assertEquals(1, stored.version)
     }
@@ -120,14 +123,14 @@ class HorseLogServiceTest {
     @Test
     fun `edit replaces the fields, keeps createdAt and takes a new version`() {
         val entry = logService.createEntry(writer, data())
-        clock.advance(Duration.ofMinutes(5))
+        clock.advance(minutes(5))
 
         logService.updateEntry(writer, entry.id, data(nextDueAt = null))
 
         val stored = stored(entry.id)
         assertEquals(null, stored.nextDueAt)
         assertEquals(entry.createdAt, stored.createdAt)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(2, stored.version)
     }
 

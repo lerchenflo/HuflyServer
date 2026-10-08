@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.authentication
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import com.lerchenflo.hufly.server.authentication.model.UNKNOWN_DEVICE_NAME
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.core.security.TokenCipher
@@ -12,7 +13,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 fun normalizeEmail(email: String): String = email.trim().lowercase()
 
@@ -73,9 +73,9 @@ class AuthService(
 
         val newRefreshToken = jwtService.generateRefreshToken(userId)
         val newHash = hashEncoder.sha256(newRefreshToken)
-        val now = clock.instant()
+        val now = clock.millis()
         val rotated = refreshTokenRepository.rotate(
-            hash, newHash, tokenCipher.encrypt(newRefreshToken), now.plus(jwtService.refreshTokenValidity), now,
+            hash, newHash, tokenCipher.encrypt(newRefreshToken), now + jwtService.refreshTokenValidity, now,
         )
         if (rotated == 1L) {
             val session = refreshTokenRepository.findByHashedToken(newHash) ?: throw unauthorized("Invalid refresh token")
@@ -100,8 +100,8 @@ class AuthService(
                 id = it.id.toHexString(),
                 deviceName = it.deviceName,
                 deviceType = it.deviceType,
-                createdAt = it.createdAt.toEpochMilli(),
-                lastUsedAt = it.lastUsedAt?.toEpochMilli(),
+                createdAt = it.createdAt,
+                lastUsedAt = it.lastUsedAt,
                 current = it.id == currentSessionId,
             )
         }
@@ -119,12 +119,12 @@ class AuthService(
 
     private fun issueTokens(userId: ObjectId, device: Device): TokenPair {
         val refreshToken = jwtService.generateRefreshToken(userId)
-        val now = clock.instant()
+        val now = clock.millis()
         val session = refreshTokenRepository.save(
             RefreshToken(
                 userId = userId,
                 hashedToken = hashEncoder.sha256(refreshToken),
-                expiresAt = now.plus(jwtService.refreshTokenValidity),
+                expiresAt = now + jwtService.refreshTokenValidity,
                 createdAt = now,
                 deviceName = device.name,
                 deviceType = device.type,

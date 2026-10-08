@@ -15,7 +15,6 @@ import org.springframework.data.domain.Limit
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -40,11 +39,11 @@ class MongoEventRepositoryTest {
         creatorUserId = creator,
         title = "v$version",
         description = "",
-        startAt = Instant.EPOCH,
-        endAt = Instant.EPOCH,
+        startAt = 0L,
+        endAt = 0L,
         horseIds = emptyList(),
-        createdAt = Instant.EPOCH,
-        updatedAt = Instant.EPOCH,
+        createdAt = 0L,
+        updatedAt = 0L,
         updatedBy = creator,
         version = version,
     )
@@ -54,9 +53,9 @@ class MongoEventRepositoryTest {
         eventId = ObjectId.get(),
         userId = userId,
         status = InvitationStatus.PENDING,
-        invitedAt = Instant.EPOCH,
+        invitedAt = 0L,
         respondedAt = null,
-        updatedAt = Instant.EPOCH,
+        updatedAt = 0L,
         updatedBy = creator,
         version = version,
     )

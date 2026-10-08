@@ -15,6 +15,9 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -23,8 +26,6 @@ import org.bson.types.ObjectId
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,8 +68,8 @@ class TaskSeriesServiceTest {
     private val foreignHorse = testHorse(stableId = OTHER_STABLE_ID)
 
     // Daily 07:00 UTC, five dates.
-    private val first = Instant.parse("2026-10-05T07:00:00Z")
-    private val second = first.plus(Duration.ofDays(1))
+    private val first = millis("2026-10-05T07:00:00Z")
+    private val second = first + days(1)
     private val daily = Recurrence(RecurrenceFrequency.DAILY, 1, emptyList(), null, 5, "UTC")
 
     @BeforeTest
@@ -77,7 +78,7 @@ class TaskSeriesServiceTest {
         listOf(plannerTag, viewerTag).forEach { tagRepository.save(it) }
         listOf(blitz, foreignHorse).forEach { horseRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -91,7 +92,7 @@ class TaskSeriesServiceTest {
         cancelled: Boolean = false,
         title: String? = null,
         comment: String? = null,
-        dueAt: Instant? = null,
+        dueAt: Long? = null,
         horseIds: List<ObjectId>? = null,
         assigneeUserIds: List<ObjectId>? = null,
     ) = TaskOccurrenceChange(cancelled, title, comment, dueAt, horseIds, assigneeUserIds)
@@ -135,7 +136,7 @@ class TaskSeriesServiceTest {
         assertStatus(HttpStatus.FORBIDDEN) { service.putOccurrence(anna, task.id, second, change()) }
         assertStatus(HttpStatus.NOT_FOUND) { service.putOccurrence(planner, ObjectId.get(), second, change()) }
         assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(planner, single.id, first, change()) }
-        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(planner, task.id, first.plus(Duration.ofDays(5)), change()) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(planner, task.id, first + days(5), change()) }
     }
 
     @Test
@@ -145,7 +146,7 @@ class TaskSeriesServiceTest {
             change(title = ""),
             change(title = "x".repeat(201)),
             change(comment = "x".repeat(5001)),
-            change(dueAt = Instant.ofEpochMilli(32_503_680_000_001)),
+            change(dueAt = 32_503_680_000_001),
             change(horseIds = listOf(foreignHorse.id)),
             change(horseIds = List(51) { blitz.id }),
         )
@@ -160,7 +161,7 @@ class TaskSeriesServiceTest {
 
         val done = service.setDone(anna, task.id, second, true)
         assertEquals(anna.id, done.doneByUserId)
-        assertEquals(clock.instant(), done.doneAt)
+        assertEquals(clock.millis(), done.doneAt)
         assertEquals("Misten Box 3", done.title)
 
         val undone = service.setDone(planner, task.id, second, false)
@@ -310,7 +311,7 @@ class TaskSeriesServiceTest {
     @Test
     fun `each date of a rotating series is ticked by its turn's assignee, a stand-in or TASK_EDIT`() {
         val task = rotating()
-        val third = second.plus(Duration.ofDays(1))
+        val third = second + days(1)
 
         assertStatus(HttpStatus.FORBIDDEN) { service.setDone(ben, task.id, first, true) }
         assertEquals(anna.id, service.setDone(anna, task.id, first, true).doneByUserId)
@@ -322,7 +323,7 @@ class TaskSeriesServiceTest {
         service.putOccurrence(planner, task.id, third, change(assigneeUserIds = listOf(ben.id)))
         assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third, false) }
         assertEquals(ben.id, service.setDone(ben, task.id, third, true).doneByUserId)
-        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third.plus(Duration.ofDays(1)), true) }
+        assertStatus(HttpStatus.FORBIDDEN) { service.setDone(anna, task.id, third + days(1), true) }
     }
 
     @Test

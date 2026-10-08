@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
@@ -28,16 +29,14 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
 
 /** Null fields keep the series' value; all null with [cancelled] false restores the date. */
 data class EventOccurrenceChange(
     val cancelled: Boolean,
     val title: String?,
     val description: String?,
-    val startAt: Instant?,
-    val endAt: Instant?,
+    val startAt: Long?,
+    val endAt: Long?,
     val horseIds: List<ObjectId>?,
     val removedUserIds: List<ObjectId>? = null,
 )
@@ -58,7 +57,7 @@ class EventOccurrenceService(
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
 ) {
-    fun putOccurrence(requester: User, eventId: ObjectId, occurrenceStartAt: Instant, change: EventOccurrenceChange): EventOccurrence {
+    fun putOccurrence(requester: User, eventId: ObjectId, occurrenceStartAt: Long, change: EventOccurrenceChange): EventOccurrence {
         val event = eventService.managedEvent(requester, eventId)
         event.recurrence.requireOccurrence(event.startAt, occurrenceStartAt)
         validate(requester, change)
@@ -79,14 +78,14 @@ class EventOccurrenceService(
                     endAt = change.endAt,
                     horseIds = change.horseIds?.distinct(),
                     removedUserIds = removedUserIds,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                 )
             )
         }
     }
 
-    fun answer(requester: User, invitationId: ObjectId, occurrenceStartAt: Instant, accepted: Boolean): EventOccurrenceAnswer {
+    fun answer(requester: User, invitationId: ObjectId, occurrenceStartAt: Long, accepted: Boolean): EventOccurrenceAnswer {
         val invitation = eventService.liveInvitation(requester, invitationId)
         if (invitation.userId != requester.id) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not your invitation")
         if (invitation.occurrenceStartAt != null) throw badRequest("A date invitation is answered as a whole")
@@ -100,7 +99,7 @@ class EventOccurrenceService(
         val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
         val saved = retryOnDuplicate {
             val existing = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)
-            val now = clock.instant()
+            val now = clock.millis()
             eventService.saveAnswer(
                 EventOccurrenceAnswer(
                     id = existing?.id ?: ObjectId.get(),
@@ -151,7 +150,7 @@ class EventOccurrenceService(
         change.description?.let { if (it.length > 5000) throw badRequest("Description too long") }
         if ((change.startAt == null) != (change.endAt == null)) throw badRequest("Set both startAt and endAt or neither")
         if (change.startAt != null && change.endAt != null) {
-            val range = Instant.EPOCH..Instant.ofEpochMilli(MAX_EPOCH_MILLIS)
+            val range = 0L..MAX_EPOCH_MILLIS
             if (change.startAt !in range || change.endAt !in range) throw badRequest("Time out of range")
             if (change.endAt <= change.startAt) throw badRequest("End must be after start")
         }

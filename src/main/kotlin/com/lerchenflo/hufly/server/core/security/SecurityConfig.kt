@@ -4,7 +4,6 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.web.filter.OncePerRequestFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
@@ -18,10 +17,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.provisioning.InMemoryUserDetailsManager
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
+import org.springframework.web.filter.OncePerRequestFilter
 
 @Configuration
 @EnableWebSecurity
@@ -65,7 +65,7 @@ class SecurityConfig(
             if (retryAfter == null) {
                 chain.doFilter(request, response)
             } else {
-                response.setHeader("Retry-After", retryAfter.toSeconds().coerceAtLeast(1).toString())
+                response.setHeader("Retry-After", retryAfterSeconds(retryAfter).toString())
                 response.sendError(HttpStatus.TOO_MANY_REQUESTS.value())
             }
         }

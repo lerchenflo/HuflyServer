@@ -35,7 +35,6 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.Instant
 
 /** Paddocks, horse groups and conflicts sync by IdTimeStamp lists; assignments by version. */
 @RestController
@@ -194,7 +193,7 @@ class PaddockController(
         val requester = accessService.requester(requireAuth())
         return paddockService.createAssignment(
             requester, parseObjectId(request.paddockId), request.groupIds.map(::parseObjectId), request.horseIds.map(::parseObjectId),
-            Instant.ofEpochMilli(request.startAt), request.endAt?.let(Instant::ofEpochMilli), request.comment, request.clientId,
+            request.startAt, request.endAt, request.comment, request.clientId,
         ).toPaddockAssignmentResponse()
     }
 
@@ -203,7 +202,7 @@ class PaddockController(
         val requester = accessService.requester(requireAuth())
         return paddockService.updateAssignment(
             requester, parseObjectId(assignmentId), parseObjectId(request.paddockId), request.groupIds.map(::parseObjectId),
-            request.horseIds.map(::parseObjectId), Instant.ofEpochMilli(request.startAt), request.endAt?.let(Instant::ofEpochMilli),
+            request.horseIds.map(::parseObjectId), request.startAt, request.endAt,
             request.comment,
         ).toPaddockAssignmentResponse()
     }

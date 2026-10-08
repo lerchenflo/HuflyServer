@@ -3,12 +3,15 @@ package com.lerchenflo.hufly.server.absence
 import com.lerchenflo.hufly.server.absence.model.AbsenceResponse
 import com.lerchenflo.hufly.server.absence.model.toAbsenceResponse
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
+import com.lerchenflo.hufly.server.core.MAX_EPOCH_DAYS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.requireValidVersionSyncRequest
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -21,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.time.LocalDate
 
 @RestController
 @RequestMapping("/absences")
@@ -32,9 +34,9 @@ class AbsenceController(
 
     data class AbsenceRequest(
         val userId: String,
-        val from: LocalDate,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val from: Long,
         /** Inclusive. */
-        val until: LocalDate,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val until: Long,
         @field:Size(max = 500) val note: String = "",
         /** Only read on create. */
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,

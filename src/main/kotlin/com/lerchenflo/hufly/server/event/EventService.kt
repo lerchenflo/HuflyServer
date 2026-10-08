@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.notification.EventInvited
@@ -35,8 +36,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
 
 /**
  * Creating needs EVENT_EDIT; changing an event or its invitations needs EVENT_EDIT and being its creator or the admin.
@@ -62,8 +61,8 @@ class EventService(
         requester: User,
         title: String,
         description: String,
-        startAt: Instant,
-        endAt: Instant,
+        startAt: Long,
+        endAt: Long,
         horseIds: List<ObjectId>,
         inviteeUserIds: List<ObjectId>,
         clientId: String? = null,
@@ -77,7 +76,7 @@ class EventService(
             requireOwnUsers(requester, invitees)
             requireInvitationCap(invitees.size)
             requireSplitSource(requester, splitFrom)
-            val now = clock.instant()
+            val now = clock.millis()
             val event = saveEvent(
                 Event(
                     stableId = requester.stableId,
@@ -108,8 +107,8 @@ class EventService(
         eventId: ObjectId,
         title: String,
         description: String,
-        startAt: Instant,
-        endAt: Instant,
+        startAt: Long,
+        endAt: Long,
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
     ): Event {
@@ -123,7 +122,7 @@ class EventService(
                 endAt = endAt,
                 horseIds = horseIds.distinct(),
                 recurrence = recurrence,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -131,7 +130,7 @@ class EventService(
 
     fun deleteEvent(requester: User, eventId: ObjectId) {
         val event = managedEvent(requester, eventId)
-        val now = clock.instant()
+        val now = clock.millis()
         invitationRepository.findByEventIdAndDeletedFalse(event.id).forEach {
             saveInvitation(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         }
@@ -149,7 +148,7 @@ class EventService(
      * users invited to the whole series and the creator are skipped then. The creator takes part in the whole event
      * ("Ich nehme auch teil") as accepted, without a push. Answers the live invitations afterwards.
      */
-    fun invite(requester: User, eventId: ObjectId, userIds: List<ObjectId>, occurrenceStartAt: Instant? = null): List<EventInvitation> {
+    fun invite(requester: User, eventId: ObjectId, userIds: List<ObjectId>, occurrenceStartAt: Long? = null): List<EventInvitation> {
         val event = managedEvent(requester, eventId)
         if (occurrenceStartAt != null) event.recurrence.requireOccurrence(event.startAt, occurrenceStartAt)
         requireOwnUsers(requester, userIds)
@@ -169,7 +168,7 @@ class EventService(
     fun removeInvitation(requester: User, invitationId: ObjectId) {
         val invitation = liveInvitation(requester, invitationId)
         val event = managedEvent(requester, invitation.eventId)
-        val now = clock.instant()
+        val now = clock.millis()
         saveInvitation(invitation.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         answerRepository.findByInvitationIdAndDeletedFalse(invitation.id).forEach {
             saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
@@ -183,7 +182,7 @@ class EventService(
         if (invitation.occurrenceStartAt == null && eventRepository.findById(invitation.eventId)?.recurrence != null) {
             throw badRequest("Answer the dates of a series one by one")
         }
-        val now = clock.instant()
+        val now = clock.millis()
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
         val saved = saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
         if (invitation.status != status) {
@@ -245,7 +244,7 @@ class EventService(
     }
 
     /** Saves a new invitation; on a split series it takes over what the user answered on the old one from the split date on. */
-    private fun addInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Instant?) {
+    private fun addInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Long?) {
         val invitation = newInvitation(requester, event, userId, occurrenceStartAt)
         val splitFrom = event.splitFromEventId ?: return run { saveInvitation(invitation) }
         val splitAt = event.splitFromOccurrenceStartAt ?: return run { saveInvitation(invitation) }
@@ -258,7 +257,7 @@ class EventService(
         }
         val saved = saveInvitation(invitation)
         if (old == null) return
-        val now = clock.instant()
+        val now = clock.millis()
         answerRepository.findByInvitationIdAndDeletedFalse(old.id).filter { it.occurrenceStartAt >= splitAt }.forEach {
             saveAnswer(
                 it.copy(
@@ -281,8 +280,8 @@ class EventService(
         if (source.creatorUserId != requester.id && !accessService.isAdmin(requester)) throw badRequest("Not your series to split")
     }
 
-    private fun newInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Instant? = null): EventInvitation {
-        val now = clock.instant()
+    private fun newInvitation(requester: User, event: Event, userId: ObjectId, occurrenceStartAt: Long? = null): EventInvitation {
+        val now = clock.millis()
         val organiser = userId == event.creatorUserId
         return EventInvitation(
             stableId = event.stableId,
@@ -330,7 +329,7 @@ class EventService(
         invitationRepository.findById(invitationId)?.takeIf { it.stableId == requester.stableId && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found")
 
-    private fun validate(requester: User, startAt: Instant, endAt: Instant, horseIds: List<ObjectId>) {
+    private fun validate(requester: User, startAt: Long, endAt: Long, horseIds: List<ObjectId>) {
         if (endAt < startAt) throw badRequest("End before start")
         val horsesOk = horseIds.isNotEmpty() &&
             horseIds.all { id -> horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }

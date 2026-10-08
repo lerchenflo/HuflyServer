@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.note
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.notification.NotePosted
@@ -21,8 +22,6 @@ import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.LocalDate
 
 /** Writing needs NOTE_WRITE (any note of the stable); every member reads and marks notes read. */
 @Service
@@ -33,12 +32,12 @@ class NoteService(
     private val events: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
-    data class NoteData(val title: String, val body: String, val pinned: Boolean, val visibleUntil: LocalDate?)
+    data class NoteData(val title: String, val body: String, val pinned: Boolean, val visibleUntil: Long?)
 
     fun createNote(requester: User, data: NoteData, clientId: String? = null): StableNote {
         accessService.requirePermission(requester, Permission.NOTE_WRITE)
         return idempotentCreate(clientId, { noteRepository.findByStableIdAndClientId(requester.stableId, it) }) {
-            val now = clock.instant()
+            val now = clock.millis()
             save(
                 StableNote(
                     stableId = requester.stableId,
@@ -61,7 +60,7 @@ class NoteService(
         val note = stableNote(requester, noteId)
         val title = requireTitle(data.title)
         val updated = versionCounterService.withVersion(SyncCollection.NOTES) { version ->
-            noteRepository.updateContent(note.id, title, data.body, data.pinned, data.visibleUntil, clock.instant(), requester.id, version)
+            noteRepository.updateContent(note.id, title, data.body, data.pinned, data.visibleUntil, clock.millis(), requester.id, version)
         }
         return announceAtomicSave(note.id, updated)
     }
@@ -69,7 +68,7 @@ class NoteService(
     fun deleteNote(requester: User, noteId: ObjectId) {
         accessService.requirePermission(requester, Permission.NOTE_WRITE)
         val note = stableNote(requester, noteId)
-        save(note.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        save(note.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     /** The author needs no mark. Leaves updatedAt alone: reading is not an edit. */

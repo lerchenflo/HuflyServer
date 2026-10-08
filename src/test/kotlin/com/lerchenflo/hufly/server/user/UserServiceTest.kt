@@ -11,14 +11,15 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.minutes
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,7 +61,7 @@ class UserServiceTest {
         listOf(admin, rider, foreigner).forEach { userRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
         tagRepository.save(roleTag)
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -70,7 +71,7 @@ class UserServiceTest {
     private fun stored(id: ObjectId) = userRepository.findById(id)!!
 
     private fun session(userId: ObjectId) = refreshTokenRepository.save(
-        RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = Instant.MAX, createdAt = Instant.EPOCH)
+        RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = Long.MAX_VALUE, createdAt = 0L)
     )
 
     // Create
@@ -83,7 +84,7 @@ class UserServiceTest {
         assertEquals(STABLE_ID, user.stableId)
         assertEquals("new@hufly.test", user.email)
         assertEquals(listOf(roleTag.id), user.roleTagIds)
-        assertEquals(clock.instant(), user.updatedAt)
+        assertEquals(clock.millis(), user.updatedAt)
         assertEquals(admin.id, user.updatedBy)
         assertTrue(created.generatedPassword.length >= 12)
         assertTrue(hashEncoder.matches(created.generatedPassword, user.hashedPassword))
@@ -129,7 +130,7 @@ class UserServiceTest {
         assertEquals("Renamed", user.displayName)
         assertEquals("+43 2", user.phoneNumber)
         assertEquals(listOf(roleTag.id), user.roleTagIds)
-        assertEquals(clock.instant(), user.updatedAt)
+        assertEquals(clock.millis(), user.updatedAt)
         assertEquals(admin.id, user.updatedBy)
     }
 
@@ -172,14 +173,14 @@ class UserServiceTest {
 
         val user = stored(rider.id)
         assertTrue(user.deleted)
-        assertEquals(clock.instant(), user.updatedAt)
+        assertEquals(clock.millis(), user.updatedAt)
         assertEquals(listOf(adminSession), refreshTokenRepository.tokens)
     }
 
     @Test
     fun `a deleted user's personal data is wiped and the email freed`() {
-        userSettingsRepository.save(com.lerchenflo.hufly.server.user.model.UserSettings(rider.id, mapOf("a" to "b"), Instant.EPOCH))
-        digestItemRepository.save(com.lerchenflo.hufly.server.notification.model.DigestItem(userId = rider.id, title = "t", body = "b", createdAt = Instant.EPOCH))
+        userSettingsRepository.save(com.lerchenflo.hufly.server.user.model.UserSettings(rider.id, mapOf("a" to "b"), 0L))
+        digestItemRepository.save(com.lerchenflo.hufly.server.notification.model.DigestItem(userId = rider.id, title = "t", body = "b", createdAt = 0L))
         pictureStore.save(com.lerchenflo.hufly.server.core.picture.PictureKind.USER, rider.id, byteArrayOf(1))
 
         userService.deleteUser(admin, rider.id)
@@ -312,7 +313,7 @@ class UserServiceTest {
     fun `user uploads and removes the own profile picture`() {
         val updated = userService.setMyPicture(rider, com.lerchenflo.hufly.server.core.picture.testPng())
 
-        assertEquals("/users/${rider.id.toHexString()}/picture?v=${updated.updatedAt.toEpochMilli()}", updated.profilePictureUrl)
+        assertEquals("/users/${rider.id.toHexString()}/picture?v=${updated.updatedAt}", updated.profilePictureUrl)
         assertEquals(updated, stored(rider.id))
         assertTrue(userService.picture(admin, rider.id).isNotEmpty())
 
@@ -337,15 +338,15 @@ class UserServiceTest {
     fun `admin sets and removes a member's profile picture`() {
         val updated = userService.setPicture(admin, rider.id, com.lerchenflo.hufly.server.core.picture.testPng())
 
-        assertEquals("/users/${rider.id.toHexString()}/picture?v=${clock.instant().toEpochMilli()}", stored(rider.id).profilePictureUrl)
+        assertEquals("/users/${rider.id.toHexString()}/picture?v=${clock.millis()}", stored(rider.id).profilePictureUrl)
         assertEquals(updated, stored(rider.id))
         assertEquals(admin.id, updated.updatedBy)
         assertTrue(userService.picture(rider, rider.id).isNotEmpty())
 
-        clock.advance(Duration.ofMinutes(1))
+        clock.advance(minutes(1))
         val cleared = userService.deletePicture(admin, rider.id)
         assertEquals(null, stored(rider.id).profilePictureUrl)
-        assertEquals(clock.instant(), cleared.updatedAt)
+        assertEquals(clock.millis(), cleared.updatedAt)
         assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
     }
 
@@ -376,13 +377,13 @@ class UserServiceTest {
     fun `a deleted member is removed from every horse they co-ride`() {
         val shared = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse().copy(coRiderUserIds = listOf(rider.id, admin.id)))
         val untouched = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse().copy(coRiderUserIds = listOf(admin.id)))
-        clock.advance(java.time.Duration.ofMinutes(1))
+        clock.advance(minutes(1))
 
         userService.deleteUser(admin, rider.id)
 
         val stored = horseRepository.findById(shared.id)!!
         assertEquals(listOf(admin.id), stored.coRiderUserIds)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(admin.id, stored.updatedBy)
         assertEquals(untouched, horseRepository.findById(untouched.id))
     }
@@ -390,7 +391,7 @@ class UserServiceTest {
     @Test
     fun `a deleted member's absences are deleted`() {
         val absence = absenceService.createAbsence(
-            rider, com.lerchenflo.hufly.server.absence.AbsenceService.AbsenceData(rider.id, java.time.LocalDate.of(2026, 10, 12), java.time.LocalDate.of(2026, 10, 13), ""),
+            rider, com.lerchenflo.hufly.server.absence.AbsenceService.AbsenceData(rider.id, epochDay(2026, 10, 12), epochDay(2026, 10, 13), ""),
         )
 
         userService.deleteUser(admin, rider.id)

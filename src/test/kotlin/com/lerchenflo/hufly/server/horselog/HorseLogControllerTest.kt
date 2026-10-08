@@ -70,7 +70,7 @@ class HorseLogControllerTest {
 
     private fun entryJson(startAt: String = "1790000000000") =
         """{"horseId":"${blitz.id.toHexString()}","activityTagId":"${vaccination.id.toHexString()}","startAt":$startAt,""" +
-            """"endAt":null,"doneByUserId":"${rider.id.toHexString()}","comment":"Influenza","nextDueAt":"2027-10-01"}"""
+            """"endAt":null,"doneByUserId":"${rider.id.toHexString()}","comment":"Influenza","nextDueAt":21092}"""
 
     @Test
     fun `create entry answers with the entry`() {
@@ -78,7 +78,7 @@ class HorseLogControllerTest {
             status { isOk() }
             jsonPath("$.horseId") { value(blitz.id.toHexString()) }
             jsonPath("$.startAt") { value(1790000000000) }
-            jsonPath("$.nextDueAt") { value("2027-10-01") }
+            jsonPath("$.nextDueAt") { value(21092) }
             jsonPath("$.version") { isNumber() }
         }
     }

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.notification.TaskAssigned
@@ -15,8 +16,8 @@ import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
-import com.lerchenflo.hufly.server.task.model.rotationAssignee
 import com.lerchenflo.hufly.server.task.model.TaskOccurrenceResponse
+import com.lerchenflo.hufly.server.task.model.rotationAssignee
 import com.lerchenflo.hufly.server.task.model.toTaskOccurrenceResponse
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
@@ -24,15 +25,13 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
 
 /** Null fields keep the series' value; an empty [horseIds] means no horses on this date. */
 data class TaskOccurrenceChange(
     val cancelled: Boolean,
     val title: String?,
     val comment: String?,
-    val dueAt: Instant?,
+    val dueAt: Long?,
     val horseIds: List<ObjectId>?,
     /** Null means the series' assignees. */
     val assigneeUserIds: List<ObjectId>? = null,
@@ -52,7 +51,7 @@ class TaskOccurrenceService(
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
 ) {
-    fun putOccurrence(requester: User, taskId: ObjectId, occurrenceDueAt: Instant, change: TaskOccurrenceChange): TaskOccurrence {
+    fun putOccurrence(requester: User, taskId: ObjectId, occurrenceDueAt: Long, change: TaskOccurrenceChange): TaskOccurrence {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = seriesTask(requester, taskId, occurrenceDueAt)
         validate(requester, change)
@@ -75,13 +74,13 @@ class TaskOccurrenceService(
         return saved
     }
 
-    fun setDone(requester: User, taskId: ObjectId, occurrenceDueAt: Instant, done: Boolean): TaskOccurrence {
+    fun setDone(requester: User, taskId: ObjectId, occurrenceDueAt: Long, done: Boolean): TaskOccurrence {
         val task = seriesTask(requester, taskId, occurrenceDueAt)
         val occurrence = occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)?.takeUnless { it.deleted }
         val assignees = occurrence?.assigneeUserIds ?: task.rotationAssignee(occurrenceDueAt)?.let(::listOf) ?: task.assigneeUserIds
         taskService.requireMayTick(requester, assignees)
         if (occurrence?.cancelled == true) throw ResponseStatusException(HttpStatus.CONFLICT, "This date is cancelled")
-        val now = clock.instant()
+        val now = clock.millis()
         return upsert(requester, task, occurrenceDueAt) {
             it.copy(doneByUserId = if (done) requester.id else null, doneAt = if (done) now else null)
         }
@@ -103,23 +102,23 @@ class TaskOccurrenceService(
         )
     }
 
-    private fun seriesTask(requester: User, taskId: ObjectId, occurrenceDueAt: Instant): StableTask {
+    private fun seriesTask(requester: User, taskId: ObjectId, occurrenceDueAt: Long): StableTask {
         val task = taskService.stableTask(requester, taskId)
         task.recurrence.requireOccurrence(task.dueAt ?: throw badRequest("Not a series"), occurrenceDueAt)
         return task
     }
 
-    private fun upsert(requester: User, task: StableTask, occurrenceDueAt: Instant, apply: (TaskOccurrence) -> TaskOccurrence) =
+    private fun upsert(requester: User, task: StableTask, occurrenceDueAt: Long, apply: (TaskOccurrence) -> TaskOccurrence) =
         retryOnDuplicate {
             val current = occurrenceRepository.findByTaskIdAndOccurrenceDueAt(task.id, occurrenceDueAt)
-                ?: TaskOccurrence(stableId = task.stableId, taskId = task.id, occurrenceDueAt = occurrenceDueAt, updatedAt = clock.instant(), updatedBy = requester.id)
-            taskService.saveOccurrence(apply(current).copy(deleted = false, updatedAt = clock.instant(), updatedBy = requester.id))
+                ?: TaskOccurrence(stableId = task.stableId, taskId = task.id, occurrenceDueAt = occurrenceDueAt, updatedAt = clock.millis(), updatedBy = requester.id)
+            taskService.saveOccurrence(apply(current).copy(deleted = false, updatedAt = clock.millis(), updatedBy = requester.id))
         }
 
     private fun validate(requester: User, change: TaskOccurrenceChange) {
         change.title?.let { if (it.isBlank() || it.length > 200) throw badRequest("Title must be 1 to 200 characters") }
         change.comment?.let { if (it.length > 5000) throw badRequest("Comment too long") }
-        change.dueAt?.let { if (it !in Instant.EPOCH..Instant.ofEpochMilli(MAX_EPOCH_MILLIS)) throw badRequest("Time out of range") }
+        change.dueAt?.let { if (it !in 0L..MAX_EPOCH_MILLIS) throw badRequest("Time out of range") }
         change.horseIds?.let {
             if (it.size > MAX_HORSES) throw badRequest("At most $MAX_HORSES horses")
             taskService.requireHorses(requester, it)

@@ -1,6 +1,5 @@
 package com.lerchenflo.hufly.server.horse.model
 
-import java.time.LocalDate
 
 /** Dates are ISO strings (`2015-04-01`), `updatedAt` is epoch milliseconds. */
 data class HorseResponse(
@@ -9,7 +8,7 @@ data class HorseResponse(
     val name: String,
     val description: String,
     val pictureUrl: String?,
-    val birthDate: LocalDate?,
+    val birthDate: Long?,
     val breed: String,
     val color: String,
     val ownerUserId: String?,
@@ -37,7 +36,7 @@ fun Horse.toHorseResponse(showMedications: Boolean) = HorseResponse(
     vetContact = vetContact,
     medications = medications.takeIf { showMedications },
     foodPlanId = foodPlanId?.toHexString(),
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     coRiderUserIds = coRiderUserIds.map { it.toHexString() },
 )

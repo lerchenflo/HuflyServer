@@ -5,7 +5,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 /**
  * One date of a task series (TSK-5), keyed by its original due time: its change (null fields keep the series' value)
@@ -18,17 +17,17 @@ data class TaskOccurrence(
     @Id val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     val taskId: ObjectId,
-    val occurrenceDueAt: Instant,
+    val occurrenceDueAt: Long,
     val cancelled: Boolean = false,
     val title: String? = null,
     val comment: String? = null,
-    val dueAt: Instant? = null,
+    val dueAt: Long? = null,
     val horseIds: List<ObjectId>? = null,
     /** Replaces the series' assignees for this date only (e.g. a holiday cover). */
     @Indexed val assigneeUserIds: List<ObjectId>? = null,
     val doneByUserId: ObjectId? = null,
-    val doneAt: Instant? = null,
-    val updatedAt: Instant,
+    val doneAt: Long? = null,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
@@ -57,16 +56,16 @@ fun TaskOccurrence.toTaskOccurrenceResponse() = TaskOccurrenceResponse(
     id = id.toHexString(),
     stableId = stableId.toHexString(),
     taskId = taskId.toHexString(),
-    occurrenceDueAt = occurrenceDueAt.toEpochMilli(),
+    occurrenceDueAt = occurrenceDueAt,
     cancelled = cancelled,
     title = title,
     comment = comment,
-    dueAt = dueAt?.toEpochMilli(),
+    dueAt = dueAt,
     horseIds = horseIds?.map { it.toHexString() },
     assigneeUserIds = assigneeUserIds?.map { it.toHexString() },
     doneByUserId = doneByUserId?.toHexString(),
-    doneAt = doneAt?.toEpochMilli(),
-    updatedAt = updatedAt.toEpochMilli(),
+    doneAt = doneAt,
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     version = version,
 )

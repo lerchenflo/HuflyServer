@@ -4,12 +4,11 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 
 /** What the client already has: an entity id and its `updatedAt` in epoch milliseconds. */
 data class IdTimeStamp(
     @field:NotBlank @field:Size(max = 100) val id: String,
-    @field:NotBlank @field:Size(max = 30) val timeStamp: String,
+    val timeStamp: Long,
 )
 
 data class SyncResponse<T>(
@@ -38,15 +37,14 @@ fun <E, R> deltaSync(
     page: Int,
     pageSize: Int,
     id: (E) -> String,
-    updatedAt: (E) -> Instant,
+    updatedAt: (E) -> Long,
     toResponse: (E) -> R,
 ): SyncResponse<R> {
     val clientTimestamps = clientEntries.associate { it.id to it.timeStamp }
     val changed = serverEntries
         .filter { entry ->
-            val known = clientTimestamps[id(entry)] ?: return@filter true
-            val clientMillis = known.toLongOrNull() ?: return@filter true
-            updatedAt(entry).toEpochMilli() > clientMillis
+            val clientMillis = clientTimestamps[id(entry)] ?: return@filter true
+            updatedAt(entry) > clientMillis
         }
         .sortedByDescending(updatedAt)
 

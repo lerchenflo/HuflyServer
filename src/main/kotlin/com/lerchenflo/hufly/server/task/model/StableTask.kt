@@ -6,7 +6,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 /** A stable chore. Done as soon as any assignee ticks it (TSK-4). Synced by [version]. */
 @Document("tasks")
@@ -18,7 +17,7 @@ data class StableTask(
     val title: String,
     val comment: String,
     /** Null for an undated task ("Ohne Termin"), open until ticked; never for a series. */
-    val dueAt: Instant?,
+    val dueAt: Long?,
     val assigneeUserIds: List<ObjectId>,
     /** Optional horses the chore is about (HOR-6). */
     val horseIds: List<ObjectId>,
@@ -30,8 +29,8 @@ data class StableTask(
     val rotatesAssignees: Boolean = false,
     val createdByUserId: ObjectId,
     val doneByUserId: ObjectId?,
-    val doneAt: Instant?,
-    val updatedAt: Instant,
+    val doneAt: Long?,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
@@ -48,7 +47,7 @@ enum class TurnoutKind { OUT, IN }
 data class TurnoutLink(val assignmentId: ObjectId, val kind: TurnoutKind)
 
 /** The assignee whose turn the series date [occurrenceDueAt] is; must match the client. */
-fun StableTask.rotationAssignee(occurrenceDueAt: Instant): ObjectId? {
+fun StableTask.rotationAssignee(occurrenceDueAt: Long): ObjectId? {
     if (!rotatesAssignees || recurrence == null || dueAt == null || assigneeUserIds.isEmpty()) return null
     return assigneeUserIds[recurrence.indexOf(dueAt, occurrenceDueAt) % assigneeUserIds.size]
 }

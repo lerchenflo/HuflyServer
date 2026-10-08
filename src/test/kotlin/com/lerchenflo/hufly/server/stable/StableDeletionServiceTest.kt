@@ -12,7 +12,6 @@ import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -50,9 +49,9 @@ class StableDeletionServiceTest {
         stables.save(testStable(id = otherStableId, adminUserId = otherUser.id, name = "Anderer Hof"))
         listOf(admin, removedMember, otherUser).forEach { user ->
             users.save(user)
-            tokens.save(RefreshToken(userId = user.id, hashedToken = "h${user.id}", expiresAt = Instant.EPOCH, createdAt = Instant.EPOCH))
-            settings.save(UserSettings(user.id, mapOf("k" to "v"), Instant.EPOCH))
-            digestItems.save(DigestItem(userId = user.id, title = "t", body = "b", createdAt = Instant.EPOCH))
+            tokens.save(RefreshToken(userId = user.id, hashedToken = "h${user.id}", expiresAt = 0L, createdAt = 0L))
+            settings.save(UserSettings(user.id, mapOf("k" to "v"), 0L))
+            digestItems.save(DigestItem(userId = user.id, title = "t", body = "b", createdAt = 0L))
             pictures.save(PictureKind.USER, user.id, byteArrayOf(1))
         }
         listOf(horse, otherHorse).forEach { horses.save(it); pictures.save(PictureKind.HORSE, it.id, byteArrayOf(1)) }

@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.absence.AbsenceService
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.picture.PictureKind
@@ -22,7 +23,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 const val DELETED_USER_NAME = "Gelöschter Nutzer"
 
@@ -53,7 +53,7 @@ class UserService(
         val normalizedEmail = requireFreeEmail(email, ownerId = null)
         requireRoleTags(requester.stableId, roleTagIds)
         val password = generatePassword()
-        val now = clock.instant()
+        val now = clock.millis()
         val user = userRepository.save(
             User(
                 stableId = requester.stableId,
@@ -90,7 +90,7 @@ class UserService(
                 displayName = displayName,
                 phoneNumber = phoneNumber,
                 roleTagIds = roleTagIds,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -115,7 +115,7 @@ class UserService(
 
     /** The row stays (soft delete) so old entries still resolve, but nothing personal is kept and the email is free again. */
     private fun erase(target: User, actorId: ObjectId) {
-        val now = clock.instant()
+        val now = clock.millis()
         userRepository.save(
             target.copy(
                 email = "deleted-${target.id.toHexString()}@deleted.invalid",
@@ -157,7 +157,7 @@ class UserService(
 
     private fun storePicture(requester: User, target: User, upload: ByteArray): User {
         pictureStore.save(PictureKind.USER, target.id, toStoredPicture(upload))
-        val now = clock.instant()
+        val now = clock.millis()
         return userRepository.save(
             target.copy(profilePictureUrl = pictureUrl(PictureKind.USER, target.id, now), updatedAt = now, updatedBy = requester.id)
         )
@@ -165,7 +165,7 @@ class UserService(
 
     private fun removePicture(requester: User, target: User): User {
         pictureStore.delete(PictureKind.USER, target.id)
-        return userRepository.save(target.copy(profilePictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+        return userRepository.save(target.copy(profilePictureUrl = null, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun picture(requester: User, userId: ObjectId): ByteArray {
@@ -189,7 +189,7 @@ class UserService(
                 email = normalizedEmail,
                 displayName = displayName,
                 phoneNumber = phoneNumber,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )

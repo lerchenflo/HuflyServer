@@ -58,8 +58,8 @@ class AbsenceControllerTest {
             }
         }
 
-    private fun absenceJson(from: String = "2026-10-12", until: String = "2026-10-18", note: String = "Urlaub") =
-        """{"userId":"${anna.id.toHexString()}","from":"$from","until":"$until","note":"$note","clientId":"local-1"}"""
+    private fun absenceJson(from: Any = 20738, until: Any = 20744, note: String = "Urlaub") =
+        """{"userId":"${anna.id.toHexString()}","from":$from,"until":$until,"note":"$note","clientId":"local-1"}"""
 
     private fun create(): String =
         objectMapper.readTree(call(HttpMethod.POST, "/absences", absenceJson()).andReturn().response.contentAsString)["id"].asString()
@@ -69,8 +69,8 @@ class AbsenceControllerTest {
         call(HttpMethod.POST, "/absences", absenceJson()).andExpect {
             status { isCreated() }
             jsonPath("$.userId") { value(anna.id.toHexString()) }
-            jsonPath("$.from") { value("2026-10-12") }
-            jsonPath("$.until") { value("2026-10-18") }
+            jsonPath("$.from") { value(20738) }
+            jsonPath("$.until") { value(20744) }
             jsonPath("$.note") { value("Urlaub") }
             jsonPath("$.createdByUserId") { value(anna.id.toHexString()) }
             jsonPath("$.stableId") { value(anna.stableId.toHexString()) }
@@ -101,9 +101,9 @@ class AbsenceControllerTest {
 
     @Test
     fun `invalid absences answer 400`() {
-        call(HttpMethod.POST, "/absences", absenceJson(until = "2026-10-11")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/absences", absenceJson(until = 20737)).andExpect { status { isBadRequest() } }
         call(HttpMethod.POST, "/absences", absenceJson(note = "x".repeat(501))).andExpect { status { isBadRequest() } }
-        call(HttpMethod.POST, "/absences", absenceJson(from = "12.10.2026")).andExpect { status { isBadRequest() } }
+        call(HttpMethod.POST, "/absences", absenceJson(from = "\"2026-10-12\"")).andExpect { status { isBadRequest() } }
         call(HttpMethod.GET, "/absences/sync?since=-1").andExpect { status { isBadRequest() } }
     }
 

@@ -4,8 +4,6 @@ import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
-import java.time.LocalDate
 
 /** One activity on a horse, typed by an ACTIVITY tag. Vaccinations are entries with [nextDueAt] (HOR-5). */
 @Document("horseLog")
@@ -16,13 +14,13 @@ data class HorseLogEntry(
     val stableId: ObjectId,
     val horseId: ObjectId,
     val activityTagId: ObjectId,
-    val startAt: Instant,
-    val endAt: Instant?,
+    val startAt: Long,
+    val endAt: Long?,
     val doneByUserId: ObjectId?,
     val comment: String,
-    val nextDueAt: LocalDate?,
-    val createdAt: Instant,
-    val updatedAt: Instant,
+    val nextDueAt: Long?,
+    val createdAt: Long,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,

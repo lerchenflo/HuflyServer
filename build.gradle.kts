@@ -26,6 +26,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("tools.jackson.module:jackson-module-kotlin")
 
     // Push notifications: FCM for Android, APNs for iOS (like SchneaggchatV3server)

@@ -2,7 +2,6 @@ package com.lerchenflo.hufly.server.repository
 
 import com.lerchenflo.hufly.server.notification.model.DigestItem
 import org.bson.types.ObjectId
-import java.time.Instant
 
 class FakeDigestItemRepository : DigestItemRepository {
     val items = mutableListOf<DigestItem>()
@@ -15,7 +14,7 @@ class FakeDigestItemRepository : DigestItemRepository {
         return item
     }
 
-    override fun findByCreatedAtBefore(time: Instant): List<DigestItem> = items.filter { it.createdAt < time }
+    override fun findByCreatedAtBefore(time: Long): List<DigestItem> = items.filter { it.createdAt < time }
 
     override fun deleteByIdIn(ids: Collection<ObjectId>): Long {
         val before = items.size

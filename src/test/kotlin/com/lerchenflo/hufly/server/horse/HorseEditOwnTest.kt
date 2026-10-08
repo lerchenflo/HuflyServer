@@ -16,9 +16,9 @@ import com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseLogRepository
+import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository
 import com.lerchenflo.hufly.server.repository.FakePaddockRepository
-import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeTaskRepository
@@ -27,6 +27,9 @@ import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.task.TurnoutTaskService
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -34,9 +37,6 @@ import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,7 +78,7 @@ class HorseEditOwnTest {
     private val blitz = testHorse(name = "Blitz").copy(ownerUserId = owner.id)
     private val donner = testHorse(name = "Donner").copy(ownerUserId = owner.id)
     private val sturm = testHorse(name = "Sturm").copy(ownerUserId = otherOwner.id, coRiderUserIds = listOf(owner.id))
-    private val aspirin = Medication("Aspirin", "1x täglich", LocalDate.of(2026, 9, 1), null)
+    private val aspirin = Medication("Aspirin", "1x täglich", epochDay(2026, 9, 1), null)
 
     @BeforeTest
     fun setUp() {
@@ -86,7 +86,7 @@ class HorseEditOwnTest {
         listOf(ownTag, activity).forEach { tagRepository.save(it) }
         listOf(blitz, donner, sturm).forEach { horseRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -100,10 +100,10 @@ class HorseEditOwnTest {
         )
 
     private fun plan(createdBy: ObjectId? = null) = foodPlanRepository.save(
-        FoodPlan(stableId = STABLE_ID, name = "Heu", entries = emptyList(), updatedAt = Instant.EPOCH, updatedBy = admin.id, createdByUserId = createdBy)
+        FoodPlan(stableId = STABLE_ID, name = "Heu", entries = emptyList(), updatedAt = 0L, updatedBy = admin.id, createdByUserId = createdBy)
     )
 
-    private fun logData(horse: Horse) = HorseLogService.LogData(horse.id, activity.id, clock.instant(), null, null, "", null)
+    private fun logData(horse: Horse) = HorseLogService.LogData(horse.id, activity.id, clock.millis(), null, null, "", null)
 
     // Horses
 
@@ -196,7 +196,7 @@ class HorseEditOwnTest {
     @Test
     fun `an owner plans, moves, ends and deletes turnouts of their own horses only`() {
         val paddock = paddockService.createPaddock(admin, "Weide", "")
-        val start = clock.instant()
+        val start = clock.millis()
 
         val own = paddockService.createAssignment(owner, paddock.id, emptyList(), listOf(blitz.id, donner.id), start, null, "")
         paddockService.updateAssignment(owner, own.id, paddock.id, emptyList(), listOf(blitz.id), start, start.plusSeconds(3600), "")

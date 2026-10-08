@@ -12,5 +12,5 @@ fun Stable.toStableResponse() = StableResponse(
     id = id.toHexString(),
     name = name,
     subscriptionStatus = subscriptionStatus,
-    subscriptionValidUntil = subscriptionValidUntil?.toEpochMilli(),
+    subscriptionValidUntil = subscriptionValidUntil,
 )

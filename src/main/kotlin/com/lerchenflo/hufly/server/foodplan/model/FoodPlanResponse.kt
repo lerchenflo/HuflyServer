@@ -20,6 +20,6 @@ fun FoodPlan.toFoodPlanResponse() = FoodPlanResponse(
     stableId = stableId.toHexString(),
     name = name,
     entries = entries.map { FoodPlanEntryResponse(it.slot, it.foodTagId.toHexString(), it.amountComment) },
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
 )

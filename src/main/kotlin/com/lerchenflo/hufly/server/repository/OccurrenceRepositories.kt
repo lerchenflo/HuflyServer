@@ -7,12 +7,11 @@ import org.bson.types.ObjectId
 import org.springframework.data.domain.Limit
 import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.repository.Repository
-import java.time.Instant
 
 interface EventOccurrenceRepository : Repository<EventOccurrence, ObjectId> {
     fun deleteByStableId(stableId: ObjectId): Long
     fun save(occurrence: EventOccurrence): EventOccurrence
-    fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Instant): EventOccurrence?
+    fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Long): EventOccurrence?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrence>
 
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")
@@ -22,7 +21,7 @@ interface EventOccurrenceRepository : Repository<EventOccurrence, ObjectId> {
 interface EventOccurrenceAnswerRepository : Repository<EventOccurrenceAnswer, ObjectId> {
     fun deleteByStableId(stableId: ObjectId): Long
     fun save(answer: EventOccurrenceAnswer): EventOccurrenceAnswer
-    fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Instant): EventOccurrenceAnswer?
+    fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Long): EventOccurrenceAnswer?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrenceAnswer>
     fun findByInvitationIdAndDeletedFalse(invitationId: ObjectId): List<EventOccurrenceAnswer>
 
@@ -33,7 +32,7 @@ interface EventOccurrenceAnswerRepository : Repository<EventOccurrenceAnswer, Ob
 interface TaskOccurrenceRepository : Repository<TaskOccurrence, ObjectId> {
     fun deleteByStableId(stableId: ObjectId): Long
     fun save(occurrence: TaskOccurrence): TaskOccurrence
-    fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Instant): TaskOccurrence?
+    fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Long): TaskOccurrence?
     fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence>
 
     /** Live dates that name [userId] among their own assignees. */

@@ -6,7 +6,6 @@ import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import org.bson.types.ObjectId
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.domain.Limit
-import java.time.Instant
 
 class FakeEventOccurrenceRepository : EventOccurrenceRepository {
     val occurrences = mutableListOf<EventOccurrence>()
@@ -22,7 +21,7 @@ class FakeEventOccurrenceRepository : EventOccurrenceRepository {
         return occurrence
     }
 
-    override fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Instant): EventOccurrence? =
+    override fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Long): EventOccurrence? =
         occurrences.firstOrNull { it.eventId == eventId && it.occurrenceStartAt == occurrenceStartAt }
 
     override fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrence> =
@@ -48,7 +47,7 @@ class FakeEventOccurrenceAnswerRepository : EventOccurrenceAnswerRepository {
         return answer
     }
 
-    override fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Instant): EventOccurrenceAnswer? =
+    override fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Long): EventOccurrenceAnswer? =
         answers.firstOrNull { it.invitationId == invitationId && it.occurrenceStartAt == occurrenceStartAt }
 
     override fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrenceAnswer> =
@@ -77,7 +76,7 @@ class FakeTaskOccurrenceRepository : TaskOccurrenceRepository {
         return occurrence
     }
 
-    override fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Instant): TaskOccurrence? =
+    override fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Long): TaskOccurrence? =
         occurrences.firstOrNull { it.taskId == taskId && it.occurrenceDueAt == occurrenceDueAt }
 
     override fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence> =

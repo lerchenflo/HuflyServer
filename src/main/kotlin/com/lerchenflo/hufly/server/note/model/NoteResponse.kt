@@ -1,16 +1,15 @@
 package com.lerchenflo.hufly.server.note.model
 
 import org.bson.types.ObjectId
-import java.time.LocalDate
 
-/** Instants are epoch milliseconds, [visibleUntil] is an ISO date. */
+/** Times are epoch milliseconds, [visibleUntil] is epoch days. */
 data class NoteResponse(
     val id: String,
     val stableId: String,
     val title: String,
     val body: String,
     val pinned: Boolean,
-    val visibleUntil: LocalDate?,
+    val visibleUntil: Long?,
     val createdByUserId: String,
     val createdAt: Long,
     val readByUserIds: List<String>,
@@ -28,9 +27,9 @@ fun StableNote.toNoteResponse(viewerId: ObjectId, seesAllReaders: Boolean) = Not
     pinned = pinned,
     visibleUntil = visibleUntil,
     createdByUserId = createdByUserId.toHexString(),
-    createdAt = createdAt.toEpochMilli(),
+    createdAt = createdAt,
     readByUserIds = readByUserIds.filter { seesAllReaders || it == viewerId }.map { it.toHexString() },
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     version = version,
 )

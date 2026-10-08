@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.paddock
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -26,8 +27,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
 
 /**
  * Paddocks themselves are managed by the admin only; every other write needs PADDOCK_PLAN; every member reads.
@@ -53,7 +52,7 @@ class PaddockService(
         return idempotentCreate(clientId, { paddockRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             paddockRepository.save(
                     Paddock(
-                        stableId = requester.stableId, name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id,
+                        stableId = requester.stableId, name = name, description = description, updatedAt = clock.millis(), updatedBy = requester.id,
                         clientId = clientId,
                     )
                 )
@@ -63,14 +62,14 @@ class PaddockService(
     fun updatePaddock(requester: User, paddockId: ObjectId, name: String, description: String): Paddock {
         accessService.requireAdmin(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
-        return paddockRepository.save(paddock.copy(name = name, description = description, updatedAt = clock.instant(), updatedBy = requester.id))
+        return paddockRepository.save(paddock.copy(name = name, description = description, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     /** Future assignments on the paddock go, running ones end now, past ones stay as history. */
     fun deletePaddock(requester: User, paddockId: ObjectId) {
         accessService.requireAdmin(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
-        val now = clock.instant()
+        val now = clock.millis()
         paddockRepository.save(paddock.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         assignmentRepository.findByPaddockIdAndDeletedFalse(paddock.id).forEach {
             when {
@@ -89,7 +88,7 @@ class PaddockService(
             val liveHorseIds = liveOwnHorses(requester, horseIds)
             groupRepository.save(
                 HorseGroup(
-                    stableId = requester.stableId, name = name, horseIds = liveHorseIds, updatedAt = clock.instant(),
+                    stableId = requester.stableId, name = name, horseIds = liveHorseIds, updatedAt = clock.millis(),
                     updatedBy = requester.id, clientId = clientId,
                 )
             )
@@ -100,13 +99,13 @@ class PaddockService(
         requirePlanner(requester)
         val group = ownGroup(requester, groupId) ?: throw notFound()
         val liveHorseIds = liveOwnHorses(requester, horseIds)
-        return groupRepository.save(group.copy(name = name, horseIds = liveHorseIds, updatedAt = clock.instant(), updatedBy = requester.id))
+        return groupRepository.save(group.copy(name = name, horseIds = liveHorseIds, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun deleteGroup(requester: User, groupId: ObjectId) {
         requirePlanner(requester)
         val group = ownGroup(requester, groupId) ?: throw notFound()
-        groupRepository.save(group.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        groupRepository.save(group.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     // Conflicts
@@ -137,7 +136,7 @@ class PaddockService(
                 firstHorseId = firstHorseId,
                 secondHorseId = secondHorseId,
                 reason = reason,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
                 clientId = clientId,
             )
@@ -147,13 +146,13 @@ class PaddockService(
     fun updateConflictReason(requester: User, conflictId: ObjectId, reason: String): HorseConflict {
         requirePlanner(requester)
         val conflict = ownConflict(requester, conflictId)
-        return conflictRepository.save(conflict.copy(reason = reason, updatedAt = clock.instant(), updatedBy = requester.id))
+        return conflictRepository.save(conflict.copy(reason = reason, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun deleteConflict(requester: User, conflictId: ObjectId) {
         requirePlanner(requester)
         val conflict = ownConflict(requester, conflictId)
-        conflictRepository.save(conflict.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        conflictRepository.save(conflict.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     // Assignments
@@ -163,8 +162,8 @@ class PaddockService(
         paddockId: ObjectId,
         groupIds: List<ObjectId>,
         horseIds: List<ObjectId>,
-        startAt: Instant,
-        endAt: Instant?,
+        startAt: Long,
+        endAt: Long?,
         comment: String,
         clientId: String? = null,
     ): PaddockAssignment {
@@ -181,7 +180,7 @@ class PaddockService(
                     startAt = startAt,
                     endAt = endAt,
                     comment = comment,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
                 )
@@ -195,8 +194,8 @@ class PaddockService(
         paddockId: ObjectId,
         groupIds: List<ObjectId>,
         horseIds: List<ObjectId>,
-        startAt: Instant,
-        endAt: Instant?,
+        startAt: Long,
+        endAt: Long?,
         comment: String,
     ): PaddockAssignment {
         val assignment = ownAssignment(requester, assignmentId)
@@ -211,7 +210,7 @@ class PaddockService(
                 startAt = startAt,
                 endAt = endAt,
                 comment = comment,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -222,7 +221,7 @@ class PaddockService(
     fun deleteAssignment(requester: User, assignmentId: ObjectId) {
         val assignment = ownAssignment(requester, assignmentId)
         requireAssignmentPlanner(requester, assignment.groupIds, assignment.horseIds)
-        saveAssignment(assignment.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        saveAssignment(assignment.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
         turnoutTaskService.drop(assignment.id, requester.id)
     }
 
@@ -247,8 +246,8 @@ class PaddockService(
         paddockId: ObjectId,
         groupIds: List<ObjectId>,
         horseIds: List<ObjectId>,
-        startAt: Instant,
-        endAt: Instant?,
+        startAt: Long,
+        endAt: Long?,
     ): ResolvedAssignment {
         if (ownPaddock(requester, paddockId) == null) throw badRequest("UNKNOWN_PADDOCK", "Unknown paddock")
         val groups = groupIds.distinct().mapNotNull { id ->

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.foodplan
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
@@ -15,7 +16,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 /**
  * Every write, including assigning plans to horses, needs FOODPLAN_EDIT. HORSE_EDIT_OWN holders who own a horse create and copy plans,
@@ -35,7 +35,7 @@ class FoodPlanService(
             requireFoodTags(requester, entries)
             foodPlanRepository.save(
                 FoodPlan(
-                    stableId = requester.stableId, name = name, entries = entries, updatedAt = clock.instant(), updatedBy = requester.id,
+                    stableId = requester.stableId, name = name, entries = entries, updatedAt = clock.millis(), updatedBy = requester.id,
                     clientId = clientId, createdByUserId = requester.id,
                 )
             )
@@ -48,14 +48,14 @@ class FoodPlanService(
         val ownerIds = horseRepository.findByFoodPlanIdAndDeletedFalse(plan.id).map { it.ownerUserId }.ifEmpty { listOf(plan.createdByUserId) }
         accessService.requireHorsePermission(requester, Permission.FOODPLAN_EDIT, ownerIds)
         requireFoodTags(requester, entries)
-        return foodPlanRepository.save(plan.copy(name = name, entries = entries, updatedAt = clock.instant(), updatedBy = requester.id))
+        return foodPlanRepository.save(plan.copy(name = name, entries = entries, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun copyPlan(requester: User, planId: ObjectId, name: String): FoodPlan {
         requireMayCreate(requester)
         val plan = stablePlan(requester, planId)
         return foodPlanRepository.save(
-            plan.copy(id = ObjectId.get(), name = name, updatedAt = clock.instant(), updatedBy = requester.id, clientId = null, createdByUserId = requester.id)
+            plan.copy(id = ObjectId.get(), name = name, updatedAt = clock.millis(), updatedBy = requester.id, clientId = null, createdByUserId = requester.id)
         )
     }
 
@@ -63,7 +63,7 @@ class FoodPlanService(
     fun deletePlan(requester: User, planId: ObjectId) {
         accessService.requirePermission(requester, Permission.FOODPLAN_EDIT)
         val plan = stablePlan(requester, planId)
-        val now = clock.instant()
+        val now = clock.millis()
         foodPlanRepository.save(plan.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         horseRepository.findByFoodPlanIdAndDeletedFalse(plan.id).forEach { horse ->
             horseRepository.save(horse.copy(foodPlanId = null, updatedAt = now, updatedBy = requester.id))
@@ -76,7 +76,7 @@ class FoodPlanService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Horse not found")
         accessService.requireHorsePermission(requester, Permission.FOODPLAN_EDIT, listOf(horse.ownerUserId))
         planId?.let { stablePlan(requester, it) }
-        return horseRepository.save(horse.copy(foodPlanId = planId, updatedAt = clock.instant(), updatedBy = requester.id))
+        return horseRepository.save(horse.copy(foodPlanId = planId, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     private fun requireMayCreate(requester: User) {

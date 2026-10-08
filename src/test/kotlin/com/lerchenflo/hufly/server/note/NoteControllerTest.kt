@@ -58,7 +58,7 @@ class NoteControllerTest {
             }
         }
 
-    private fun noteJson(title: String = "Hufschmied", body: String = "Freitag", visibleUntil: String = "\"2026-10-09\"") =
+    private fun noteJson(title: String = "Hufschmied", body: String = "Freitag", visibleUntil: String = "20735") =
         """{"title":"$title","body":"$body","pinned":true,"visibleUntil":$visibleUntil,"clientId":"local-1"}"""
 
     private fun createNote(): String =
@@ -73,7 +73,7 @@ class NoteControllerTest {
             jsonPath("$.title") { value("Hufschmied") }
             jsonPath("$.body") { value("Freitag") }
             jsonPath("$.pinned") { value(true) }
-            jsonPath("$.visibleUntil") { value("2026-10-09") }
+            jsonPath("$.visibleUntil") { value(20735) }
             jsonPath("$.createdByUserId") { value(admin.id.toHexString()) }
             jsonPath("$.createdAt") { isNumber() }
             jsonPath("$.readByUserIds.length()") { value(0) }
@@ -84,7 +84,7 @@ class NoteControllerTest {
 
     @Test
     fun `invalid title, body or date answers 400`() {
-        listOf(noteJson(title = " "), noteJson(title = "x".repeat(201)), noteJson(body = "x".repeat(5001)), noteJson(visibleUntil = "\"9.10.2026\""))
+        listOf(noteJson(title = " "), noteJson(title = "x".repeat(201)), noteJson(body = "x".repeat(5001)), noteJson(visibleUntil = "\"2026-10-09\""))
             .forEach { call(HttpMethod.POST, "/notes", it).andExpect { status { isBadRequest() } } }
     }
 

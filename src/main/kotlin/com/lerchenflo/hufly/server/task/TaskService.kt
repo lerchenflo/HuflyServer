@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.notification.NotificationEvent
@@ -29,8 +30,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
 
 /** Creating, editing and deleting needs TASK_EDIT; seeing all tasks needs TASK_VIEW, otherwise only own ones. */
 @Service
@@ -50,7 +49,7 @@ class TaskService(
         requester: User,
         title: String,
         comment: String,
-        dueAt: Instant?,
+        dueAt: Long?,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         clientId: String? = null,
@@ -80,7 +79,7 @@ class TaskService(
                     createdByUserId = requester.id,
                     doneByUserId = null,
                     doneAt = null,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
                     turnoutAssignmentId = turnout?.assignmentId,
@@ -95,7 +94,7 @@ class TaskService(
         taskId: ObjectId,
         title: String,
         comment: String,
-        dueAt: Instant?,
+        dueAt: Long?,
         assigneeUserIds: List<ObjectId>,
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
@@ -122,7 +121,7 @@ class TaskService(
                 rotatesAssignees = rotates(rotatesAssignees, recurrence, assigneeUserIds),
                 turnoutAssignmentId = turnout?.assignmentId,
                 turnoutKind = turnout?.kind,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -138,7 +137,7 @@ class TaskService(
     fun deleteTask(requester: User, taskId: ObjectId) {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
-        val now = clock.instant()
+        val now = clock.millis()
         occurrenceRepository.findByTaskIdAndDeletedFalse(task.id).forEach {
             saveOccurrence(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         }
@@ -149,7 +148,7 @@ class TaskService(
         val task = stableTask(requester, taskId)
         requireMayTick(requester, task.assigneeUserIds)
         if (task.recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates of a series are ticked one by one")
-        val now = clock.instant()
+        val now = clock.millis()
         return save(
             task.copy(
                 doneByUserId = if (done) requester.id else null,
@@ -222,7 +221,7 @@ class TaskService(
     private fun rotates(requested: Boolean, recurrence: Recurrence?, assigneeUserIds: List<ObjectId>) =
         requested && recurrence != null && assigneeUserIds.size >= 2
 
-    private fun requireDateIfRepeating(dueAt: Instant?, recurrence: Recurrence?) {
+    private fun requireDateIfRepeating(dueAt: Long?, recurrence: Recurrence?) {
         if (dueAt == null && recurrence != null) throw repeatingTaskNeedsDate()
     }
 

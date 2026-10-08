@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horselog
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
@@ -21,9 +22,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
 
 /** Writing needs HORSE_LOG_WRITE, or HORSE_EDIT_OWN for entries of own horses; every member reads the whole log. */
 @Service
@@ -39,18 +37,18 @@ class HorseLogService(
     data class LogData(
         val horseId: ObjectId,
         val activityTagId: ObjectId,
-        val startAt: Instant,
-        val endAt: Instant?,
+        val startAt: Long,
+        val endAt: Long?,
         val doneByUserId: ObjectId?,
         val comment: String,
-        val nextDueAt: LocalDate?,
+        val nextDueAt: Long?,
     )
 
     fun createEntry(requester: User, data: LogData, clientId: String? = null): HorseLogEntry {
         requireWriter(requester, listOf(data.horseId))
         return idempotentCreate(clientId, { logRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             validate(requester, data)
-            val now = clock.instant()
+            val now = clock.millis()
             save(
                 HorseLogEntry(
                     stableId = requester.stableId,
@@ -83,7 +81,7 @@ class HorseLogService(
                 doneByUserId = data.doneByUserId,
                 comment = data.comment,
                 nextDueAt = data.nextDueAt,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -92,7 +90,7 @@ class HorseLogService(
     fun deleteEntry(requester: User, entryId: ObjectId) {
         val entry = stableEntry(requester, entryId)
         requireWriter(requester, listOf(entry.horseId))
-        save(entry.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        save(entry.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun sync(requester: User, since: Long, pageSize: Int): VersionSyncResponse<HorseLogEntryResponse> {

@@ -6,7 +6,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 /** Mainly riding lessons (EVT-2). Horses are attached to the event, not to riders (EVT-6). */
 @Document("events")
@@ -18,13 +17,13 @@ data class Event(
     @Indexed val creatorUserId: ObjectId,
     val title: String,
     val description: String,
-    val startAt: Instant,
-    val endAt: Instant,
+    val startAt: Long,
+    val endAt: Long,
     val horseIds: List<ObjectId>,
     /** Null for a single event; else [startAt]/[endAt] are those of the first date (EVT-10). */
     val recurrence: Recurrence? = null,
-    val createdAt: Instant,
-    val updatedAt: Instant,
+    val createdAt: Long,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,
@@ -32,11 +31,11 @@ data class Event(
     val clientId: String? = null,
     /** Set when the client split this series off [splitFromEventId] ("Diesen und alle folgenden"), see [EventSplit]. */
     val splitFromEventId: ObjectId? = null,
-    val splitFromOccurrenceStartAt: Instant? = null,
+    val splitFromOccurrenceStartAt: Long? = null,
 )
 
 /** Invitees of the old series take their answers from [occurrenceStartAt] on over to the new one. */
-data class EventSplit(val eventId: ObjectId, val occurrenceStartAt: Instant)
+data class EventSplit(val eventId: ObjectId, val occurrenceStartAt: Long)
 
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED }
 
@@ -48,11 +47,11 @@ data class EventInvitation(
     @Indexed val eventId: ObjectId,
     @Indexed val userId: ObjectId,
     val status: InvitationStatus,
-    val invitedAt: Instant,
-    val respondedAt: Instant?,
+    val invitedAt: Long,
+    val respondedAt: Long?,
     /** Null invites to the event or the whole series; else to that one date of the series. */
-    val occurrenceStartAt: Instant? = null,
-    val updatedAt: Instant,
+    val occurrenceStartAt: Long? = null,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,

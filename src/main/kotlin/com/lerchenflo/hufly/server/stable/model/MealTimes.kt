@@ -26,6 +26,6 @@ fun Stable.toMealTimesResponse() = MealTimesResponse(
     lunch = mealTimes.lunch,
     dinner = mealTimes.dinner,
     night = mealTimes.night,
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
 )

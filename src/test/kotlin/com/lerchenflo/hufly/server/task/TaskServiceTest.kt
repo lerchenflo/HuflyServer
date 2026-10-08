@@ -17,6 +17,9 @@ import com.lerchenflo.hufly.server.task.model.TurnoutKind
 import com.lerchenflo.hufly.server.task.model.TurnoutLink
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -25,8 +28,6 @@ import org.bson.types.ObjectId
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,7 +64,7 @@ class TaskServiceTest {
     private val anna = testUser()
     private val ben = testUser()
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
-    private val due = Instant.parse("2026-10-05T07:00:00Z")
+    private val due = millis("2026-10-05T07:00:00Z")
 
     @BeforeTest
     fun setUp() {
@@ -72,7 +73,7 @@ class TaskServiceTest {
         tagRepository.save(viewerTag)
         stableRepository.save(testStable(adminUserId = admin.id))
         horseRepository.save(blitz)
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -98,7 +99,7 @@ class TaskServiceTest {
         assertEquals(listOf(anna.id, ben.id), stored.assigneeUserIds)
         assertEquals(planner.id, stored.createdByUserId)
         assertEquals(due, stored.dueAt)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(1, stored.version)
         assertNull(stored.doneByUserId)
     }
@@ -151,7 +152,7 @@ class TaskServiceTest {
 
         val stored = stored(task.id)
         assertEquals(ben.id, stored.doneByUserId)
-        assertEquals(clock.instant(), stored.doneAt)
+        assertEquals(clock.millis(), stored.doneAt)
         assertEquals(ben.id, stored.updatedBy)
     }
 
@@ -330,7 +331,7 @@ class TaskServiceTest {
     private fun assignment(stableId: ObjectId = STABLE_ID, deleted: Boolean = false) = assignmentRepository.save(
         com.lerchenflo.hufly.server.paddock.model.PaddockAssignment(
             stableId = stableId, paddockId = ObjectId.get(), groupIds = emptyList(), horseIds = listOf(blitz.id),
-            startAt = due, endAt = due.plusSeconds(3600), comment = "", updatedAt = clock.instant(), updatedBy = admin.id, deleted = deleted,
+            startAt = due, endAt = due.plusSeconds(3600), comment = "", updatedAt = clock.millis(), updatedBy = admin.id, deleted = deleted,
         )
     )
 

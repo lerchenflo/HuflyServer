@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.tag
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.repository.TagRepository
@@ -11,7 +12,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 /** Only the admin manages tags (TAG-2). */
 @Service
@@ -42,7 +42,7 @@ class TagService(
                     permissions = permissions,
                     defaultIntervalDays = defaultIntervalDays.takeIf { type == TagType.ACTIVITY },
                     icon = icon,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
                 )
@@ -69,7 +69,7 @@ class TagService(
                 permissions = permissions,
                 defaultIntervalDays = defaultIntervalDays.takeIf { tag.type == TagType.ACTIVITY },
                 icon = icon,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -78,7 +78,7 @@ class TagService(
     fun deleteTag(requester: User, tagId: ObjectId) {
         accessService.requireAdmin(requester)
         val tag = stableTag(requester, tagId)
-        tagRepository.save(tag.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        tagRepository.save(tag.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     private fun requirePermissionsFit(type: TagType, permissions: Set<Permission>) {

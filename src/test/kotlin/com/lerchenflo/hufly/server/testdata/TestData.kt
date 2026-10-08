@@ -8,7 +8,6 @@ import com.lerchenflo.hufly.server.tag.model.Tag
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
-import java.time.Instant
 
 val STABLE_ID = ObjectId("66f0000000000000000000a1")
 val OTHER_STABLE_ID = ObjectId("66f0000000000000000000a2")
@@ -19,7 +18,7 @@ fun testUser(
     email: String = "${id.toHexString()}@hufly.test",
     hashedPassword: String = "unused",
     roleTagIds: List<ObjectId> = emptyList(),
-    updatedAt: Instant = Instant.EPOCH,
+    updatedAt: Long = 0L,
     deleted: Boolean = false,
 ) = User(
     id = id,
@@ -30,7 +29,7 @@ fun testUser(
     profilePictureUrl = null,
     hashedPassword = hashedPassword,
     roleTagIds = roleTagIds,
-    createdAt = Instant.EPOCH,
+    createdAt = 0L,
     updatedAt = updatedAt,
     updatedBy = id,
     deleted = deleted,
@@ -46,8 +45,8 @@ fun testStable(
     adminUserId = adminUserId,
     subscriptionStatus = SubscriptionStatus.TRIAL,
     subscriptionValidUntil = null,
-    createdAt = Instant.EPOCH,
-    updatedAt = Instant.EPOCH,
+    createdAt = 0L,
+    updatedAt = 0L,
     updatedBy = adminUserId,
 )
 
@@ -56,7 +55,7 @@ fun testTag(
     stableId: ObjectId = STABLE_ID,
     type: TagType = TagType.USER_ROLE,
     permissions: Set<Permission> = emptySet(),
-    updatedAt: Instant = Instant.EPOCH,
+    updatedAt: Long = 0L,
     deleted: Boolean = false,
 ) = Tag(
     id = id,
@@ -74,7 +73,7 @@ fun testHorse(
     id: ObjectId = ObjectId.get(),
     stableId: ObjectId = STABLE_ID,
     name: String = "Blitz",
-    updatedAt: Instant = Instant.EPOCH,
+    updatedAt: Long = 0L,
     deleted: Boolean = false,
 ) = Horse(
     id = id,

@@ -4,6 +4,8 @@ import com.lerchenflo.hufly.server.note.model.StableNote
 import com.lerchenflo.hufly.server.repository.NoteRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.millis
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,8 +14,6 @@ import org.springframework.data.domain.Limit
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -35,10 +35,10 @@ class MongoNoteRepositoryTest {
         title = "Hufschmied",
         body = "",
         pinned = false,
-        visibleUntil = LocalDate.of(2026, 10, 9),
+        visibleUntil = epochDay(2026, 10, 9),
         createdByUserId = ObjectId.get(),
-        createdAt = Instant.EPOCH,
-        updatedAt = Instant.EPOCH,
+        createdAt = 0L,
+        updatedAt = 0L,
         updatedBy = ObjectId.get(),
         deleted = deleted,
         version = version,
@@ -52,7 +52,7 @@ class MongoNoteRepositoryTest {
         val page = noteRepository.findVersionPage(STABLE_ID, since = 1, watermark = 4, limit = Limit.of(2))
 
         assertEquals(listOf(2L, 3L), page.map { it.version })
-        assertEquals(LocalDate.of(2026, 10, 9), page.first().visibleUntil)
+        assertEquals(epochDay(2026, 10, 9), page.first().visibleUntil)
     }
 
     @Test
@@ -76,13 +76,13 @@ class MongoNoteRepositoryTest {
         val editor = ObjectId.get()
         noteRepository.addReader(note.id, anna, 2)
 
-        val at = Instant.parse("2026-10-05T10:00:00.123Z")
-        assertEquals(1, noteRepository.updateContent(note.id, "Neu", "Text", true, LocalDate.of(1969, 12, 31), at, editor, 3))
+        val at = millis("2026-10-05T10:00:00.123Z")
+        assertEquals(1, noteRepository.updateContent(note.id, "Neu", "Text", true, epochDay(1969, 12, 31), at, editor, 3))
 
         val stored = noteRepository.findById(note.id)!!
         assertEquals(listOf(anna), stored.readByUserIds)
         assertEquals(listOf("Neu", "Text", true), listOf(stored.title, stored.body, stored.pinned))
-        assertEquals(LocalDate.of(1969, 12, 31), stored.visibleUntil)
+        assertEquals(epochDay(1969, 12, 31), stored.visibleUntil)
         assertEquals(at, stored.updatedAt)
         assertEquals(editor to 3L, stored.updatedBy to stored.version)
         assertEquals(1, noteRepository.updateContent(note.id, "Neu", "Text", true, null, at, editor, 4))

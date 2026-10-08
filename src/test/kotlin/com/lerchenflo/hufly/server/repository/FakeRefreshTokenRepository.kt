@@ -4,7 +4,6 @@ import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import org.bson.types.ObjectId
-import java.time.Instant
 
 class FakeRefreshTokenRepository : RefreshTokenRepository {
     val tokens = mutableListOf<RefreshToken>()
@@ -60,15 +59,15 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         return (before - tokens.size).toLong()
     }
 
-    override fun rotate(oldHash: String, newHash: String, encryptedToken: String, expiresAt: Instant, lastUsedAt: Instant): Long {
+    override fun rotate(oldHash: String, newHash: String, encryptedToken: String, expiresAt: Long, lastUsedAt: Long): Long {
         val row = tokens.firstOrNull { it.hashedToken == oldHash } ?: return 0
         save(row.copy(hashedToken = newHash, previousHashedToken = oldHash, encryptedToken = encryptedToken, expiresAt = expiresAt, lastUsedAt = lastUsedAt))
         return 1
     }
 
-    override fun deleteByExpiresAtBefore(time: Instant): Long {
+    override fun deleteByExpiresAtBefore(time: Long): Long {
         val before = tokens.size
-        tokens.removeIf { it.expiresAt.isBefore(time) }
+        tokens.removeIf { it.expiresAt < time }
         return (before - tokens.size).toLong()
     }
 

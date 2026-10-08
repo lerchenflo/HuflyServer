@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.absence.model.Absence
 import com.lerchenflo.hufly.server.repository.AbsenceRepository
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.epochDay
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,8 +13,6 @@ import org.springframework.data.domain.Limit
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -35,11 +34,11 @@ class MongoAbsenceRepositoryTest {
     private fun absence(version: Long, stableId: ObjectId = STABLE_ID, deleted: Boolean = false) = Absence(
         stableId = stableId,
         userId = userId,
-        from = LocalDate.of(1969, 12, 30),
-        until = LocalDate.of(2026, 10, 18),
+        from = epochDay(1969, 12, 30),
+        until = epochDay(2026, 10, 18),
         note = "",
         createdByUserId = userId,
-        updatedAt = Instant.EPOCH,
+        updatedAt = 0L,
         updatedBy = userId,
         deleted = deleted,
         version = version,
@@ -53,7 +52,7 @@ class MongoAbsenceRepositoryTest {
         val page = absenceRepository.findVersionPage(STABLE_ID, since = 1, watermark = 4, limit = Limit.of(2))
 
         assertEquals(listOf(2L, 3L), page.map { it.version })
-        assertEquals(LocalDate.of(1969, 12, 30), page.first().from)
+        assertEquals(epochDay(1969, 12, 30), page.first().from)
     }
 
     @Test

@@ -12,7 +12,6 @@ import org.springframework.data.domain.Limit
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -34,10 +33,10 @@ class MongoPaddockAssignmentRepositoryTest {
         paddockId = ObjectId.get(),
         groupIds = emptyList(),
         horseIds = listOf(ObjectId.get()),
-        startAt = Instant.EPOCH,
+        startAt = 0L,
         endAt = null,
         comment = "",
-        updatedAt = Instant.EPOCH,
+        updatedAt = 0L,
         updatedBy = ObjectId.get(),
         version = version,
     )

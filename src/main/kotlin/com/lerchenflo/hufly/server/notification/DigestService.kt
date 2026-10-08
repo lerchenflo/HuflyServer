@@ -1,14 +1,19 @@
 package com.lerchenflo.hufly.server.notification
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.notification.model.DigestItem
 import com.lerchenflo.hufly.server.notification.model.NotificationPreferences
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.repository.DigestItemRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.minus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import java.time.Clock
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Sends each digest user what was collected before their latest digest time (in their zone) as one push. */
 @Service
@@ -20,7 +25,7 @@ class DigestService(
 ) {
     @Scheduled(fixedDelayString = "PT5M", initialDelayString = "PT1M")
     fun sendDue() {
-        val now = clock.instant()
+        val now = clock.millis()
         digestRepository.findByCreatedAtBefore(now).groupBy { it.userId }.forEach { (userId, items) ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(userId)?.values)
             val cutoff = latestDigestTime(now, preferences)
@@ -31,9 +36,12 @@ class DigestService(
         }
     }
 
-    private fun latestDigestTime(now: Instant, preferences: NotificationPreferences): Instant {
-        val today = now.atZone(preferences.zone).toLocalDate().atTime(preferences.digestTime).atZone(preferences.zone)
-        return (if (today.toInstant() > now) today.minusDays(1) else today).toInstant()
+    private fun latestDigestTime(now: Long, preferences: NotificationPreferences): Long {
+        val zone = preferences.zone
+        val date = Instant.fromEpochMilliseconds(now).toLocalDateTime(zone).date
+        val today = LocalDateTime(date, preferences.digestTime).toInstant(zone).toEpochMilliseconds()
+        if (today <= now) return today
+        return LocalDateTime(date.minus(1, DateTimeUnit.DAY), preferences.digestTime).toInstant(zone).toEpochMilliseconds()
     }
 
     private fun summary(items: List<DigestItem>): PushMessage {

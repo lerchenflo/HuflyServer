@@ -18,7 +18,6 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +45,7 @@ class PushTokenControllerTest {
         sessions.tokens.clear()
         userRepository.save(anna)
         stableRepository.save(testStable(adminUserId = anna.id))
-        session = sessions.save(RefreshToken(userId = anna.id, hashedToken = "h", expiresAt = Instant.MAX, createdAt = Instant.EPOCH))
+        session = sessions.save(RefreshToken(userId = anna.id, hashedToken = "h", expiresAt = Long.MAX_VALUE, createdAt = 0L))
     }
 
     private fun call(method: HttpMethod, body: String? = null, sessionId: ObjectId? = session.id) =

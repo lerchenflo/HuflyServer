@@ -22,12 +22,13 @@ import com.lerchenflo.hufly.server.repository.FakeUserSettingsRepository
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.hours
+import com.lerchenflo.hufly.server.testdata.millis
 import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.User
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
-import java.time.Duration
-import java.time.Instant
 import java.util.concurrent.Executor
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -37,7 +38,7 @@ import kotlin.test.assertTrue
 /** Push notifications (user 2026-10-05): sent always, socket or not, with German text from the server. */
 class NotificationServiceTest {
 
-    private val clock = MutableClock(Instant.parse("2026-10-05T08:00:00Z"))
+    private val clock = MutableClock(millis("2026-10-05T08:00:00Z"))
     private val userRepository = FakeUserRepository()
     private val settingsRepository = FakeUserSettingsRepository()
     private val sessions = FakeRefreshTokenRepository()
@@ -58,14 +59,14 @@ class NotificationServiceTest {
     private val foreigner = testUser(email = "foreign@hufly.test", stableId = OTHER_STABLE_ID)
 
     // Friday 9 October 2026, 17:00 in Vienna (CEST).
-    private val lesson = Instant.parse("2026-10-09T15:00:00Z")
+    private val lesson = millis("2026-10-09T15:00:00Z")
 
     @BeforeTest
     fun setUp() {
         listOf(anna, ben, clara, gone, foreigner).forEach {
             userRepository.save(it)
             val session = sessions.save(
-                RefreshToken(userId = it.id, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.instant().plus(Duration.ofDays(30)), createdAt = clock.instant())
+                RefreshToken(userId = it.id, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.millis() + days(30), createdAt = clock.millis())
             )
             pushService.register(it.id, session.id, PushPlatform.ANDROID, "token-${it.displayName}")
         }
@@ -75,18 +76,18 @@ class NotificationServiceTest {
 
     private fun note() = noteRepository.save(
         StableNote(stableId = STABLE_ID, title = "Hufschmied kommt", body = "", pinned = false, visibleUntil = null,
-            createdByUserId = anna.id, createdAt = clock.instant(), updatedAt = clock.instant(), updatedBy = anna.id)
+            createdByUserId = anna.id, createdAt = clock.millis(), updatedAt = clock.millis(), updatedBy = anna.id)
     )
 
     private fun event(recurrence: Recurrence? = null) = eventRepository.save(
         Event(stableId = STABLE_ID, creatorUserId = anna.id, title = "Springstunde", description = "", startAt = lesson,
-            endAt = lesson.plus(Duration.ofHours(1)), horseIds = emptyList(), recurrence = recurrence, createdAt = clock.instant(),
-            updatedAt = clock.instant(), updatedBy = anna.id)
+            endAt = lesson + hours(1), horseIds = emptyList(), recurrence = recurrence, createdAt = clock.millis(),
+            updatedAt = clock.millis(), updatedBy = anna.id)
     )
 
-    private fun task(dueAt: Instant? = lesson) = taskRepository.save(
+    private fun task(dueAt: Long? = lesson) = taskRepository.save(
         StableTask(stableId = STABLE_ID, title = "Misten", comment = "", dueAt = dueAt, assigneeUserIds = listOf(ben.id),
-            horseIds = emptyList(), createdByUserId = anna.id, doneByUserId = null, doneAt = null, updatedAt = clock.instant(), updatedBy = anna.id)
+            horseIds = emptyList(), createdByUserId = anna.id, doneByUserId = null, doneAt = null, updatedAt = clock.millis(), updatedBy = anna.id)
     )
 
     @Test
@@ -117,13 +118,13 @@ class NotificationServiceTest {
     @Test
     fun `an invitation to one date of a series names that date`() {
         val event = event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna"))
-        val nextWeek = lesson.plus(Duration.ofDays(7))
+        val nextWeek = lesson + days(7)
 
         service.on(EventInvited(STABLE_ID, anna.id, event.id, listOf(ben.id), occurrenceStartAt = nextWeek))
 
         assertEquals(
             PushMessage("Einladung: Springstunde", "Fr. 16.10. 17:00 · von anna",
-                mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toEpochMilli().toString())),
+                mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toString())),
             sentTo(ben).single(),
         )
     }
@@ -167,8 +168,8 @@ class NotificationServiceTest {
 
     @Test
     fun `muted users get nothing, digest users get it later in their own time zone`() {
-        settingsRepository.save(UserSettings(ben.id, mapOf("notificationsEnabled" to "false"), clock.instant()))
-        settingsRepository.save(UserSettings(clara.id, mapOf("notificationDigest" to "true", "notificationTimeZone" to "Europe/London"), clock.instant()))
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationsEnabled" to "false"), clock.millis()))
+        settingsRepository.save(UserSettings(clara.id, mapOf("notificationDigest" to "true", "notificationTimeZone" to "Europe/London"), clock.millis()))
         val event = event()
 
         service.on(EventInvited(STABLE_ID, anna.id, event.id, listOf(ben.id, clara.id), null))

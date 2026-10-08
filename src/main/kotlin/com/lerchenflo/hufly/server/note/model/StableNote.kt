@@ -4,8 +4,6 @@ import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
-import java.time.LocalDate
 
 /** A stable notice ("Aushang"). Written with NOTE_WRITE, read by every member. Synced by [version]. */
 @Document("notes")
@@ -18,12 +16,12 @@ data class StableNote(
     val body: String,
     val pinned: Boolean,
     /** Inclusive; only shown by the client, nothing expires on the server. */
-    val visibleUntil: LocalDate?,
+    val visibleUntil: Long?,
     val createdByUserId: ObjectId,
-    val createdAt: Instant,
+    val createdAt: Long,
     /** Only the author and the admin get the full list, see [toNoteResponse]. */
     val readByUserIds: List<ObjectId> = emptyList(),
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,

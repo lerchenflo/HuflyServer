@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.horselog
 
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
+import com.lerchenflo.hufly.server.core.MAX_EPOCH_DAYS
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
@@ -23,8 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.Instant
-import java.time.LocalDate
 
 @RestController
 @RequestMapping("/horselogs")
@@ -41,14 +40,14 @@ class HorseLogController(
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val endAt: Long? = null,
         val doneByUserId: String? = null,
         @field:Size(max = 5000) val comment: String = "",
-        val nextDueAt: LocalDate? = null,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val nextDueAt: Long? = null,
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
     ) {
         fun toData() = HorseLogService.LogData(
             horseId = parseObjectId(horseId),
             activityTagId = parseObjectId(activityTagId),
-            startAt = Instant.ofEpochMilli(startAt),
-            endAt = endAt?.let(Instant::ofEpochMilli),
+            startAt = startAt,
+            endAt = endAt,
             doneByUserId = doneByUserId?.let(::parseObjectId),
             comment = comment,
             nextDueAt = nextDueAt,

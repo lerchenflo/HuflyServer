@@ -20,7 +20,6 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -36,8 +35,8 @@ class UserSyncControllerTest {
     @Autowired lateinit var stableRepository: FakeStableRepository
     @Autowired lateinit var tagRepository: FakeTagRepository
 
-    private val admin = testUser(updatedAt = Instant.ofEpochMilli(100))
-    private val rider = testUser(updatedAt = Instant.ofEpochMilli(200))
+    private val admin = testUser(updatedAt = 100)
+    private val rider = testUser(updatedAt = 200)
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
     private val removed = testUser(deleted = true)
 

@@ -3,9 +3,9 @@ package com.lerchenflo.hufly.server.task
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
-import com.lerchenflo.hufly.server.core.epochMillisToInstant
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.recurrence.RecurrenceRequest
+import com.lerchenflo.hufly.server.core.requireEpochMillis
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.core.sync.VersionSyncResponse
 import com.lerchenflo.hufly.server.core.sync.requireValidVersionSyncRequest
@@ -31,7 +31,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 
 @RestController
 @RequestMapping("/tasks")
@@ -88,7 +87,7 @@ class TaskController(
     @PostMapping
     fun createTask(@Valid @RequestBody request: TaskRequest): TaskResponse {
         val requester = accessService.requester(requireAuth())
-        val dueAt = request.dueAt?.let(Instant::ofEpochMilli)
+        val dueAt = request.dueAt
         return taskService.createTask(
             requester, request.title, request.comment, dueAt, request.assigneeUserIds.map(::parseObjectId),
             request.horseIds.map(::parseObjectId), request.clientId, request.recurrence?.toRecurrence(dueAt ?: throw repeatingTaskNeedsDate()),
@@ -101,7 +100,7 @@ class TaskController(
     @PutMapping("/{taskId}")
     fun updateTask(@PathVariable taskId: String, @Valid @RequestBody request: TaskRequest): TaskResponse {
         val requester = accessService.requester(requireAuth())
-        val dueAt = request.dueAt?.let(Instant::ofEpochMilli)
+        val dueAt = request.dueAt
         return taskService.updateTask(
             requester, parseObjectId(taskId), request.title, request.comment, dueAt,
             request.assigneeUserIds.map(::parseObjectId),
@@ -136,11 +135,11 @@ class TaskController(
             cancelled = request.cancelled,
             title = request.title,
             comment = request.comment,
-            dueAt = request.dueAt?.let(::epochMillisToInstant),
+            dueAt = request.dueAt?.let(::requireEpochMillis),
             horseIds = request.horseIds?.map(::parseObjectId),
             assigneeUserIds = request.assigneeUserIds?.map(::parseObjectId),
         )
-        return occurrenceService.putOccurrence(requester, parseObjectId(taskId), epochMillisToInstant(occurrenceDueAt), change)
+        return occurrenceService.putOccurrence(requester, parseObjectId(taskId), requireEpochMillis(occurrenceDueAt), change)
             .toTaskOccurrenceResponse()
     }
 
@@ -151,7 +150,7 @@ class TaskController(
         @RequestBody request: DoneRequest,
     ): TaskOccurrenceResponse {
         val requester = accessService.requester(requireAuth())
-        return occurrenceService.setDone(requester, parseObjectId(taskId), epochMillisToInstant(occurrenceDueAt), request.done)
+        return occurrenceService.setDone(requester, parseObjectId(taskId), requireEpochMillis(occurrenceDueAt), request.done)
             .toTaskOccurrenceResponse()
     }
 

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.stable
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.repository.StableRepository
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 /** Feeding times of the own stable: every member reads, only the admin sets them (last write wins). */
 @RestController
@@ -51,7 +51,7 @@ class MealTimesController(
         return stableRepository.save(
             stable.copy(
                 mealTimes = MealTimes(request.morning, request.lunch, request.dinner, request.night),
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         ).toMealTimesResponse()

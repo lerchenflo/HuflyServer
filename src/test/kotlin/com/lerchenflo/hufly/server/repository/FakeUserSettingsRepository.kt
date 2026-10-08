@@ -3,7 +3,6 @@ package com.lerchenflo.hufly.server.repository
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
 import org.springframework.dao.DuplicateKeyException
-import java.time.Instant
 
 class FakeUserSettingsRepository : UserSettingsRepository {
     val settings = mutableMapOf<ObjectId, UserSettings>()
@@ -23,9 +22,9 @@ class FakeUserSettingsRepository : UserSettingsRepository {
     }
 
     /** Mongo stores epoch millis, so versions compare at millisecond precision. */
-    override fun replaceIfUnchanged(userId: ObjectId, expected: Instant, values: Map<String, String>, updatedAt: Instant): Long {
+    override fun replaceIfUnchanged(userId: ObjectId, expected: Long, values: Map<String, String>, updatedAt: Long): Long {
         val stored = settings[userId] ?: return 0
-        if (stored.updatedAt.toEpochMilli() != expected.toEpochMilli()) return 0
+        if (stored.updatedAt != expected) return 0
         save(UserSettings(userId, values, updatedAt))
         return 1
     }

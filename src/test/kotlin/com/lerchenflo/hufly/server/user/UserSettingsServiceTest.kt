@@ -2,9 +2,9 @@ package com.lerchenflo.hufly.server.user
 
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.repository.FakeUserSettingsRepository
+import com.lerchenflo.hufly.server.testdata.seconds
 import com.lerchenflo.hufly.server.user.UserSettingsService.PutResult
 import org.bson.types.ObjectId
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -24,32 +24,32 @@ class UserSettingsServiceTest {
     @Test
     fun `without an expectation the last write wins`() {
         service.put(anna, mapOf("theme" to "dark"), PutCondition.None)
-        clock.advance(Duration.ofSeconds(1))
+        clock.advance(seconds(1))
 
         val result = saved(service.put(anna, mapOf("theme" to "light"), PutCondition.None))
 
         assertEquals(mapOf("theme" to "light"), result.values)
-        assertEquals(clock.instant(), result.updatedAt)
+        assertEquals(clock.millis(), result.updatedAt)
     }
 
     @Test
     fun `expecting the stored version saves`() {
         val first = saved(service.put(anna, mapOf("theme" to "dark"), PutCondition.None))
-        clock.advance(Duration.ofSeconds(1))
+        clock.advance(seconds(1))
 
-        val second = saved(service.put(anna, mapOf("theme" to "light"), PutCondition.Expect(first.updatedAt.toEpochMilli())))
+        val second = saved(service.put(anna, mapOf("theme" to "light"), PutCondition.Expect(first.updatedAt)))
 
         assertEquals(mapOf("theme" to "light"), repository.findById(anna)!!.values)
-        assertEquals(clock.instant(), second.updatedAt)
+        assertEquals(clock.millis(), second.updatedAt)
     }
 
     @Test
     fun `an outdated expectation answers the current settings and changes nothing`() {
         val first = saved(service.put(anna, mapOf("theme" to "dark"), PutCondition.None))
-        clock.advance(Duration.ofSeconds(1))
+        clock.advance(seconds(1))
         val other = saved(service.put(anna, mapOf("theme" to "light"), PutCondition.None))
 
-        val current = conflict(service.put(anna, mapOf("theme" to "blue"), PutCondition.Expect(first.updatedAt.toEpochMilli())))
+        val current = conflict(service.put(anna, mapOf("theme" to "blue"), PutCondition.Expect(first.updatedAt)))
 
         assertEquals(other, current)
         assertEquals(mapOf("theme" to "light"), repository.findById(anna)!!.values)

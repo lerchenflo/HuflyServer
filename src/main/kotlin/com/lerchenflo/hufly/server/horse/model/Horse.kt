@@ -5,14 +5,12 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
-import java.time.LocalDate
 
 data class Medication(
     val name: String,
     val dosage: String,
-    val from: LocalDate,
-    val until: LocalDate?,
+    val from: Long,
+    val until: Long?,
 )
 
 @Document("horses")
@@ -23,7 +21,7 @@ data class Horse(
     val name: String,
     val description: String,
     val pictureUrl: String?,
-    val birthDate: LocalDate?,
+    val birthDate: Long?,
     val breed: String,
     val color: String,
     val ownerUserId: ObjectId?,
@@ -32,7 +30,7 @@ data class Horse(
     val medications: List<Medication>,
     /** Only changed by members with FOODPLAN_EDIT. */
     val foodPlanId: ObjectId?,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */

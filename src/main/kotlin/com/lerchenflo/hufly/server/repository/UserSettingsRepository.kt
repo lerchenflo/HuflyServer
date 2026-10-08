@@ -5,7 +5,6 @@ import org.bson.types.ObjectId
 import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.mongodb.repository.Update
 import org.springframework.data.repository.Repository
-import java.time.Instant
 
 interface UserSettingsRepository : Repository<UserSettings, ObjectId> {
     fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long
@@ -18,5 +17,5 @@ interface UserSettingsRepository : Repository<UserSettings, ObjectId> {
     /** Atomic: replaces only while [expected] is still the stored version; returns 1 then, else 0. */
     @Query("{ '_id': ?0, 'updatedAt': ?1 }")
     @Update("{ '\$set': { 'values': ?2, 'updatedAt': ?3 } }")
-    fun replaceIfUnchanged(userId: ObjectId, expected: Instant, values: Map<String, String>, updatedAt: Instant): Long
+    fun replaceIfUnchanged(userId: ObjectId, expected: Long, values: Map<String, String>, updatedAt: Long): Long
 }

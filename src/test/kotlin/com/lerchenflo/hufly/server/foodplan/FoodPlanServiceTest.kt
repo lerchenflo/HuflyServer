@@ -13,6 +13,8 @@ import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.minutes
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -20,7 +22,6 @@ import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,7 +59,7 @@ class FoodPlanServiceTest {
         listOf(feederTag, hay, oats).forEach { tagRepository.save(it) }
         horseRepository.save(blitz)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -74,7 +75,7 @@ class FoodPlanServiceTest {
         val stored = stored(plan.id)
         assertEquals(STABLE_ID, stored.stableId)
         assertEquals(listOf(morningHay, nightOats), stored.entries)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(feeder.id, stored.updatedBy)
     }
 
@@ -105,13 +106,13 @@ class FoodPlanServiceTest {
     @Test
     fun `edit replaces name and entries`() {
         val plan = foodPlanService.createPlan(feeder, "Standard", listOf(morningHay))
-        clock.advance(Duration.ofMinutes(5))
+        clock.advance(minutes(5))
 
         foodPlanService.updatePlan(feeder, plan.id, "Winter", listOf(nightOats))
 
         assertEquals("Winter", stored(plan.id).name)
         assertEquals(listOf(nightOats), stored(plan.id).entries)
-        assertEquals(clock.instant(), stored(plan.id).updatedAt)
+        assertEquals(clock.millis(), stored(plan.id).updatedAt)
     }
 
     @Test
@@ -134,7 +135,7 @@ class FoodPlanServiceTest {
 
         val horse = horseRepository.findById(blitz.id)!!
         assertEquals(plan.id, horse.foodPlanId)
-        assertEquals(clock.instant(), horse.updatedAt)
+        assertEquals(clock.millis(), horse.updatedAt)
         assertEquals(feeder.id, horse.updatedBy)
     }
 
@@ -164,14 +165,14 @@ class FoodPlanServiceTest {
     fun `deleting a plan soft deletes it and clears it from its horses`() {
         val plan = foodPlanService.createPlan(feeder, "Standard", listOf(morningHay))
         foodPlanService.assignPlan(feeder, blitz.id, plan.id)
-        clock.advance(Duration.ofMinutes(5))
+        clock.advance(minutes(5))
 
         foodPlanService.deletePlan(feeder, plan.id)
 
         assertTrue(stored(plan.id).deleted)
         val horse = horseRepository.findById(blitz.id)!!
         assertNull(horse.foodPlanId)
-        assertEquals(clock.instant(), horse.updatedAt)
+        assertEquals(clock.millis(), horse.updatedAt)
     }
 
     @Test

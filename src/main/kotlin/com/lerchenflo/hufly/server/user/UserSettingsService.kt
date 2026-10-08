@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.Document
@@ -8,8 +9,6 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent
 import org.springframework.stereotype.Service
-import java.time.Clock
-import java.time.Instant
 
 sealed interface PutCondition {
     /** Last write wins. */
@@ -32,7 +31,7 @@ class UserSettingsService(
     }
 
     fun put(userId: ObjectId, values: Map<String, String>, condition: PutCondition): PutResult {
-        val now = clock.instant()
+        val now = clock.millis()
         val settings = UserSettings(userId, values, now)
         return when (condition) {
             PutCondition.None -> PutResult.Saved(settingsRepository.save(settings))
@@ -43,7 +42,7 @@ class UserSettingsService(
                     PutResult.Conflict(settingsRepository.findById(userId))
                 }
             } else {
-                val replaced = settingsRepository.replaceIfUnchanged(userId, Instant.ofEpochMilli(condition.updatedAt), values, now)
+                val replaced = settingsRepository.replaceIfUnchanged(userId, condition.updatedAt, values, now)
                 if (replaced == 1L) {
                     // The atomic update fires no Mongo save event, so announce it like one for the realtime hints.
                     events.publishEvent(AfterSaveEvent(settings, Document(), "userSettings"))

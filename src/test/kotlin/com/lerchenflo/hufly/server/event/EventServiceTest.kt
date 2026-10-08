@@ -17,6 +17,10 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.minusSeconds
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -26,8 +30,6 @@ import org.bson.types.ObjectId
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,7 +67,7 @@ class EventServiceTest {
     private val clara = testUser()
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
     private val blitz = testHorse()
-    private val start = Instant.parse("2026-10-10T16:00:00Z")
+    private val start = millis("2026-10-10T16:00:00Z")
     private val end = start.plusSeconds(3600)
 
     @BeforeTest
@@ -74,7 +76,7 @@ class EventServiceTest {
         listOf(teacherTag, viewerTag).forEach { tagRepository.save(it) }
         horseRepository.save(blitz)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -98,7 +100,7 @@ class EventServiceTest {
         assertEquals(listOf(blitz.id), event.horseIds)
         val invitations = invitationRepository.findByEventIdAndDeletedFalse(event.id)
         assertEquals(setOf(anna.id, ben.id), invitations.map { it.userId }.toSet())
-        assertTrue(invitations.all { it.status == InvitationStatus.PENDING && it.invitedAt == clock.instant() })
+        assertTrue(invitations.all { it.status == InvitationStatus.PENDING && it.invitedAt == clock.millis() })
     }
 
     @Test
@@ -152,7 +154,7 @@ class EventServiceTest {
         service.respond(ben, invitationOf(event, ben).id, accepted = false)
 
         assertEquals(InvitationStatus.ACCEPTED, invitationOf(event, anna).status)
-        assertEquals(clock.instant(), invitationOf(event, anna).respondedAt)
+        assertEquals(clock.millis(), invitationOf(event, anna).respondedAt)
         assertEquals(InvitationStatus.DECLINED, invitationOf(event, ben).status)
         assertStatus(HttpStatus.FORBIDDEN) { service.respond(anna, invitationOf(event, ben).id, accepted = true) }
         assertStatus(HttpStatus.FORBIDDEN) { service.respond(teacher, invitationOf(event, ben).id, accepted = true) }
@@ -291,7 +293,7 @@ class EventServiceTest {
         assertEquals(setOf(anna.id, ben.id, teacher.id), live.map { it.userId }.toSet())
         val own = invitationOf(event, teacher)
         assertEquals(InvitationStatus.ACCEPTED, own.status)
-        assertEquals(clock.instant(), own.respondedAt)
+        assertEquals(clock.millis(), own.respondedAt)
         assertEquals(InvitationStatus.PENDING, invitationOf(event, ben).status)
         assertEquals(
             listOf(com.lerchenflo.hufly.server.core.notification.EventInvited(STABLE_ID, teacher.id, event.id, listOf(ben.id), null)),

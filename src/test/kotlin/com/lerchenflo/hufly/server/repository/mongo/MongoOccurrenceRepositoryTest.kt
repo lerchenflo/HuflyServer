@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.repository.mongo
 
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.recurrence.RecurrenceFrequency
+import com.lerchenflo.hufly.server.core.recurrence.Weekday
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
@@ -15,6 +16,9 @@ import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -24,9 +28,6 @@ import org.springframework.data.domain.Limit
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -49,20 +50,20 @@ class MongoOccurrenceRepositoryTest {
     @Autowired lateinit var taskOccurrenceRepository: TaskOccurrenceRepository
 
     private val user = ObjectId.get()
-    private val key = Instant.parse("2026-10-20T16:00:00Z")
+    private val key = millis("2026-10-20T16:00:00Z")
 
-    private fun occurrence(version: Long, eventId: ObjectId = ObjectId.get(), stableId: ObjectId = STABLE_ID, at: Instant = key) = EventOccurrence(
+    private fun occurrence(version: Long, eventId: ObjectId = ObjectId.get(), stableId: ObjectId = STABLE_ID, at: Long = key) = EventOccurrence(
         stableId = stableId, eventId = eventId, occurrenceStartAt = at, cancelled = false, title = null, description = null,
-        startAt = null, endAt = null, horseIds = null, updatedAt = Instant.EPOCH, updatedBy = user, version = version,
+        startAt = null, endAt = null, horseIds = null, updatedAt = 0L, updatedBy = user, version = version,
     )
 
     private fun answer(version: Long, invitationId: ObjectId = ObjectId.get(), eventId: ObjectId = ObjectId.get()) = EventOccurrenceAnswer(
         stableId = STABLE_ID, eventId = eventId, invitationId = invitationId, userId = user, occurrenceStartAt = key,
-        status = InvitationStatus.ACCEPTED, respondedAt = Instant.EPOCH, updatedAt = Instant.EPOCH, updatedBy = user, version = version,
+        status = InvitationStatus.ACCEPTED, respondedAt = 0L, updatedAt = 0L, updatedBy = user, version = version,
     )
 
     private fun taskOccurrence(version: Long, taskId: ObjectId = ObjectId.get()) = TaskOccurrence(
-        stableId = STABLE_ID, taskId = taskId, occurrenceDueAt = key, updatedAt = Instant.EPOCH, updatedBy = user, version = version,
+        stableId = STABLE_ID, taskId = taskId, occurrenceDueAt = key, updatedAt = 0L, updatedBy = user, version = version,
     )
 
     @Test
@@ -117,17 +118,17 @@ class MongoOccurrenceRepositoryTest {
 
     @Test
     fun `series rules survive a round trip`() {
-        val recurrence = Recurrence(RecurrenceFrequency.WEEKLY, 2, listOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), LocalDate.parse("2026-12-31"), null, "Europe/Vienna")
+        val recurrence = Recurrence(RecurrenceFrequency.WEEKLY, 2, listOf(Weekday.TUESDAY, Weekday.THURSDAY), epochDay("2026-12-31"), null, "Europe/Vienna")
         val event = eventRepository.save(
             Event(
                 stableId = STABLE_ID, creatorUserId = user, title = "Serie", description = "", startAt = key, endAt = key,
-                horseIds = emptyList(), recurrence = recurrence, createdAt = Instant.EPOCH, updatedAt = Instant.EPOCH, updatedBy = user,
+                horseIds = emptyList(), recurrence = recurrence, createdAt = 0L, updatedAt = 0L, updatedBy = user,
             )
         )
         val task = taskRepository.save(
             StableTask(
                 stableId = STABLE_ID, title = "Misten", comment = "", dueAt = key, assigneeUserIds = listOf(user), horseIds = emptyList(),
-                createdByUserId = user, doneByUserId = null, doneAt = null, updatedAt = Instant.EPOCH, updatedBy = user,
+                createdByUserId = user, doneByUserId = null, doneAt = null, updatedAt = 0L, updatedBy = user,
                 recurrence = recurrence.copy(frequency = RecurrenceFrequency.DAILY, weekdays = emptyList(), until = null, count = 5),
             )
         )

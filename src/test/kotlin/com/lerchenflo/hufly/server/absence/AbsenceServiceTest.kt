@@ -11,6 +11,8 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -18,8 +20,6 @@ import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,22 +44,22 @@ class AbsenceServiceTest {
     private val anna = testUser()
     private val ben = testUser()
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
-    private val from = LocalDate.of(2026, 10, 12)
-    private val until = LocalDate.of(2026, 10, 18)
+    private val from = epochDay(2026, 10, 12)
+    private val until = epochDay(2026, 10, 18)
 
     @BeforeTest
     fun setUp() {
         listOf(admin, planner, anna, ben, foreigner).forEach { userRepository.save(it) }
         tagRepository.save(plannerTag)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
         assertEquals(status, assertFailsWith<ResponseStatusException> { block() }.statusCode)
     }
 
-    private fun data(user: User = anna, from: LocalDate = this.from, until: LocalDate = this.until, note: String = "Urlaub") =
+    private fun data(user: User = anna, from: Long = this.from, until: Long = this.until, note: String = "Urlaub") =
         AbsenceService.AbsenceData(user.id, from, until, note)
 
     private fun stored(id: ObjectId) = absenceRepository.findById(id)!!
@@ -74,7 +74,7 @@ class AbsenceServiceTest {
         assertEquals(from to until, stored.from to stored.until)
         assertEquals("Urlaub", stored.note)
         assertEquals(anna.id, stored.createdByUserId)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(1, stored.version)
     }
 
@@ -107,7 +107,7 @@ class AbsenceServiceTest {
     @Test
     fun `an absence ends on or after its start and belongs to a live user of the stable`() {
         service.createAbsence(anna, data(until = from))
-        assertStatus(HttpStatus.BAD_REQUEST) { service.createAbsence(anna, data(until = from.minusDays(1))) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.createAbsence(anna, data(until = from - 1)) }
 
         val gone = userRepository.save(testUser(deleted = true))
         listOf(foreigner, gone).forEach { user ->

@@ -1,6 +1,6 @@
 package com.lerchenflo.hufly.server.core.security
 
-import java.time.Duration
+import com.lerchenflo.hufly.server.testdata.minutes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -8,7 +8,7 @@ import kotlin.test.assertNull
 class FailureLimiterTest {
 
     private val clock = MutableClock()
-    private val limiter = FailureLimiter(maxFailures = 3, window = Duration.ofMinutes(15), clock = clock)
+    private val limiter = FailureLimiter(maxFailures = 3, window = minutes(15), clock = clock)
 
     @Test
     fun `allows up to the limit and blocks after it`() {
@@ -17,16 +17,16 @@ class FailureLimiterTest {
 
         limiter.recordFailure("anna")
 
-        assertEquals(Duration.ofMinutes(15), limiter.retryAfter("anna"))
+        assertEquals(minutes(15), limiter.retryAfter("anna"))
     }
 
     @Test
     fun `old failures fall out of the window`() {
         repeat(3) { limiter.recordFailure("anna") }
-        clock.advance(Duration.ofMinutes(10))
-        assertEquals(Duration.ofMinutes(5), limiter.retryAfter("anna"))
+        clock.advance(minutes(10))
+        assertEquals(minutes(5), limiter.retryAfter("anna"))
 
-        clock.advance(Duration.ofMinutes(5))
+        clock.advance(minutes(5))
 
         assertNull(limiter.retryAfter("anna"))
     }
@@ -39,6 +39,6 @@ class FailureLimiterTest {
         limiter.reset("anna")
 
         assertNull(limiter.retryAfter("anna"))
-        assertEquals(Duration.ofMinutes(15), limiter.retryAfter("ben"))
+        assertEquals(minutes(15), limiter.retryAfter("ben"))
     }
 }

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.notification
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.notification.sender.PlatformPushSender
@@ -11,7 +12,6 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 import java.util.concurrent.Executor
 
 /** Push tokens sit on the session row, so logout, ending a session and expiry drop them with it. */
@@ -37,7 +37,7 @@ class PushService(
 
     /** Looks the devices up now and sends in the background, so a slow push service never holds a request. */
     fun send(userId: ObjectId, message: PushMessage) {
-        val now = clock.instant()
+        val now = clock.millis()
         val targets = sessionRepository.findByUserIdAndPushTokenNotNull(userId).filter { it.expiresAt > now }
         targets.forEach { session ->
             val token = session.pushToken ?: return@forEach

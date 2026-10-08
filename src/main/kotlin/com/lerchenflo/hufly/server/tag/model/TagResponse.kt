@@ -22,6 +22,6 @@ fun Tag.toTagResponse() = TagResponse(
     permissions = permissions,
     defaultIntervalDays = defaultIntervalDays,
     icon = icon,
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
 )

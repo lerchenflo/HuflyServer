@@ -5,7 +5,6 @@ import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 /**
  * One row per device session, rotated in place like SchneaggchatV3server: `/auth/refresh` swaps [hashedToken] to
@@ -24,8 +23,8 @@ data class RefreshToken(
     /** The current token, AES-GCM encrypted; null until the first rotation. */
     val encryptedToken: String? = null,
     /** Slides forward on every rotation. Expired rows are removed by `RefreshTokenCleanup`. */
-    @Indexed val expiresAt: Instant,
-    val createdAt: Instant,
+    @Indexed val expiresAt: Long,
+    val createdAt: Long,
     /**
      * Logging in again on the same user and [deviceId] replaces this session; without a device id, on the same name
      * and type (USR-5). Device names are not unique: since iOS 16 every iPhone is called "iPhone".
@@ -35,7 +34,7 @@ data class RefreshToken(
     /** Client-generated per app install; never sent back to clients. */
     val deviceId: String? = null,
     /** Last refresh; null until the first one. */
-    val lastUsedAt: Instant? = null,
+    val lastUsedAt: Long? = null,
     /** FCM or APNs token of this install; one session per token, see `PushService.register`. */
     @Indexed(sparse = true) val pushToken: String? = null,
     val pushPlatform: PushPlatform? = null,

@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.horse
 
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
+import com.lerchenflo.hufly.server.core.MAX_EPOCH_DAYS
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.picture.pictureResponse
@@ -15,6 +16,8 @@ import com.lerchenflo.hufly.server.horse.model.Medication
 import com.lerchenflo.hufly.server.horse.model.toHorseResponse
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.ResponseEntity
@@ -28,7 +31,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
-import java.time.LocalDate
 
 @RestController
 @RequestMapping("/horses")
@@ -44,8 +46,8 @@ class HorseController(
     data class MedicationRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 200) val dosage: String = "",
-        val from: LocalDate,
-        val until: LocalDate? = null,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val from: Long,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val until: Long? = null,
     )
 
     data class MedicationsRequest(
@@ -55,7 +57,7 @@ class HorseController(
     data class HorseRequest(
         @field:NotBlank @field:Size(max = 100) val name: String,
         @field:Size(max = 5000) val description: String = "",
-        val birthDate: LocalDate? = null,
+        @field:Min(-MAX_EPOCH_DAYS) @field:Max(MAX_EPOCH_DAYS) val birthDate: Long? = null,
         @field:Size(max = 100) val breed: String = "",
         @field:Size(max = 100) val color: String = "",
         val ownerUserId: String? = null,

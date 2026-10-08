@@ -1,9 +1,9 @@
 package com.lerchenflo.hufly.server.core.security
 
+import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.MILLIS_PER_MINUTE
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.time.Clock
-import java.time.Duration
 
 /**
  * Brute-force protection for password logins. Only failures count, because many members share the stable's
@@ -16,7 +16,7 @@ class LoginGuard(
     @Value("\${ratelimit.operator.max-failures-per-ip:5}") maxOperatorFailuresPerIp: Int,
     clock: Clock,
 ) {
-    private val window = Duration.ofMinutes(15)
+    private val window = 15 * MILLIS_PER_MINUTE
     private val byEmail = FailureLimiter(maxFailuresPerEmail, window, clock)
     private val byIp = FailureLimiter(maxFailuresPerIp, window, clock)
     private val operatorByIp = FailureLimiter(maxOperatorFailuresPerIp, window, clock)
@@ -33,7 +33,8 @@ class LoginGuard(
 
     fun loginSucceeded(email: String) = byEmail.reset(email)
 
-    fun operatorRetryAfter(ip: String): Duration? = operatorByIp.retryAfter(ip)
+    /** Milliseconds until [ip] may try the operator login again, or null. */
+    fun operatorRetryAfter(ip: String): Long? = operatorByIp.retryAfter(ip)
 
     fun operatorLoginFailed(ip: String) = operatorByIp.recordFailure(ip)
 }

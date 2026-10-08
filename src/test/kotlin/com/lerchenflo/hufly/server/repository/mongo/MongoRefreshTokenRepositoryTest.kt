@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
+import com.lerchenflo.hufly.server.testdata.millis
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,7 +13,6 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -31,10 +31,10 @@ class MongoRefreshTokenRepositoryTest {
     @Autowired lateinit var repository: RefreshTokenRepository
     @Autowired lateinit var mongoTemplate: MongoTemplate
 
-    private val later = Instant.parse("2026-11-01T00:00:00Z")
+    private val later = millis("2026-11-01T00:00:00Z")
 
     private fun session(hash: String) =
-        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = hash, expiresAt = Instant.parse("2026-10-31T00:00:00Z"), createdAt = Instant.EPOCH))
+        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = hash, expiresAt = millis("2026-10-31T00:00:00Z"), createdAt = 0L))
 
     @Test
     fun `rotate swaps the current hash in place, once`() {
@@ -66,17 +66,17 @@ class MongoRefreshTokenRepositoryTest {
         repository.rotate("t1", "t2", "enc", later, later)
 
         val raw = mongoTemplate.getCollection("refreshTokens").find(org.bson.Document("hashedToken", "t2")).first()!!
-        assertEquals(later.toEpochMilli(), raw["expiresAt"])
+        assertEquals(later, raw["expiresAt"])
         assertEquals(0L, raw["createdAt"])
         assertEquals(later, repository.findByHashedToken("t2")!!.expiresAt)
     }
 
     @Test
     fun `cleanup query deletes only expired sessions`() {
-        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "old", expiresAt = Instant.parse("2026-01-01T00:00:00Z"), createdAt = Instant.EPOCH))
-        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "new", expiresAt = Instant.parse("2027-01-01T00:00:00Z"), createdAt = Instant.EPOCH))
+        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "old", expiresAt = millis("2026-01-01T00:00:00Z"), createdAt = 0L))
+        repository.save(RefreshToken(userId = ObjectId.get(), hashedToken = "new", expiresAt = millis("2027-01-01T00:00:00Z"), createdAt = 0L))
 
-        repository.deleteByExpiresAtBefore(Instant.parse("2026-06-01T00:00:00Z"))
+        repository.deleteByExpiresAtBefore(millis("2026-06-01T00:00:00Z"))
 
         assertNull(repository.findByHashedToken("old"))
         assertEquals("new", repository.findByHashedToken("new")!!.hashedToken)
@@ -87,7 +87,7 @@ class MongoRefreshTokenRepositoryTest {
         val anna = ObjectId.get()
         fun device(hash: String, name: String, type: DeviceType, id: String? = null) = repository.save(
             RefreshToken(
-                userId = anna, hashedToken = hash, expiresAt = later, createdAt = Instant.EPOCH, deviceName = name, deviceType = type, deviceId = id,
+                userId = anna, hashedToken = hash, expiresAt = later, createdAt = 0L, deviceName = name, deviceType = type, deviceId = id,
             )
         )
         val phone = device("d1", "Pixel 7", DeviceType.ANDROID)
@@ -107,7 +107,7 @@ class MongoRefreshTokenRepositoryTest {
         val other = repository.save(session("push-b"))
 
         assertEquals(1, repository.setPushToken(phone.id, "tok", PushPlatform.IOS))
-        repository.rotate("push-a", "push-a2", "enc", Instant.parse("2027-01-01T00:00:00Z"), Instant.parse("2026-10-05T00:00:00Z"))
+        repository.rotate("push-a", "push-a2", "enc", millis("2027-01-01T00:00:00Z"), millis("2026-10-05T00:00:00Z"))
         assertEquals("tok" to PushPlatform.IOS, repository.findById(phone.id)!!.let { it.pushToken to it.pushPlatform })
         assertEquals(listOf(phone.id), repository.findByUserIdAndPushTokenNotNull(phone.userId).map { it.id })
 

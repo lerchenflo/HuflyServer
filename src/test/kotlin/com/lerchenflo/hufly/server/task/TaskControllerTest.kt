@@ -181,8 +181,8 @@ class TaskControllerTest {
         val assignment = assignmentRepository.save(
             com.lerchenflo.hufly.server.paddock.model.PaddockAssignment(
                 stableId = admin.stableId, paddockId = ObjectId.get(), groupIds = emptyList(), horseIds = emptyList(),
-                startAt = java.time.Instant.ofEpochMilli(1790000000000), endAt = null, comment = "",
-                updatedAt = java.time.Instant.now(), updatedBy = admin.id,
+                startAt = 1790000000000, endAt = null, comment = "",
+                updatedAt = 0L, updatedBy = admin.id,
             )
         )
         val id = assignment.id.toHexString()

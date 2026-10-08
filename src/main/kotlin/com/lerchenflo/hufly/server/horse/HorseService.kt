@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horse
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.picture.PictureKind
@@ -19,8 +20,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.LocalDate
 
 /**
  * Adding and removing horses is admin-only (TAG-6); editing needs HORSE_EDIT, medications HORSE_MEDICATION_EDIT,
@@ -41,7 +40,7 @@ class HorseService(
     data class HorseData(
         val name: String,
         val description: String,
-        val birthDate: LocalDate?,
+        val birthDate: Long?,
         val breed: String,
         val color: String,
         val ownerUserId: ObjectId?,
@@ -74,7 +73,7 @@ class HorseService(
                     medications = medications,
                     foodPlanId = requireStablePlan(requester, data.foodPlanId),
                     coRiderUserIds = data.coRiders,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
                 )
@@ -105,7 +104,7 @@ class HorseService(
                 vetContact = data.vetContact,
                 foodPlanId = foodPlanId,
                 coRiderUserIds = data.coRiders,
-                updatedAt = clock.instant(),
+                updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
         )
@@ -115,14 +114,14 @@ class HorseService(
     fun updateMedications(requester: User, horseId: ObjectId, medications: List<Medication>): Horse {
         val horse = editableHorse(requester, horseId, Permission.HORSE_MEDICATION_EDIT)
         validateMedications(medications)
-        return horseRepository.save(horse.copy(medications = medications, updatedAt = clock.instant(), updatedBy = requester.id))
+        return horseRepository.save(horse.copy(medications = medications, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     /** HOR-3: whoever may edit the horse sets its picture. */
     fun setPicture(requester: User, horseId: ObjectId, upload: ByteArray): Horse {
         val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
         pictureStore.save(PictureKind.HORSE, horse.id, toStoredPicture(upload))
-        val now = clock.instant()
+        val now = clock.millis()
         return horseRepository.save(
             horse.copy(pictureUrl = pictureUrl(PictureKind.HORSE, horse.id, now), updatedAt = now, updatedBy = requester.id)
         )
@@ -131,7 +130,7 @@ class HorseService(
     fun deletePicture(requester: User, horseId: ObjectId): Horse {
         val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
         pictureStore.delete(PictureKind.HORSE, horse.id)
-        return horseRepository.save(horse.copy(pictureUrl = null, updatedAt = clock.instant(), updatedBy = requester.id))
+        return horseRepository.save(horse.copy(pictureUrl = null, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     fun picture(requester: User, horseId: ObjectId): ByteArray {
@@ -150,7 +149,7 @@ class HorseService(
     fun deleteHorse(requester: User, horseId: ObjectId) {
         accessService.requireAdmin(requester)
         val horse = stableHorse(requester, horseId)
-        val now = clock.instant()
+        val now = clock.millis()
         horseRepository.save(horse.copy(deleted = true, pictureUrl = null, updatedAt = now, updatedBy = requester.id))
         pictureStore.delete(PictureKind.HORSE, horse.id)
         // Paddock assignments keep the horse: they are history.

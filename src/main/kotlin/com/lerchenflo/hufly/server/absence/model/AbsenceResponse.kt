@@ -1,14 +1,13 @@
 package com.lerchenflo.hufly.server.absence.model
 
-import java.time.LocalDate
 
-/** Instants are epoch milliseconds, [from] and [until] ISO dates. */
+/** Times are epoch milliseconds, [from] and [until] epoch days. */
 data class AbsenceResponse(
     val id: String,
     val stableId: String,
     val userId: String,
-    val from: LocalDate,
-    val until: LocalDate,
+    val from: Long,
+    val until: Long,
     val note: String,
     val createdByUserId: String,
     val updatedAt: Long,
@@ -25,7 +24,7 @@ fun Absence.toAbsenceResponse() = AbsenceResponse(
     until = until,
     note = note,
     createdByUserId = createdByUserId.toHexString(),
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     version = version,
     deleted = deleted,

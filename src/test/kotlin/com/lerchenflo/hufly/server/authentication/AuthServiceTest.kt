@@ -1,17 +1,18 @@
 package com.lerchenflo.hufly.server.authentication
 
+import com.lerchenflo.hufly.server.authentication.model.DeviceType
+import com.lerchenflo.hufly.server.core.security.CountingHashEncoder
 import com.lerchenflo.hufly.server.core.security.JwtService
-import com.lerchenflo.hufly.server.core.security.TokenCipher
 import com.lerchenflo.hufly.server.core.security.MutableClock
+import com.lerchenflo.hufly.server.core.security.TokenCipher
+import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.hours
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
-import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import org.springframework.http.HttpStatus
-import com.lerchenflo.hufly.server.core.security.CountingHashEncoder
-import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -164,7 +165,7 @@ class AuthServiceTest {
     fun `retry with the old token returns the same refresh token as the lost response, even much later`() {
         val login = authService.login("anna@hufly.test", "Secret123")
         val lost = authService.refresh(login.refreshToken)
-        clock.advance(Duration.ofDays(3))
+        clock.advance(days(3))
 
         val retried = authService.refresh(login.refreshToken)
 
@@ -223,11 +224,11 @@ class AuthServiceTest {
     @Test
     fun `rotation slides the session expiry`() {
         val login = authService.login("anna@hufly.test", "Secret123")
-        clock.advance(Duration.ofDays(10))
+        clock.advance(days(10))
 
         authService.refresh(login.refreshToken)
 
-        assertEquals(clock.instant().plus(jwtService.refreshTokenValidity), refreshTokenRepository.tokens.single().expiresAt)
+        assertEquals(clock.millis().plus(jwtService.refreshTokenValidity), refreshTokenRepository.tokens.single().expiresAt)
     }
 
     // Sessions per device (USR-5)
@@ -293,13 +294,13 @@ class AuthServiceTest {
     @Test
     fun `refresh keeps the session id and records the last use`() {
         val login = authService.login("anna@hufly.test", "Secret123", pixel)
-        clock.advance(Duration.ofHours(2))
+        clock.advance(hours(2))
 
         val refreshed = authService.refresh(login.refreshToken)
 
         val session = refreshTokenRepository.tokens.single()
         assertEquals(session.id, jwtService.sessionIdFromAccessToken(refreshed.accessToken))
-        assertEquals(clock.instant(), session.lastUsedAt)
+        assertEquals(clock.millis(), session.lastUsedAt)
     }
 
     @Test

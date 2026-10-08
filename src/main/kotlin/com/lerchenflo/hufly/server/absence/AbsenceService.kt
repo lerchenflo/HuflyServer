@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.absence
 import com.lerchenflo.hufly.server.absence.model.Absence
 import com.lerchenflo.hufly.server.absence.model.AbsenceResponse
 import com.lerchenflo.hufly.server.absence.model.toAbsenceResponse
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
@@ -18,8 +19,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
-import java.time.LocalDate
 
 /** Everyone writes their own absences; others' need TASK_EDIT (or the admin). Every member sees all. No pushes. */
 @Service
@@ -30,7 +29,7 @@ class AbsenceService(
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
 ) {
-    data class AbsenceData(val userId: ObjectId, val from: LocalDate, val until: LocalDate, val note: String)
+    data class AbsenceData(val userId: ObjectId, val from: Long, val until: Long, val note: String)
 
     fun createAbsence(requester: User, data: AbsenceData, clientId: String? = null): Absence {
         requireMayWrite(requester, data.userId)
@@ -44,7 +43,7 @@ class AbsenceService(
                     until = data.until,
                     note = data.note,
                     createdByUserId = requester.id,
-                    updatedAt = clock.instant(),
+                    updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
                 )
@@ -60,7 +59,7 @@ class AbsenceService(
         return save(
             absence.copy(
                 userId = data.userId, from = data.from, until = data.until, note = data.note,
-                updatedAt = clock.instant(), updatedBy = requester.id,
+                updatedAt = clock.millis(), updatedBy = requester.id,
             )
         )
     }
@@ -68,13 +67,13 @@ class AbsenceService(
     fun deleteAbsence(requester: User, absenceId: ObjectId) {
         val absence = ownAbsence(requester, absenceId)
         requireMayWrite(requester, absence.userId)
-        save(absence.copy(deleted = true, updatedAt = clock.instant(), updatedBy = requester.id))
+        save(absence.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
     }
 
     /** Called when [userId] leaves the stable. */
     fun removeUser(userId: ObjectId, by: ObjectId) {
         absenceRepository.findByUserIdAndDeletedFalse(userId).forEach {
-            save(it.copy(deleted = true, updatedAt = clock.instant(), updatedBy = by))
+            save(it.copy(deleted = true, updatedAt = clock.millis(), updatedBy = by))
         }
     }
 

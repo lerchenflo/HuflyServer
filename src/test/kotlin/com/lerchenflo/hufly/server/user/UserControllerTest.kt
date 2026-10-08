@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.core.picture.testPng
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
@@ -13,14 +14,12 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.get
 import org.springframework.http.HttpMethod
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
-import com.lerchenflo.hufly.server.core.picture.testPng
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -38,7 +37,7 @@ class UserControllerTest {
 
     private val admin = testUser(email = "admin@hufly.test")
     private val trainerTag = testTag(permissions = setOf(Permission.EVENT_VIEW))
-    private val rider = testUser(email = "rider@hufly.test", roleTagIds = listOf(trainerTag.id), updatedAt = Instant.ofEpochMilli(1234))
+    private val rider = testUser(email = "rider@hufly.test", roleTagIds = listOf(trainerTag.id), updatedAt = 1234)
 
     @BeforeTest
     fun setUp() {

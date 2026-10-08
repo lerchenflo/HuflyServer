@@ -1,7 +1,6 @@
 package com.lerchenflo.hufly.server.core.notification
 
 import org.bson.types.ObjectId
-import java.time.Instant
 
 /**
  * Something members should hear about, published through Spring's ApplicationEventPublisher and turned into pushes by
@@ -22,7 +21,7 @@ data class EventInvited(
     override val actorUserId: ObjectId,
     val eventId: ObjectId,
     val userIds: List<ObjectId>,
-    val occurrenceStartAt: Instant?,
+    val occurrenceStartAt: Long?,
 ) : NotificationEvent
 
 /** The invitee [actorUserId] changed their answer, for one date of a series when [occurrenceStartAt] is set. */
@@ -31,7 +30,7 @@ data class InvitationAnswered(
     override val actorUserId: ObjectId,
     val eventId: ObjectId,
     val accepted: Boolean,
-    val occurrenceStartAt: Instant?,
+    val occurrenceStartAt: Long?,
 ) : NotificationEvent
 
 /** [userIds] newly have the task, or only its date [occurrenceDueAt] as stand-ins. */
@@ -40,5 +39,5 @@ data class TaskAssigned(
     override val actorUserId: ObjectId,
     val taskId: ObjectId,
     val userIds: List<ObjectId>,
-    val occurrenceDueAt: Instant?,
+    val occurrenceDueAt: Long?,
 ) : NotificationEvent

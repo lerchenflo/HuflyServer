@@ -5,10 +5,11 @@ import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.minutes
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
 import java.util.concurrent.Executor
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,8 +29,8 @@ class PushServiceTest {
     private val ben = ObjectId.get()
     private val message = PushMessage("Neuer Aushang", "Hufschmied kommt", mapOf("type" to "note"))
 
-    private fun session(userId: ObjectId, expiresIn: Duration = Duration.ofDays(30)) = sessions.save(
-        RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.instant().plus(expiresIn), createdAt = clock.instant())
+    private fun session(userId: ObjectId, expiresIn: Long = days(30)) = sessions.save(
+        RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.millis().plus(expiresIn), createdAt = clock.millis())
     )
 
     @Test
@@ -65,9 +66,9 @@ class PushServiceTest {
         pushService.unregister(anna, phone.id)
         pushService.send(anna, message)
 
-        val expired = session(anna, expiresIn = Duration.ofMinutes(1))
+        val expired = session(anna, expiresIn = minutes(1))
         pushService.register(anna, expired.id, PushPlatform.ANDROID, "fcm-2")
-        clock.advance(Duration.ofMinutes(2))
+        clock.advance(minutes(2))
         pushService.send(anna, message)
 
         assertEquals(emptyList(), android.sent)

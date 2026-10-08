@@ -31,15 +31,15 @@ data class PaddockAssignmentResponse(
 )
 
 fun Paddock.toPaddockResponse() =
-    PaddockResponse(id.toHexString(), stableId.toHexString(), name, description, updatedAt.toEpochMilli(), updatedBy.toHexString())
+    PaddockResponse(id.toHexString(), stableId.toHexString(), name, description, updatedAt, updatedBy.toHexString())
 
 fun HorseGroup.toHorseGroupResponse() = HorseGroupResponse(
-    id.toHexString(), stableId.toHexString(), name, horseIds.map { it.toHexString() }, updatedAt.toEpochMilli(), updatedBy.toHexString(),
+    id.toHexString(), stableId.toHexString(), name, horseIds.map { it.toHexString() }, updatedAt, updatedBy.toHexString(),
 )
 
 fun HorseConflict.toHorseConflictResponse() = HorseConflictResponse(
     id.toHexString(), stableId.toHexString(), firstHorseId.toHexString(), secondHorseId.toHexString(), reason,
-    updatedAt.toEpochMilli(), updatedBy.toHexString(),
+    updatedAt, updatedBy.toHexString(),
 )
 
 fun PaddockAssignment.toPaddockAssignmentResponse() = PaddockAssignmentResponse(
@@ -49,10 +49,10 @@ fun PaddockAssignment.toPaddockAssignmentResponse() = PaddockAssignmentResponse(
     groupIds = groupIds.map { it.toHexString() },
     horseIds = horseIds.map { it.toHexString() },
     singleHorseIds = singleHorseIds.map { it.toHexString() },
-    startAt = startAt.toEpochMilli(),
-    endAt = endAt?.toEpochMilli(),
+    startAt = startAt,
+    endAt = endAt,
     comment = comment,
-    updatedAt = updatedAt.toEpochMilli(),
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     version = version,
 )

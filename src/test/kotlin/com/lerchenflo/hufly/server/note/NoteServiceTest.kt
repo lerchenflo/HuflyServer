@@ -8,13 +8,16 @@ import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.note.model.StableNote
 import com.lerchenflo.hufly.server.repository.FakeNoteRepository
-import com.lerchenflo.hufly.server.repository.NoteRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.repository.NoteRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.hours
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -23,8 +26,6 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,14 +53,14 @@ class NoteServiceTest {
     private val ben = testUser()
     private val foreigner = testUser(stableId = OTHER_STABLE_ID)
 
-    private val data = NoteService.NoteData("  Hufschmied kommt  ", "Am Freitag ab 8 Uhr", pinned = true, visibleUntil = LocalDate.of(2026, 10, 9))
+    private val data = NoteService.NoteData("  Hufschmied kommt  ", "Am Freitag ab 8 Uhr", pinned = true, visibleUntil = epochDay(2026, 10, 9))
 
     @BeforeTest
     fun setUp() {
         listOf(admin, writer, anna, ben, foreigner).forEach { userRepository.save(it) }
         tagRepository.save(writerTag)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -79,9 +80,9 @@ class NoteServiceTest {
         assertEquals("Hufschmied kommt", stored.title)
         assertEquals("Am Freitag ab 8 Uhr", stored.body)
         assertTrue(stored.pinned)
-        assertEquals(LocalDate.of(2026, 10, 9), stored.visibleUntil)
+        assertEquals(epochDay(2026, 10, 9), stored.visibleUntil)
         assertEquals(writer.id, stored.createdByUserId)
-        assertEquals(clock.instant(), stored.createdAt)
+        assertEquals(clock.millis(), stored.createdAt)
         assertEquals(emptyList(), stored.readByUserIds)
         assertTrue(stored.version > 0)
     }
@@ -98,7 +99,7 @@ class NoteServiceTest {
     fun `any writer edits any note of the stable without touching author, creation time or readers`() {
         val note = post()
         noteService.markRead(anna, note.id)
-        clock.advance(Duration.ofHours(1))
+        clock.advance(hours(1))
 
         noteService.updateNote(admin, note.id, NoteService.NoteData("Hufschmied verschoben", "", pinned = false, visibleUntil = null))
 
@@ -110,7 +111,7 @@ class NoteServiceTest {
         assertEquals(note.createdAt, stored.createdAt)
         assertEquals(listOf(anna.id), stored.readByUserIds)
         assertEquals(admin.id, stored.updatedBy)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
     }
 
     @Test

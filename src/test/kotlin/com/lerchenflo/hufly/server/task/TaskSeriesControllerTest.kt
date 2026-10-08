@@ -41,7 +41,7 @@ class TaskSeriesControllerTest {
     // 2026-10-05 07:00 UTC, daily.
     private val first = 1791190800000L
     private val second = first + 86_400_000L
-    private val daily = """{"frequency":"DAILY","interval":1,"weekdays":[],"until":"2026-10-31","count":null,"timeZone":"UTC"}"""
+    private val daily = """{"frequency":"DAILY","interval":1,"weekdays":[],"until":20757,"count":null,"timeZone":"UTC"}"""
 
     @BeforeTest
     fun setUp() {
@@ -76,7 +76,7 @@ class TaskSeriesControllerTest {
         call(HttpMethod.POST, "/tasks", taskJson()).andExpect {
             status { isOk() }
             jsonPath("$.recurrence.frequency") { value("DAILY") }
-            jsonPath("$.recurrence.until") { value("2026-10-31") }
+            jsonPath("$.recurrence.until") { value(20757) }
             jsonPath("$.recurrence.weekdays.length()") { value(0) }
         }
         val taskId = taskRepository.tasks.single().id.toHexString()
@@ -88,7 +88,7 @@ class TaskSeriesControllerTest {
 
     @Test
     fun `an until before the first date answers 400`() {
-        call(HttpMethod.POST, "/tasks", taskJson(recurrence = """{"frequency":"DAILY","until":"2026-10-04","timeZone":"UTC"}"""))
+        call(HttpMethod.POST, "/tasks", taskJson(recurrence = """{"frequency":"DAILY","until":20730,"timeZone":"UTC"}"""))
             .andExpect { status { isBadRequest() } }
     }
 

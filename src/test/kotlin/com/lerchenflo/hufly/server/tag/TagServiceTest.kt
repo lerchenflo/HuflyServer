@@ -9,12 +9,12 @@ import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,7 +39,7 @@ class TagServiceTest {
         userRepository.save(admin)
         userRepository.save(rider)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -53,7 +53,7 @@ class TagServiceTest {
         val stored = tagRepository.findById(tag.id)!!
         assertEquals(STABLE_ID, stored.stableId)
         assertEquals(setOf(Permission.EVENT_EDIT), stored.permissions)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(admin.id, stored.updatedBy)
     }
 
@@ -80,7 +80,7 @@ class TagServiceTest {
         assertEquals("#123456", stored.color)
         assertEquals(setOf(Permission.TASK_EDIT), stored.permissions)
         assertEquals(TagType.USER_ROLE, stored.type)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
     }
 
     @Test
@@ -97,7 +97,7 @@ class TagServiceTest {
         tagService.deleteTag(admin, tag.id)
 
         assertTrue(tagRepository.findById(tag.id)!!.deleted)
-        assertEquals(clock.instant(), tagRepository.findById(tag.id)!!.updatedAt)
+        assertEquals(clock.millis(), tagRepository.findById(tag.id)!!.updatedAt)
     }
 
     @Test

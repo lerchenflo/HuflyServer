@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.stable
 
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
@@ -11,7 +12,6 @@ import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 
 /** Creates a stable together with its single admin (BIZ-1, BIZ-2). Used by the operator website and the dev bootstrap. */
 @Service
@@ -27,7 +27,7 @@ class StableOnboardingService(
         val email = normalizeEmail(adminEmail)
         if (userRepository.findByEmail(email) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Email already in use")
 
-        val now = clock.instant()
+        val now = clock.millis()
         val stableId = ObjectId.get()
         val adminId = ObjectId.get()
         val admin = userRepository.save(

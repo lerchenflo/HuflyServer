@@ -13,19 +13,21 @@ import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.task.model.StableTask
+import com.lerchenflo.hufly.server.task.model.TurnoutKind
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.minusSeconds
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
-import com.lerchenflo.hufly.server.task.model.TurnoutKind
-import com.lerchenflo.hufly.server.task.model.StableTask
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,7 +62,7 @@ class PaddockServiceTest {
     private val donner = testHorse(name = "Donner")
     private val wolke = testHorse(name = "Wolke")
     private val foreignHorse = testHorse(stableId = OTHER_STABLE_ID)
-    private val start = Instant.parse("2026-10-03T07:00:00Z")
+    private val start = millis("2026-10-03T07:00:00Z")
 
     @BeforeTest
     fun setUp() {
@@ -68,7 +70,7 @@ class PaddockServiceTest {
         tagRepository.save(plannerTag)
         listOf(blitz, donner, wolke, foreignHorse).forEach { horseRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -87,7 +89,7 @@ class PaddockServiceTest {
 
         service.deletePaddock(admin, paddock.id)
         assertTrue(paddockRepository.findById(paddock.id)!!.deleted)
-        assertEquals(clock.instant(), paddockRepository.findById(paddock.id)!!.updatedAt)
+        assertEquals(clock.millis(), paddockRepository.findById(paddock.id)!!.updatedAt)
     }
 
     @Test
@@ -272,7 +274,7 @@ class PaddockServiceTest {
 
     @Test
     fun `deleting a paddock drops future assignments, ends running ones and keeps the past`() {
-        val now = clock.instant()
+        val now = clock.millis()
         val paddock = service.createPaddock(admin, "Koppel", "")
         val other = service.createPaddock(admin, "Andere", "")
         val past = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(7200), now.minusSeconds(3600), "")
@@ -379,7 +381,7 @@ class PaddockServiceTest {
     private fun chore(
         assignmentId: ObjectId?,
         kind: TurnoutKind?,
-        dueAt: Instant = start,
+        dueAt: Long = start,
         done: Boolean = false,
     ) = taskRepository.save(
         StableTask(
@@ -411,7 +413,7 @@ class PaddockServiceTest {
         assertEquals(listOf(donner.id, wolke.id), task(out.id).horseIds)
         assertEquals(listOf(donner.id, wolke.id), task(bringIn.id).horseIds)
         assertTrue(task(out.id).version > 0)
-        assertEquals(clock.instant(), task(out.id).updatedAt)
+        assertEquals(clock.millis(), task(out.id).updatedAt)
         assertEquals(planner.id, task(out.id).updatedBy)
         assertEquals(doneOut, task(doneOut.id))
         assertEquals(unrelated, task(unrelated.id))
@@ -448,7 +450,7 @@ class PaddockServiceTest {
     @Test
     fun `deleting a paddock deletes chores of dropped assignments and moves bring-in of ended ones to now`() {
         val paddock = service.createPaddock(admin, "Koppel", "")
-        val now = clock.instant()
+        val now = clock.millis()
         val running = service.createAssignment(planner, paddock.id, emptyList(), listOf(blitz.id), now.minusSeconds(60), now.plusSeconds(600), "")
         val future = service.createAssignment(planner, paddock.id, emptyList(), listOf(wolke.id), now.plusSeconds(3600), null, "")
         val runningIn = chore(running.id, TurnoutKind.IN, dueAt = now.plusSeconds(600))

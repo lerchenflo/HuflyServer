@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.repository.mongo
 
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
+import com.lerchenflo.hufly.server.testdata.millis
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -10,7 +11,6 @@ import org.springframework.dao.DuplicateKeyException
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,8 +29,8 @@ class MongoUserSettingsRepositoryTest {
 
     @Autowired lateinit var repository: UserSettingsRepository
 
-    private val first = Instant.parse("2026-10-03T10:00:00.123Z")
-    private val second = Instant.parse("2026-10-03T10:00:05.456Z")
+    private val first = millis("2026-10-03T10:00:00.123Z")
+    private val second = millis("2026-10-03T10:00:05.456Z")
 
     @Test
     fun `insert fails when settings exist`() {

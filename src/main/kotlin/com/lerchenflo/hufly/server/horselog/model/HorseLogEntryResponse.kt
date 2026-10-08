@@ -1,8 +1,7 @@
 package com.lerchenflo.hufly.server.horselog.model
 
-import java.time.LocalDate
 
-/** Instants are epoch milliseconds, [nextDueAt] is an ISO date. */
+/** Times are epoch milliseconds, [nextDueAt] is epoch days. */
 data class HorseLogEntryResponse(
     val id: String,
     val stableId: String,
@@ -12,7 +11,7 @@ data class HorseLogEntryResponse(
     val endAt: Long?,
     val doneByUserId: String?,
     val comment: String,
-    val nextDueAt: LocalDate?,
+    val nextDueAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
     val updatedBy: String,
@@ -24,13 +23,13 @@ fun HorseLogEntry.toHorseLogEntryResponse() = HorseLogEntryResponse(
     stableId = stableId.toHexString(),
     horseId = horseId.toHexString(),
     activityTagId = activityTagId.toHexString(),
-    startAt = startAt.toEpochMilli(),
-    endAt = endAt?.toEpochMilli(),
+    startAt = startAt,
+    endAt = endAt,
     doneByUserId = doneByUserId?.toHexString(),
     comment = comment,
     nextDueAt = nextDueAt,
-    createdAt = createdAt.toEpochMilli(),
-    updatedAt = updatedAt.toEpochMilli(),
+    createdAt = createdAt,
+    updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
     version = version,
 )

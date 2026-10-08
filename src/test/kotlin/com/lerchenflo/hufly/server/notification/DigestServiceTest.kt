@@ -8,10 +8,12 @@ import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.repository.FakeDigestItemRepository
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
 import com.lerchenflo.hufly.server.repository.FakeUserSettingsRepository
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.minusSeconds
+import com.lerchenflo.hufly.server.testdata.minutes
 import com.lerchenflo.hufly.server.user.model.UserSettings
 import org.bson.types.ObjectId
-import java.time.Duration
-import java.time.Instant
 import java.util.concurrent.Executor
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -22,7 +24,7 @@ import kotlin.test.assertTrue
 class DigestServiceTest {
 
     // 06:30 in Vienna (CEST).
-    private val clock = MutableClock(Instant.parse("2026-10-06T04:30:00Z"))
+    private val clock = MutableClock(millis("2026-10-06T04:30:00Z"))
     private val sessions = FakeRefreshTokenRepository()
     private val settingsRepository = FakeUserSettingsRepository()
     private val digestRepository = FakeDigestItemRepository()
@@ -35,24 +37,24 @@ class DigestServiceTest {
     @BeforeTest
     fun setUp() {
         val session = sessions.save(
-            RefreshToken(userId = anna, hashedToken = "h", expiresAt = clock.instant().plus(Duration.ofDays(30)), createdAt = clock.instant())
+            RefreshToken(userId = anna, hashedToken = "h", expiresAt = clock.millis() + days(30), createdAt = clock.millis())
         )
         pushService.register(anna, session.id, PushPlatform.ANDROID, "anna-phone")
-        settingsRepository.save(UserSettings(anna, mapOf("notificationDigest" to "true"), clock.instant()))
+        settingsRepository.save(UserSettings(anna, mapOf("notificationDigest" to "true"), clock.millis()))
     }
 
-    private fun item(title: String, at: Instant) = digestRepository.save(DigestItem(userId = anna, title = title, body = "$title body", createdAt = at))
+    private fun item(title: String, at: Long) = digestRepository.save(DigestItem(userId = anna, title = title, body = "$title body", createdAt = at))
 
     @Test
     fun `nothing goes out before the digest time, everything collected until then goes out after it`() {
-        item("Neuer Aushang", Instant.parse("2026-10-05T18:00:00Z"))
-        item("Einladung: Springstunde", Instant.parse("2026-10-06T04:00:00Z"))
+        item("Neuer Aushang", millis("2026-10-05T18:00:00Z"))
+        item("Einladung: Springstunde", millis("2026-10-06T04:00:00Z"))
 
         service.sendDue()
         assertTrue(android.sent.isEmpty())
 
-        clock.advance(Duration.ofMinutes(31))
-        item("Neue Aufgabe: Misten", clock.instant())
+        clock.advance(minutes(31))
+        item("Neue Aufgabe: Misten", clock.millis())
         service.sendDue()
 
         assertEquals(
@@ -64,14 +66,14 @@ class DigestServiceTest {
 
     @Test
     fun `a single item keeps its own text, many are cut after four lines, the time is the user's`() {
-        settingsRepository.save(UserSettings(anna, mapOf("notificationDigest" to "true", "notificationDigestTime" to "06:00"), clock.instant()))
-        item("Neuer Aushang", Instant.parse("2026-10-06T03:00:00Z"))
+        settingsRepository.save(UserSettings(anna, mapOf("notificationDigest" to "true", "notificationDigestTime" to "06:00"), clock.millis()))
+        item("Neuer Aushang", millis("2026-10-06T03:00:00Z"))
 
         service.sendDue()
         assertEquals(PushMessage("Neuer Aushang", "Neuer Aushang body", mapOf("type" to "digest")), android.sent.single().second)
 
-        (1..6).forEach { item("Aushang $it", clock.instant().minusSeconds(60)) }
-        clock.advance(Duration.ofDays(1))
+        (1..6).forEach { item("Aushang $it", clock.millis().minusSeconds(60)) }
+        clock.advance(days(1))
         service.sendDue()
         assertEquals("6 Neuigkeiten", android.sent.last().second.title)
         assertEquals("Aushang 1\nAushang 2\nAushang 3\nAushang 4\n… und 2 weitere", android.sent.last().second.body)

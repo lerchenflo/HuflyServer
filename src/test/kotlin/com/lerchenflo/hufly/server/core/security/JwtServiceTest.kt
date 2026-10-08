@@ -1,7 +1,8 @@
 package com.lerchenflo.hufly.server.core.security
 
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.minutes
 import org.bson.types.ObjectId
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -54,10 +55,10 @@ class JwtServiceTest {
     fun `access token expires after 15 minutes`() {
         val token = jwtService.generateAccessToken(userId)
 
-        clock.advance(Duration.ofMinutes(14))
+        clock.advance(minutes(14))
         assertEquals(userId, jwtService.userIdFromAccessToken(token))
 
-        clock.advance(Duration.ofMinutes(2))
+        clock.advance(minutes(2))
         assertNull(jwtService.userIdFromAccessToken(token))
     }
 
@@ -65,10 +66,10 @@ class JwtServiceTest {
     fun `refresh token expires after 30 days`() {
         val token = jwtService.generateRefreshToken(userId)
 
-        clock.advance(Duration.ofDays(29))
+        clock.advance(days(29))
         assertEquals(userId, jwtService.userIdFromRefreshToken(token))
 
-        clock.advance(Duration.ofDays(2))
+        clock.advance(days(2))
         assertNull(jwtService.userIdFromRefreshToken(token))
     }
 

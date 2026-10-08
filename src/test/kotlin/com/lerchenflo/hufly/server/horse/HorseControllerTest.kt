@@ -4,20 +4,20 @@ import com.lerchenflo.hufly.server.core.picture.FakePictureStore
 import com.lerchenflo.hufly.server.core.picture.testPng
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.foodplan.model.FoodPlan
+import com.lerchenflo.hufly.server.horse.model.Medication
 import com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.epochDay
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
-import com.lerchenflo.hufly.server.horse.model.Medication
-import com.lerchenflo.hufly.server.tag.model.Permission
-import java.time.LocalDate
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -26,11 +26,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.request
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -53,11 +52,11 @@ class HorseControllerTest {
     private val rider = testUser()
     private val medicTag = testTag(permissions = setOf(Permission.HORSE_MEDICATION_VIEW))
     private val medic = testUser(roleTagIds = listOf(medicTag.id))
-    private val aspirin = Medication("Aspirin", "1x", LocalDate.of(2026, 9, 1), null)
+    private val aspirin = Medication("Aspirin", "1x", epochDay(2026, 9, 1), null)
 
-    private val horseJson = """{"name":"Blitz","description":"Brav","pictureUrl":null,"birthDate":"2015-04-01","breed":"Haflinger",
+    private val horseJson = """{"name":"Blitz","description":"Brav","pictureUrl":null,"birthDate":16526,"breed":"Haflinger",
         |"color":"Fuchs","ownerUserId":null,"medicalNotes":"","vetContact":"Dr. Huf",
-        |"medications":[{"name":"Aspirin","dosage":"1x","from":"2026-09-01","until":null}]}""".trimMargin()
+        |"medications":[{"name":"Aspirin","dosage":"1x","from":20697,"until":null}]}""".trimMargin()
 
     @BeforeTest
     fun setUp() {
@@ -84,12 +83,12 @@ class HorseControllerTest {
         }
 
     @Test
-    fun `create horse answers with the horse, dates as ISO strings`() {
+    fun `create horse answers with the horse, dates as epoch days`() {
         call(HttpMethod.POST, "/horses", horseJson).andExpect {
             status { isOk() }
             jsonPath("$.name") { value("Blitz") }
-            jsonPath("$.birthDate") { value("2015-04-01") }
-            jsonPath("$.medications[0].from") { value("2026-09-01") }
+            jsonPath("$.birthDate") { value(16526) }
+            jsonPath("$.medications[0].from") { value(20697) }
             jsonPath("$.foodPlanId") { value(null) }
             jsonPath("$.updatedAt") { isNumber() }
         }
@@ -124,7 +123,7 @@ class HorseControllerTest {
     @Test
     fun `edit horse links the food plan from the body`() {
         val horse = horseRepository.save(testHorse())
-        val plan = foodPlanRepository.save(FoodPlan(stableId = STABLE_ID, name = "Heu", entries = emptyList(), updatedAt = Instant.EPOCH, updatedBy = admin.id))
+        val plan = foodPlanRepository.save(FoodPlan(stableId = STABLE_ID, name = "Heu", entries = emptyList(), updatedAt = 0L, updatedBy = admin.id))
         val body = horseJson.replace("\"vetContact\"", "\"foodPlanId\":\"${plan.id.toHexString()}\",\"vetContact\"")
 
         call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}", body).andExpect {
@@ -195,7 +194,7 @@ class HorseControllerTest {
 
     @Test
     fun `every member syncs the live horses of the own stable`() {
-        val horse = horseRepository.save(testHorse(updatedAt = Instant.ofEpochMilli(5)))
+        val horse = horseRepository.save(testHorse(updatedAt = 5))
         horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
         val deleted = horseRepository.save(testHorse(deleted = true))
 
@@ -255,7 +254,7 @@ class HorseControllerTest {
         val horse = horseRepository.save(testHorse())
 
         call(HttpMethod.PUT, "/horses/${horse.id.toHexString()}/medications",
-            """{"medications":[{"name":"Aspirin","dosage":"1x","from":"2026-09-01"}]}""").andExpect {
+            """{"medications":[{"name":"Aspirin","dosage":"1x","from":20697}]}""").andExpect {
             status { isOk() }
             jsonPath("$.medications[0].name") { value("Aspirin") }
         }

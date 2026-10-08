@@ -12,7 +12,6 @@ import org.springframework.dao.DuplicateKeyException
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,13 +34,13 @@ class MongoClientIdIndexTest {
         stableId = stableId,
         horseId = ObjectId.get(),
         activityTagId = ObjectId.get(),
-        startAt = Instant.EPOCH,
+        startAt = 0L,
         endAt = null,
         doneByUserId = null,
         comment = "",
         nextDueAt = null,
-        createdAt = Instant.EPOCH,
-        updatedAt = Instant.EPOCH,
+        createdAt = 0L,
+        updatedAt = 0L,
         updatedBy = ObjectId.get(),
         clientId = clientId,
     )

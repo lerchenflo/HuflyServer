@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.sync.SyncCollection
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.paddock.model.PaddockAssignment
@@ -8,7 +9,6 @@ import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TurnoutKind
 import org.bson.types.ObjectId
 import org.springframework.stereotype.Service
-import java.time.Clock
 
 /** Keeps open bring-out/bring-in chores in step with their paddock assignment, whoever edits it. Done chores stay as they were. */
 @Service
@@ -29,12 +29,12 @@ class TurnoutTaskService(
             } else {
                 task.copy(dueAt = dueAt, horseIds = assignment.horseIds)
             }
-            if (changed != task) save(changed.copy(updatedAt = clock.instant(), updatedBy = by))
+            if (changed != task) save(changed.copy(updatedAt = clock.millis(), updatedBy = by))
         }
     }
 
     fun drop(assignmentId: ObjectId, by: ObjectId) {
-        openChores(assignmentId).forEach { save(it.copy(deleted = true, updatedAt = clock.instant(), updatedBy = by)) }
+        openChores(assignmentId).forEach { save(it.copy(deleted = true, updatedAt = clock.millis(), updatedBy = by)) }
     }
 
     private fun openChores(assignmentId: ObjectId) =

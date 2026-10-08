@@ -5,7 +5,6 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
 
 @Document("paddocks")
 @CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
@@ -14,7 +13,7 @@ data class Paddock(
     @Indexed val stableId: ObjectId,
     val name: String,
     val description: String,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
@@ -29,7 +28,7 @@ data class HorseGroup(
     @Indexed val stableId: ObjectId,
     val name: String,
     val horseIds: List<ObjectId>,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
@@ -45,7 +44,7 @@ data class HorseConflict(
     val firstHorseId: ObjectId,
     val secondHorseId: ObjectId,
     val reason: String,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
@@ -64,10 +63,10 @@ data class PaddockAssignment(
     val horseIds: List<ObjectId>,
     /** The horses picked one by one, so an edit shows them apart from the group horses. */
     val singleHorseIds: List<ObjectId> = emptyList(),
-    val startAt: Instant,
-    val endAt: Instant?,
+    val startAt: Long,
+    val endAt: Long?,
     val comment: String,
-    val updatedAt: Instant,
+    val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     val version: Long = 0,

@@ -9,9 +9,8 @@ import org.springframework.stereotype.Component
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 enum class PictureKind(val route: String) {
     HORSE("horses"),
@@ -19,13 +18,13 @@ enum class PictureKind(val route: String) {
 }
 
 /** Clients load pictures from this url; the version changes with every upload so caches never serve an old one. */
-fun pictureUrl(kind: PictureKind, id: ObjectId, uploadedAt: Instant) =
-    "/${kind.route}/${id.toHexString()}/picture?v=${uploadedAt.toEpochMilli()}"
+fun pictureUrl(kind: PictureKind, id: ObjectId, uploadedAt: Long) =
+    "/${kind.route}/${id.toHexString()}/picture?v=${uploadedAt}"
 
 /** Urls are versioned, so clients may keep a picture for good. */
 fun pictureResponse(jpeg: ByteArray): ResponseEntity<ByteArray> = ResponseEntity.ok()
     .contentType(MediaType.IMAGE_JPEG)
-    .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePrivate())
+    .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate())
     .body(jpeg)
 
 interface PictureStore {

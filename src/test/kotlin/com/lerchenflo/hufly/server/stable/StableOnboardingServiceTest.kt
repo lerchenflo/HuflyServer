@@ -32,7 +32,7 @@ class StableOnboardingServiceTest {
         assertEquals(created.stable.id, admin.stableId)
         assertEquals(admin.id, created.stable.adminUserId)
         assertEquals("Chef", admin.displayName)
-        assertEquals(clock.instant(), created.stable.createdAt)
+        assertEquals(clock.millis(), created.stable.createdAt)
         assertTrue(hashEncoder.matches("Secret123", admin.hashedPassword))
         assertTrue(accessService.isAdmin(admin))
     }

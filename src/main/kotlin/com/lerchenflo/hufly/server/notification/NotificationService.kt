@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.notification
 
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
 import com.lerchenflo.hufly.server.core.notification.NotePosted
@@ -15,15 +16,15 @@ import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.user.model.User
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
+import kotlinx.datetime.toLocalDateTime
 import org.bson.types.ObjectId
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import kotlin.time.Instant
 
 /**
  * Turns [NotificationEvent]s into German pushes. Runs in the request after the change is saved, reloads what it
@@ -109,28 +110,34 @@ class NotificationService(
         .filter { it != event.actorUserId }
         .mapNotNull { id -> userRepository.findById(id)?.takeIf { it.stableId == event.stableId && !it.deleted } }
 
-    private fun deliver(recipients: List<User>, message: (ZoneId) -> PushMessage) {
+    private fun deliver(recipients: List<User>, message: (TimeZone) -> PushMessage) {
         recipients.forEach { user ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(user.id)?.values)
             if (!preferences.enabled) return@forEach
             val push = message(preferences.zone)
             if (preferences.digest) {
-                digestRepository.save(DigestItem(userId = user.id, title = push.title, body = push.body, createdAt = clock.instant()))
+                digestRepository.save(DigestItem(userId = user.id, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
                 pushService.send(user.id, push)
             }
         }
     }
 
-    private fun data(type: String, id: Pair<String, ObjectId>, occurrenceAt: Instant?) = buildMap {
+    private fun data(type: String, id: Pair<String, ObjectId>, occurrenceAt: Long?) = buildMap {
         put("type", type)
         put(id.first, id.second.toHexString())
-        if (occurrenceAt != null) put("occurrenceAt", occurrenceAt.toEpochMilli().toString())
+        if (occurrenceAt != null) put("occurrenceAt", occurrenceAt.toString())
     }
 
-    private fun format(at: Instant, zone: ZoneId): String = DATE_TIME.format(at.atZone(zone))
+    /** Like "Fr. 09.10. 17:00". */
+    private fun format(at: Long, zone: TimeZone): String {
+        val local = Instant.fromEpochMilliseconds(at).toLocalDateTime(zone)
+        fun Int.twoDigits() = toString().padStart(2, '0')
+        return "${WEEKDAYS[local.dayOfWeek.isoDayNumber - 1]} ${local.day.twoDigits()}.${local.month.number.twoDigits()}. " +
+            "${local.hour.twoDigits()}:${local.minute.twoDigits()}"
+    }
 
     companion object {
-        private val DATE_TIME = DateTimeFormatter.ofPattern("EE dd.MM. HH:mm", Locale.GERMAN)
+        private val WEEKDAYS = listOf("Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So.")
     }
 }

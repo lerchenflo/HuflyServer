@@ -1,10 +1,10 @@
 package com.lerchenflo.hufly.server.operator
 
+import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.OPERATOR_ROLE
 import com.lerchenflo.hufly.server.core.security.generatePassword
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
-import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.stable.StableDeletionService
 import com.lerchenflo.hufly.server.stable.StableOnboardingService
 import com.lerchenflo.hufly.server.stable.model.SubscriptionStatus
@@ -73,7 +73,7 @@ class OperatorController(
                 name = stable.name,
                 adminEmail = userRepository.findById(stable.adminUserId)?.email,
                 subscriptionStatus = stable.subscriptionStatus,
-                createdAt = stable.createdAt.toEpochMilli(),
+                createdAt = stable.createdAt,
             )
         }
     }

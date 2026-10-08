@@ -14,8 +14,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.io.File
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.toJavaInstant
 
 /**
  * iOS via APNs. A plain alert like WhatsApp's: no `interruption-level` (so "active"; SchneaggchatV3server's
@@ -56,7 +57,7 @@ class ApnsPushSender(
             .apply { message.data.forEach { (key, value) -> addCustomProperty(key, value) } }
             .build()
         val notification = SimpleApnsPushNotification(
-            token, bundleId, payload, Instant.now().plus(KEEP_WHILE_OFFLINE), DeliveryPriority.IMMEDIATE, PushType.ALERT,
+            token, bundleId, payload, (Clock.System.now() + KEEP_WHILE_OFFLINE).toJavaInstant(), DeliveryPriority.IMMEDIATE, PushType.ALERT,
         )
         return try {
             val response = client.sendNotification(notification).get()
@@ -77,7 +78,7 @@ class ApnsPushSender(
     }
 
     companion object {
-        private val KEEP_WHILE_OFFLINE = Duration.ofDays(7)
+        private val KEEP_WHILE_OFFLINE = 7.days
         private val INVALID_TOKEN_REASONS = setOf("BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic", "ExpiredToken")
     }
 }

@@ -21,6 +21,10 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.hours
+import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.plusSeconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
@@ -30,8 +34,6 @@ import org.bson.types.ObjectId
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,8 +78,8 @@ class EventSeriesServiceTest {
     private val foreignHorse = testHorse(stableId = OTHER_STABLE_ID)
 
     // Tuesdays 16:00 UTC, four dates.
-    private val first = Instant.parse("2026-10-13T16:00:00Z")
-    private val second = first.plus(Duration.ofDays(7))
+    private val first = millis("2026-10-13T16:00:00Z")
+    private val second = first + days(7)
     private val weekly = Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, 4, "UTC")
 
     @BeforeTest
@@ -86,7 +88,7 @@ class EventSeriesServiceTest {
         tagRepository.save(teacherTag)
         listOf(blitz, foreignHorse).forEach { horseRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -104,8 +106,8 @@ class EventSeriesServiceTest {
         cancelled: Boolean = false,
         title: String? = null,
         description: String? = null,
-        startAt: Instant? = null,
-        endAt: Instant? = null,
+        startAt: Long? = null,
+        endAt: Long? = null,
         horseIds: List<ObjectId>? = null,
         removedUserIds: List<ObjectId>? = null,
     ) = EventOccurrenceChange(cancelled, title, description, startAt, endAt, horseIds, removedUserIds)
@@ -162,8 +164,8 @@ class EventSeriesServiceTest {
         val event = series()
 
         assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, single.id, first, change()) }
-        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, first.plus(Duration.ofDays(1)), change()) }
-        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, first.plus(Duration.ofDays(28)), change()) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, first + days(1), change()) }
+        assertStatus(HttpStatus.BAD_REQUEST) { service.putOccurrence(teacher, event.id, first + days(28), change()) }
     }
 
     @Test
@@ -176,7 +178,7 @@ class EventSeriesServiceTest {
             change(startAt = second),
             change(endAt = second),
             change(startAt = second, endAt = second),
-            change(startAt = second, endAt = Instant.ofEpochMilli(32_503_680_000_001)),
+            change(startAt = second, endAt = 32_503_680_000_001),
             change(horseIds = emptyList()),
             change(horseIds = listOf(foreignHorse.id)),
             change(horseIds = List(51) { blitz.id }),
@@ -437,9 +439,9 @@ class EventSeriesServiceTest {
 
     // "Diesen und alle folgenden": a split series takes over invitees' answers
 
-    private val third = second.plus(Duration.ofDays(7))
+    private val third = second + days(7)
 
-    private fun splitOff(by: User = teacher, from: Event, at: Instant = second, invitees: List<ObjectId> = emptyList()) =
+    private fun splitOff(by: User = teacher, from: Event, at: Long = second, invitees: List<ObjectId> = emptyList()) =
         eventService.createEvent(
             by, "Springstunde neu", "", at, at.plusSeconds(3600), listOf(blitz.id), invitees,
             recurrence = weekly, splitFrom = EventSplit(from.id, at),
@@ -484,7 +486,7 @@ class EventSeriesServiceTest {
         val oldInvitation = invitationOf(old, anna)
         service.answer(anna, oldInvitation.id, first, accepted = false)
         val secondAnswer = service.answer(anna, oldInvitation.id, second, accepted = false)
-        clock.advance(Duration.ofHours(1))
+        clock.advance(hours(1))
         service.answer(anna, oldInvitation.id, third, accepted = true)
         val split = splitOff(from = old)
         published.clear()

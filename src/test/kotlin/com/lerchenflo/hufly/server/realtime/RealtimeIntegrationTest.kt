@@ -11,10 +11,12 @@ import com.lerchenflo.hufly.server.repository.HorseGroupRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
-import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
+import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.millis
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -30,20 +32,19 @@ import org.springframework.messaging.simp.stomp.StompFrameHandler
 import org.springframework.messaging.simp.stomp.StompHeaders
 import org.springframework.messaging.simp.stomp.StompSession
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.web.socket.WebSocketHttpHeaders
 import org.springframework.web.socket.client.standard.StandardWebSocketClient
 import org.springframework.web.socket.messaging.WebSocketStompClient
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import java.lang.reflect.Type
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.concurrent.CompletableFuture
-import java.time.Instant
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -126,7 +127,7 @@ class RealtimeIntegrationTest {
         val stableId = ObjectId.get()
         val inbox = subscribe(connect(userRepository.save(testUser(stableId = stableId)).id))
         val user = ObjectId.get()
-        val at = Instant.parse("2026-10-20T16:00:00Z")
+        val at = millis("2026-10-20T16:00:00Z")
 
         eventOccurrenceRepository.save(
             EventOccurrence(stableId = stableId, eventId = ObjectId.get(), occurrenceStartAt = at, cancelled = true, title = null,
@@ -148,7 +149,7 @@ class RealtimeIntegrationTest {
         val stableId = ObjectId.get()
         val reader = userRepository.save(testUser(stableId = stableId))
         val inbox = subscribe(connect(reader.id))
-        val at = Instant.parse("2026-10-05T08:00:00Z")
+        val at = millis("2026-10-05T08:00:00Z")
         val note = noteRepository.save(
             com.lerchenflo.hufly.server.note.model.StableNote(stableId = stableId, title = "Hufschmied", body = "", pinned = false,
                 visibleUntil = null, createdByUserId = ObjectId.get(), createdAt = at, updatedAt = at, updatedBy = ObjectId.get())
@@ -168,8 +169,8 @@ class RealtimeIntegrationTest {
 
         absenceRepository.save(
             com.lerchenflo.hufly.server.absence.model.Absence(
-                stableId = stableId, userId = member.id, from = java.time.LocalDate.of(2026, 10, 12), until = java.time.LocalDate.of(2026, 10, 12),
-                note = "", createdByUserId = member.id, updatedAt = Instant.EPOCH, updatedBy = member.id,
+                stableId = stableId, userId = member.id, from = epochDay(2026, 10, 12), until = epochDay(2026, 10, 12),
+                note = "", createdByUserId = member.id, updatedAt = 0L, updatedBy = member.id,
             )
         )
 
@@ -183,7 +184,7 @@ class RealtimeIntegrationTest {
         val anna = subscribe(connect(annaUser.id))
         val ben = subscribe(connect(benUser.id))
 
-        settingsRepository.save(UserSettings(annaUser.id, mapOf("theme" to "dark"), Instant.EPOCH))
+        settingsRepository.save(UserSettings(annaUser.id, mapOf("theme" to "dark"), 0L))
 
         assertEquals("""{"type":"changed","collection":"usersettings"}""", anna.next())
         assertTrue(ben.nothing())
@@ -230,7 +231,7 @@ class RealtimeIntegrationTest {
     fun `side effects of a request carry no origin`() {
         val (adminId, stableId) = adminOfNewStable()
         val horse = horseRepository.save(testHorse(stableId = stableId))
-        groupRepository.save(HorseGroup(stableId = stableId, name = "Wallache", horseIds = listOf(horse.id), updatedAt = Instant.EPOCH, updatedBy = adminId))
+        groupRepository.save(HorseGroup(stableId = stableId, name = "Wallache", horseIds = listOf(horse.id), updatedAt = 0L, updatedBy = adminId))
         val session = ObjectId.get()
         val inbox = subscribe(connect(adminId))
 
@@ -253,7 +254,7 @@ class RealtimeIntegrationTest {
     @Test
     fun `a guarded settings save tells the owner's devices and names the session`() {
         val owner = userRepository.save(testUser())
-        settingsRepository.save(UserSettings(owner.id, mapOf("theme" to "dark"), Instant.ofEpochMilli(1000)))
+        settingsRepository.save(UserSettings(owner.id, mapOf("theme" to "dark"), 1000))
         val session = ObjectId.get()
         val inbox = subscribe(connect(owner.id))
 

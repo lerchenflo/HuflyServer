@@ -15,15 +15,15 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
+import com.lerchenflo.hufly.server.testdata.days
+import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.seconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,10 +57,10 @@ class HorseServiceTest {
     private val planner = testUser(roleTagIds = listOf(plannerTag.id))
 
     private fun plan(stableId: org.bson.types.ObjectId = STABLE_ID, deleted: Boolean = false) = foodPlanRepository.save(
-        FoodPlan(stableId = stableId, name = "Heu", entries = emptyList(), updatedAt = Instant.EPOCH, updatedBy = admin.id, deleted = deleted)
+        FoodPlan(stableId = stableId, name = "Heu", entries = emptyList(), updatedAt = 0L, updatedBy = admin.id, deleted = deleted)
     )
 
-    private val aspirin = Medication("Aspirin", "1x täglich", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 14))
+    private val aspirin = Medication("Aspirin", "1x täglich", epochDay(2026, 9, 1), epochDay(2026, 9, 14))
 
     private fun data(
         name: String = "Blitz",
@@ -70,7 +70,7 @@ class HorseServiceTest {
     ) = HorseService.HorseData(
         name = name,
         description = "Brav",
-        birthDate = LocalDate.of(2015, 4, 1),
+        birthDate = epochDay(2015, 4, 1),
         breed = "Haflinger",
         color = "Fuchs",
         ownerUserId = ownerUserId,
@@ -87,7 +87,7 @@ class HorseServiceTest {
         tagRepository.save(plannerTag)
         tagRepository.save(medicTag)
         stableRepository.save(testStable(adminUserId = admin.id))
-        clock.advance(Duration.ofDays(1))
+        clock.advance(days(1))
     }
 
     private fun assertStatus(status: HttpStatus, block: () -> Unit) {
@@ -104,7 +104,7 @@ class HorseServiceTest {
         assertEquals("Dr. Huf, 0664 123", stored.vetContact)
         assertEquals(rider.id, stored.ownerUserId)
         assertEquals(listOf(aspirin), stored.medications)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
         assertEquals(admin.id, stored.updatedBy)
     }
 
@@ -124,7 +124,7 @@ class HorseServiceTest {
 
     @Test
     fun `medication cannot end before it starts`() {
-        val backwards = aspirin.copy(until = aspirin.from.minusDays(1))
+        val backwards = aspirin.copy(until = aspirin.from - 1)
 
         assertStatus(HttpStatus.BAD_REQUEST) { horseService.createHorse(admin, data(), listOf(backwards)) }
     }
@@ -140,7 +140,7 @@ class HorseServiceTest {
         assertEquals("Donner", stored.name)
         assertEquals(foodPlanId, stored.foodPlanId)
         assertEquals(editor.id, stored.updatedBy)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
     }
 
     @Test
@@ -209,7 +209,7 @@ class HorseServiceTest {
 
         val stored = horseRepository.findById(horse.id)!!
         assertTrue(stored.deleted)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
     }
 
     @Test
@@ -237,7 +237,7 @@ class HorseServiceTest {
         val stored = horseRepository.findById(horse.id)!!
         assertEquals(listOf(aspirin), stored.medications)
         assertEquals(medic.id, stored.updatedBy)
-        assertEquals(clock.instant(), stored.updatedAt)
+        assertEquals(clock.millis(), stored.updatedAt)
     }
 
     @Test
@@ -253,7 +253,7 @@ class HorseServiceTest {
         val foreign = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
 
         assertStatus(HttpStatus.BAD_REQUEST) {
-            horseService.updateMedications(medic, horse.id, listOf(aspirin.copy(until = aspirin.from.minusDays(1))))
+            horseService.updateMedications(medic, horse.id, listOf(aspirin.copy(until = aspirin.from - 1)))
         }
         assertStatus(HttpStatus.NOT_FOUND) { horseService.updateMedications(medic, foreign.id, listOf(aspirin)) }
     }
@@ -265,10 +265,10 @@ class HorseServiceTest {
         val horse = horseRepository.save(testHorse())
 
         val first = horseService.setPicture(editor, horse.id, testPng())
-        clock.advance(Duration.ofSeconds(1))
+        clock.advance(seconds(1))
         val second = horseService.setPicture(editor, horse.id, testPng())
 
-        assertEquals("/horses/${horse.id.toHexString()}/picture?v=${first.updatedAt.toEpochMilli()}", first.pictureUrl)
+        assertEquals("/horses/${horse.id.toHexString()}/picture?v=${first.updatedAt}", first.pictureUrl)
         assertTrue(first.pictureUrl != second.pictureUrl)
         assertEquals(second, horseRepository.findById(horse.id))
         assertTrue(pictureStore.load(PictureKind.HORSE, horse.id)!!.isNotEmpty())
@@ -334,13 +334,13 @@ class HorseServiceTest {
         val other = horseRepository.save(testHorse())
         val group = groupRepository.save(
             com.lerchenflo.hufly.server.paddock.model.HorseGroup(
-                stableId = STABLE_ID, name = "G", horseIds = listOf(horse.id, other.id), updatedAt = Instant.EPOCH, updatedBy = admin.id,
+                stableId = STABLE_ID, name = "G", horseIds = listOf(horse.id, other.id), updatedAt = 0L, updatedBy = admin.id,
             )
         )
         val untouchedGroup = groupRepository.save(group.copy(id = org.bson.types.ObjectId.get(), horseIds = listOf(other.id)))
         val conflict = conflictRepository.save(
             com.lerchenflo.hufly.server.paddock.model.HorseConflict(
-                stableId = STABLE_ID, firstHorseId = other.id, secondHorseId = horse.id, reason = "", updatedAt = Instant.EPOCH, updatedBy = admin.id,
+                stableId = STABLE_ID, firstHorseId = other.id, secondHorseId = horse.id, reason = "", updatedAt = 0L, updatedBy = admin.id,
             )
         )
 
@@ -348,12 +348,12 @@ class HorseServiceTest {
 
         val storedGroup = groupRepository.findById(group.id)!!
         assertEquals(listOf(other.id), storedGroup.horseIds)
-        assertEquals(clock.instant(), storedGroup.updatedAt)
+        assertEquals(clock.millis(), storedGroup.updatedAt)
         assertEquals(admin.id, storedGroup.updatedBy)
         assertEquals(untouchedGroup, groupRepository.findById(untouchedGroup.id))
         val storedConflict = conflictRepository.findById(conflict.id)!!
         assertTrue(storedConflict.deleted)
-        assertEquals(clock.instant(), storedConflict.updatedAt)
+        assertEquals(clock.millis(), storedConflict.updatedAt)
     }
 
     // Co-riders (Reitbeteiligungen)
