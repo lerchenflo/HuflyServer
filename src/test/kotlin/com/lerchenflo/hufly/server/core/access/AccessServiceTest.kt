@@ -24,7 +24,7 @@ class AccessServiceTest {
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
 
     private val admin = testUser()
     private val rider = testUser()
@@ -46,10 +46,29 @@ class AccessServiceTest {
     }
 
     @Test
-    fun `requester of a deleted user is unauthorized`() {
-        userRepository.save(rider.copy(deleted = true))
+    fun `requester of a deleted login is unauthorized`() {
+        userRepository.accounts.save(userRepository.accounts.findById(rider.accountId)!!.copy(deleted = true))
 
         assertStatus(HttpStatus.UNAUTHORIZED) { accessService.requester(rider.id) }
+        assertStatus(HttpStatus.UNAUTHORIZED) { accessService.requireAccount(rider.id) }
+    }
+
+    @Test
+    fun `a login whose membership is gone answers 403 NO_STABLE`() {
+        userRepository.save(rider.copy(deleted = true))
+
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { accessService.requester(rider.id) }
+        assertEquals(HttpStatus.FORBIDDEN, e.statusCode)
+        assertEquals("NO_STABLE", e.code)
+        assertEquals(rider.id, accessService.requireAccount(rider.id).id)
+    }
+
+    @Test
+    fun `the requester is the membership of the login, also when its id differs`() {
+        val login = userRepository.accounts.save(com.lerchenflo.hufly.server.testdata.testAccount())
+        val member = userRepository.save(testUser().copy(accountId = login.id))
+
+        assertEquals(member, accessService.requester(login.id))
     }
 
     @Test

@@ -31,15 +31,15 @@ class PushTokenController(
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun register(@Valid @RequestBody request: PushTokenRequest) {
-        val requester = accessService.requester(requireAuth())
-        pushService.register(requester.id, requireSession(), request.platform, request.token)
+        val account = accessService.requireAccount(requireAuth())
+        pushService.register(account.id, requireSession(), request.platform, request.token)
     }
 
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unregister() {
-        val requester = accessService.requester(requireAuth())
-        pushService.unregister(requester.id, requireSession())
+        val account = accessService.requireAccount(requireAuth())
+        pushService.unregister(account.id, requireSession())
     }
 
     private fun requireSession() = currentSessionId() ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Token without session")

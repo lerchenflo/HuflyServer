@@ -41,3 +41,9 @@ data class TaskAssigned(
     val userIds: List<ObjectId>,
     val occurrenceDueAt: Long?,
 ) : NotificationEvent
+
+/** The account [actorUserId] (no member yet, so an account id) asks to join; goes to the stable's admin. */
+data class JoinRequested(override val stableId: ObjectId, override val actorUserId: ObjectId, val joinRequestId: ObjectId) : NotificationEvent
+
+/** The admin [actorUserId] accepted a join request; [memberUserId] is the new membership. */
+data class JoinAccepted(override val stableId: ObjectId, override val actorUserId: ObjectId, val memberUserId: ObjectId) : NotificationEvent

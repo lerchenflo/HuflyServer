@@ -49,7 +49,7 @@ class EventServiceTest {
     private val horseRepository = FakeHorseRepository()
     private val eventRepository = FakeEventRepository()
     private val invitationRepository = FakeEventInvitationRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val service = EventService(
         eventRepository, invitationRepository, FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),

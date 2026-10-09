@@ -95,10 +95,20 @@ class UserControllerTest {
     }
 
     @Test
-    fun `me of a deleted user answers 401`() {
-        userRepository.save(rider.copy(deleted = true))
+    fun `me of a deleted login answers 401`() {
+        userRepository.accounts.save(userRepository.accounts.findById(rider.accountId)!!.copy(deleted = true))
 
         getMe(rider.id).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `me of a login without a stable answers 403 NO_STABLE`() {
+        userRepository.save(rider.copy(deleted = true))
+
+        getMe(rider.id).andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("NO_STABLE") }
+        }
     }
 
     @Test
@@ -130,7 +140,7 @@ class UserControllerTest {
             jsonPath("$.mustChangePassword") { value(false) }
             jsonPath("$.user.mustChangePassword") { doesNotExist() }
         }
-        userRepository.save(rider.copy(mustChangePassword = true))
+        userRepository.accounts.save(userRepository.accounts.findById(rider.id)!!.copy(mustChangePassword = true))
 
         getMe(rider.id).andExpect {
             status { isOk() }

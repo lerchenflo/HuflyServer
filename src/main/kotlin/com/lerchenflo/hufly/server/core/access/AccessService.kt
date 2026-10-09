@@ -1,5 +1,8 @@
 package com.lerchenflo.hufly.server.core.access
 
+import com.lerchenflo.hufly.server.account.model.Account
+import com.lerchenflo.hufly.server.core.CodedException
+import com.lerchenflo.hufly.server.repository.AccountRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
@@ -15,13 +18,25 @@ import org.springframework.web.server.ResponseStatusException
 @Service
 class AccessService(
     private val userRepository: UserRepository,
+    private val accountRepository: AccountRepository,
     private val stableRepository: StableRepository,
     private val tagRepository: TagRepository,
 ) {
-    /** Call with the id from `requireAuth()`. A deleted user keeps a valid access token for up to 15 minutes. */
-    fun requester(userId: ObjectId): User =
-        userRepository.findById(userId)?.takeUnless { it.deleted }
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "User no longer exists")
+    /**
+     * The requester's stable membership; call with the id from `requireAuth()`. An account without a stable answers
+     * 403 `NO_STABLE`, so it never reaches stable data. A deleted account keeps a valid access token for up to 15
+     * minutes and answers 401.
+     */
+    fun requester(accountId: ObjectId): User {
+        val account = requireAccount(accountId)
+        return userRepository.findFirstByAccountIdAndDeletedFalse(account.id)
+            ?: throw CodedException(HttpStatus.FORBIDDEN, NO_STABLE, "Not a member of a stable")
+    }
+
+    /** For account-level endpoints (sessions, push tokens, settings, password) that work without a stable too. */
+    fun requireAccount(accountId: ObjectId): Account =
+        accountRepository.findById(accountId)?.takeUnless { it.deleted }
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account no longer exists")
 
     fun isAdmin(user: User): Boolean = stableRepository.findById(user.stableId)?.adminUserId == user.id
 
@@ -56,4 +71,8 @@ class AccessService(
     }
 
     private fun forbidden() = ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed")
+
+    companion object {
+        const val NO_STABLE = "NO_STABLE"
+    }
 }

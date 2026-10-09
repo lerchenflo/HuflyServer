@@ -34,7 +34,7 @@ class AbsenceServiceTest {
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
     private val absenceRepository = FakeAbsenceRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val service = AbsenceService(absenceRepository, userRepository, accessService, versionCounterService, clock)
 

@@ -20,13 +20,13 @@ class SessionController(
 
     @GetMapping
     fun sessions(): List<AuthService.SessionResponse> {
-        val requester = accessService.requester(requireAuth())
-        return authService.sessions(requester.id, currentSessionId())
+        val account = accessService.requireAccount(requireAuth())
+        return authService.sessions(account.id, currentSessionId())
     }
 
     @DeleteMapping("/{sessionId}")
     fun endSession(@PathVariable sessionId: String) {
-        val requester = accessService.requester(requireAuth())
-        authService.endSession(requester.id, parseObjectId(sessionId))
+        val account = accessService.requireAccount(requireAuth())
+        authService.endSession(account.id, parseObjectId(sessionId))
     }
 }

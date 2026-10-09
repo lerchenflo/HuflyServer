@@ -28,7 +28,7 @@ class TagServiceTest {
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val tagService = TagService(tagRepository, accessService, clock)
 
     private val admin = testUser()

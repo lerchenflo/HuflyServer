@@ -194,18 +194,17 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "displayName: String",
     "phoneNumber: String?",
     "profilePictureUrl: String?",
-    "hashedPassword: String",
     "roleTagIds: List\u003cObjectId>",
     "createdAt: Long (epoch ms)",
     "updatedAt: Long (epoch ms)",
     "updatedBy: ObjectId",
     "deleted: Boolean",
-    "mustChangePassword: Boolean"
+    "accountId: ObjectId"
    ],
    "id": "user",
    "kind": "class",
    "name": "User",
-   "note": "Belongs to exactly one stable. Stables are separate user bases: nobody, admins included, sees another stable. Email is globally unique and is the login (email + password). The stable admin is Stable.adminUserId and bypasses role tags. No own subscription field. Role is computed: ADMIN if id == Stable.adminUserId, else MEMBER.",
+   "note": "A stable membership. Login data (email, password) lives in Account; accountId links them (one live membership per account for now, unique partial index; older memberships share their account's id). email is a display copy of the account's. Stables are separate user bases: nobody, admins included, sees another stable. The stable admin is Stable.adminUserId and bypasses role tags. Role is computed: ADMIN if id == Stable.adminUserId, else MEMBER.",
    "pkg": "user",
    "x": 29,
    "y": 30
@@ -214,6 +213,8 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "fields": [
     "id: ObjectId",
     "name: String",
+    "place: String?",
+    "inviteCode: String? (unique, admin only)",
     "adminUserId: ObjectId",
     "subscriptionStatus: SubscriptionStatus",
     "subscriptionValidUntil: Long? (epoch ms)",
@@ -226,7 +227,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "stable",
    "kind": "class",
    "name": "Stable",
-   "note": "Created when someone pays. Exactly one admin, fixed to the paying user (no handover). The subscription lives only here: the stable pays, its members get access through it. mealTimes: start of each feeding (24 h \"HH:mm\", morning \u003c lunch \u003c dinner \u003c night; defaults 06:00, 12:00, 18:00, 22:00), set by the admin via /stables/me/mealtimes.",
+   "note": "Created by the operator, the dev bootstrap or a registered account for itself (POST /accounts/me/stable). Exactly one admin. The app is free for now; subscription fields stay unused (TRIAL). inviteCode: 8 chars without look-alikes, lets an account ask to join (JoinRequest). place: optional Ort. mealTimes: start of each feeding (24 h \"HH:mm\", morning \u003c lunch \u003c dinner \u003c night; defaults 06:00, 12:00, 18:00, 22:00), set by the admin via /stables/me/mealtimes.",
    "pkg": "stable",
    "x": 395,
    "y": 220
@@ -793,6 +794,58 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "pkg": "notification",
    "x": 29,
    "y": 1300
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "email: String (unique)",
+    "displayName: String",
+    "hashedPassword: String",
+    "mustChangePassword: Boolean",
+    "createdByStableId: ObjectId?",
+    "createdAt: Long (epoch ms)",
+    "updatedAt: Long (epoch ms)",
+    "deleted: Boolean"
+   ],
+   "id": "account",
+   "kind": "class",
+   "name": "Account",
+   "note": "The login, separate from stable membership (User). Tokens, sessions (RefreshToken.userId), push tokens, settings and digest items belong to it. Self-registered (POST /auth/register, createdByStableId null) or created with a member by the admin/operator (createdByStableId set: only then may that stable's admin reset the password or change the email). Without a live membership, stable endpoints answer 403 NO_STABLE.",
+   "pkg": "account",
+   "x": 29,
+   "y": 1300
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "accountId: ObjectId",
+    "stableId: ObjectId",
+    "status: JoinRequestStatus",
+    "createdAt: Long (epoch ms)",
+    "updatedAt: Long (epoch ms)"
+   ],
+   "id": "joinrequest",
+   "kind": "class",
+   "name": "JoinRequest",
+   "note": "An account asks to join a stable with its invite code; the admin accepts (membership created, optional role tags) or declines. At most one PENDING per account; rows keep their final status (hints reach the admin).",
+   "pkg": "account",
+   "x": 395,
+   "y": 1300
+  },
+  {
+   "fields": [
+    "PENDING",
+    "DECLINED",
+    "ACCEPTED",
+    "WITHDRAWN"
+   ],
+   "id": "joinstatus",
+   "kind": "enum",
+   "name": "JoinRequestStatus",
+   "note": "DECLINED stays visible to the account (GET /accounts/me) until it asks again.",
+   "pkg": "account",
+   "x": 760,
+   "y": 1300
   }
  ],
  "packages": [
@@ -808,7 +861,8 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
   "note",
   "absence",
   "notification",
-  "authentication"
+  "authentication",
+  "account"
  ],
  "questions": [
   {
@@ -1283,6 +1337,33 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "repeats by",
    "to": "recurrence",
    "toCard": "0..1"
+  },
+  {
+   "from": "user",
+   "fromCard": "0..1",
+   "id": "r_acc1",
+   "kind": "assoc",
+   "label": "login",
+   "to": "account",
+   "toCard": "1"
+  },
+  {
+   "from": "joinrequest",
+   "fromCard": "*",
+   "id": "r_acc2",
+   "kind": "assoc",
+   "label": "asks",
+   "to": "account",
+   "toCard": "1"
+  },
+  {
+   "from": "joinrequest",
+   "fromCard": "*",
+   "id": "r_acc3",
+   "kind": "assoc",
+   "label": "to join",
+   "to": "stable",
+   "toCard": "1"
   }
  ]
 }

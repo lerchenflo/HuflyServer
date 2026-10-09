@@ -45,7 +45,7 @@ class PaddockServiceTest {
     private val groupRepository = FakeHorseGroupRepository()
     private val conflictRepository = FakeHorseConflictRepository()
     private val assignmentRepository = FakePaddockAssignmentRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskRepository = com.lerchenflo.hufly.server.repository.FakeTaskRepository()
     private val service = PaddockService(

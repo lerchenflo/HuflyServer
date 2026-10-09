@@ -39,7 +39,7 @@ class SessionControllerTest {
         userRepository.users.clear()
         stableRepository.stables.clear()
         refreshTokenRepository.tokens.clear()
-        val anna = userRepository.save(testUser(email = "anna@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        val anna = userRepository.saveWithLogin(testUser(email = "anna@hufly.test"), hashEncoder.encode("Secret123"))
         stableRepository.save(testStable(adminUserId = anna.id))
     }
 

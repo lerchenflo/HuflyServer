@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.realtime
 
 import com.lerchenflo.hufly.server.absence.model.Absence
+import com.lerchenflo.hufly.server.account.model.JoinRequest
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
@@ -35,9 +36,12 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
     /** Also for saves that bypass the repository events, like an atomic `@Update`. */
     fun publish(saved: Any) {
         val (target, collection, id) = when (saved) {
-            is UserSettings -> Triple(HintTarget.User(saved.userId), "usersettings", saved.userId)
+            is UserSettings -> Triple(HintTarget.Account(saved.userId), "usersettings", saved.userId)
             is Stable -> Triple(HintTarget.Stable(saved.id), "stable", saved.id)
-            is User -> Triple(HintTarget.Stable(saved.stableId), "users", saved.id)
+            is User -> {
+                notifier.membershipChanged(saved)
+                Triple(HintTarget.Stable(saved.stableId), "users", saved.id)
+            }
             is Tag -> Triple(HintTarget.Stable(saved.stableId), "tags", saved.id)
             is Horse -> Triple(HintTarget.Stable(saved.stableId), "horses", saved.id)
             is FoodPlan -> Triple(HintTarget.Stable(saved.stableId), "foodplans", saved.id)
@@ -54,6 +58,8 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
             is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
             is Absence -> Triple(HintTarget.Stable(saved.stableId), "absence", saved.id)
+            // Every member gets the hint, but only the admin may list the requests.
+            is JoinRequest -> Triple(HintTarget.Stable(saved.stableId), "joinRequest", saved.id)
             else -> return
         }
         queueOrSend(notifier, target, collection, id)

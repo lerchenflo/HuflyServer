@@ -46,7 +46,7 @@ class TaskSeriesServiceTest {
     private val taskRepository = FakeTaskRepository()
     private val occurrenceRepository = FakeTaskOccurrenceRepository()
     private val horseRepository = FakeHorseRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val taskService = TaskService(
         taskRepository, occurrenceRepository, userRepository, horseRepository, tagRepository,

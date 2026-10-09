@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.testdata
 
+import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.horse.model.Horse
 import com.lerchenflo.hufly.server.stable.model.Stable
 import com.lerchenflo.hufly.server.stable.model.SubscriptionStatus
@@ -16,7 +17,6 @@ fun testUser(
     id: ObjectId = ObjectId.get(),
     stableId: ObjectId = STABLE_ID,
     email: String = "${id.toHexString()}@hufly.test",
-    hashedPassword: String = "unused",
     roleTagIds: List<ObjectId> = emptyList(),
     updatedAt: Long = 0L,
     deleted: Boolean = false,
@@ -27,11 +27,29 @@ fun testUser(
     displayName = email.substringBefore('@'),
     phoneNumber = null,
     profilePictureUrl = null,
-    hashedPassword = hashedPassword,
     roleTagIds = roleTagIds,
     createdAt = 0L,
     updatedAt = updatedAt,
     updatedBy = id,
+    deleted = deleted,
+)
+
+fun testAccount(
+    id: ObjectId = ObjectId.get(),
+    email: String = "${id.toHexString()}@hufly.test",
+    hashedPassword: String = "unused",
+    mustChangePassword: Boolean = false,
+    createdByStableId: ObjectId? = null,
+    deleted: Boolean = false,
+) = Account(
+    id = id,
+    email = email,
+    displayName = email.substringBefore('@'),
+    hashedPassword = hashedPassword,
+    mustChangePassword = mustChangePassword,
+    createdByStableId = createdByStableId,
+    createdAt = 0L,
+    updatedAt = 0L,
     deleted = deleted,
 )
 

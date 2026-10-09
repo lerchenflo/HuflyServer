@@ -8,7 +8,13 @@ import org.springframework.context.annotation.Primary
 @TestConfiguration
 class FakeRepositoryConfig {
     @Bean @Primary
-    fun fakeUserRepository() = FakeUserRepository()
+    fun fakeAccountRepository() = FakeAccountRepository()
+
+    @Bean @Primary
+    fun fakeUserRepository(accounts: FakeAccountRepository) = FakeUserRepository(accounts)
+
+    @Bean @Primary
+    fun fakeJoinRequestRepository() = FakeJoinRequestRepository()
 
     @Bean @Primary
     fun fakeRefreshTokenRepository() = FakeRefreshTokenRepository()

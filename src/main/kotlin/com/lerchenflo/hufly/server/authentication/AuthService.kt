@@ -1,24 +1,36 @@
 package com.lerchenflo.hufly.server.authentication
 
+import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
 import com.lerchenflo.hufly.server.authentication.model.UNKNOWN_DEVICE_NAME
 import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.core.security.TokenCipher
+import com.lerchenflo.hufly.server.repository.AccountRepository
 import com.lerchenflo.hufly.server.repository.RefreshTokenRepository
-import com.lerchenflo.hufly.server.repository.UserRepository
 import org.bson.types.ObjectId
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
 fun normalizeEmail(email: String): String = email.trim().lowercase()
 
+/** Erased accounts get `deleted-<id>@deleted.invalid`; nobody may take such an address, or that erase would fail. */
+fun requireUsableEmail(normalizedEmail: String) {
+    if (normalizedEmail.endsWith("@$ERASED_EMAIL_DOMAIN")) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Email not allowed")
+}
+
+fun erasedEmail(id: ObjectId) = "deleted-${id.toHexString()}@$ERASED_EMAIL_DOMAIN"
+
+private const val ERASED_EMAIL_DOMAIN = "deleted.invalid"
+
 @Service
 class AuthService(
-    private val userRepository: UserRepository,
+    private val accountRepository: AccountRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val jwtService: JwtService,
     private val hashEncoder: HashEncoder,
@@ -48,17 +60,39 @@ class AuthService(
 
     /** Logging in again on the same device replaces that device's session, see [RefreshToken.deviceName]. */
     fun login(email: String, password: String, device: Device = Device.UNKNOWN): TokenPair {
-        val user = userRepository.findByEmail(normalizeEmail(email))
-        val passwordMatches = hashEncoder.matches(password, user?.hashedPassword ?: dummyHash)
-        if (user == null || !passwordMatches || user.deleted) {
+        val account = accountRepository.findByEmail(normalizeEmail(email))
+        val passwordMatches = hashEncoder.matches(password, account?.hashedPassword ?: dummyHash)
+        if (account == null || !passwordMatches || account.deleted) {
             throw unauthorized("Invalid email or password")
         }
         if (device.id != null) {
-            refreshTokenRepository.deleteByUserIdAndDeviceId(user.id, device.id)
+            refreshTokenRepository.deleteByUserIdAndDeviceId(account.id, device.id)
         } else {
-            refreshTokenRepository.deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(user.id, device.name, device.type)
+            refreshTokenRepository.deleteByUserIdAndDeviceNameAndDeviceTypeAndDeviceIdIsNull(account.id, device.name, device.type)
         }
-        return issueTokens(user.id, device)
+        return issueTokens(account.id, device)
+    }
+
+    /** Self-signup: a login without a stable; the app then joins one with an invite code or creates one. */
+    fun register(email: String, password: String, displayName: String, device: Device = Device.UNKNOWN): TokenPair {
+        val normalized = normalizeEmail(email)
+        requireUsableEmail(normalized)
+        if (accountRepository.findByEmail(normalized) != null) throw emailInUse()
+        val now = clock.millis()
+        val account = try {
+            accountRepository.insert(
+                Account(
+                    email = normalized,
+                    displayName = displayName.trim(),
+                    hashedPassword = hashEncoder.encode(password),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+        } catch (e: DuplicateKeyException) {
+            throw emailInUse()
+        }
+        return issueTokens(account.id, device)
     }
 
     /**
@@ -68,7 +102,7 @@ class AuthService(
     fun refresh(refreshToken: String): TokenPair {
         val userId = jwtService.userIdFromRefreshToken(refreshToken)
             ?: throw unauthorized("Invalid refresh token")
-        if (userRepository.findById(userId)?.deleted != false) throw unauthorized("Invalid refresh token")
+        if (accountRepository.findById(userId)?.deleted != false) throw unauthorized("Invalid refresh token")
         val hash = hashEncoder.sha256(refreshToken)
 
         val newRefreshToken = jwtService.generateRefreshToken(userId)
@@ -135,4 +169,10 @@ class AuthService(
     }
 
     private fun unauthorized(reason: String) = ResponseStatusException(HttpStatus.UNAUTHORIZED, reason)
+
+    private fun emailInUse() = CodedException(HttpStatus.CONFLICT, EMAIL_IN_USE, "Email already in use")
+
+    companion object {
+        const val EMAIL_IN_USE = "EMAIL_IN_USE"
+    }
 }

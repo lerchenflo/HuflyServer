@@ -15,8 +15,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.request
@@ -45,9 +45,9 @@ class UserAdminControllerTest {
         userRepository.users.clear()
         stableRepository.stables.clear()
         tagRepository.tags.clear()
-        rider = testUser(email = "rider@hufly.test", hashedPassword = hashEncoder.encode("OldSecret1"))
+        rider = testUser(email = "rider@hufly.test")
         userRepository.save(admin)
-        userRepository.save(rider)
+        userRepository.saveWithLogin(rider, hashEncoder.encode("OldSecret1"))
         stableRepository.save(testStable(adminUserId = admin.id))
     }
 

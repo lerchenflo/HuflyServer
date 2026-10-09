@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.stable
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.MutableClock
+import com.lerchenflo.hufly.server.repository.FakeJoinRequestRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
@@ -19,21 +20,25 @@ class StableBootstrapTest {
     private val hashEncoder = HashEncoder()
     private val userRepository = FakeUserRepository()
     private val stableRepository = FakeStableRepository()
-    private val accessService = AccessService(userRepository, stableRepository, FakeTagRepository())
-    private val bootstrap = StableBootstrap(userRepository, StableOnboardingService(userRepository, stableRepository, hashEncoder, clock))
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, FakeTagRepository())
+    private val bootstrap = StableBootstrap(
+        userRepository.accounts,
+        StableOnboardingService(userRepository, userRepository.accounts, stableRepository, FakeJoinRequestRepository(), hashEncoder, clock),
+    )
 
     @Test
     fun `creates the stable with its admin when the email is unknown`() {
         bootstrap.run("Teststall", " Admin@Hufly.test ", "Secret123")
 
-        val admin = userRepository.findByEmail("admin@hufly.test")!!
+        val login = userRepository.accounts.findByEmail("admin@hufly.test")!!
+        val admin = userRepository.findFirstByAccountIdAndDeletedFalse(login.id)!!
         val stable = stableRepository.findById(admin.stableId)!!
         assertEquals("Teststall", stable.name)
         assertEquals(admin.id, stable.adminUserId)
         assertEquals(SubscriptionStatus.TRIAL, stable.subscriptionStatus)
-        assertTrue(hashEncoder.matches("Secret123", admin.hashedPassword))
+        assertTrue(hashEncoder.matches("Secret123", login.hashedPassword))
         assertTrue(accessService.isAdmin(admin))
-        assertFalse(admin.mustChangePassword, "the dev admin is not prompted on every fresh database")
+        assertFalse(login.mustChangePassword, "the dev admin is not prompted on every fresh database")
     }
 
     @Test

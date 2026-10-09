@@ -44,7 +44,7 @@
     <p>Einträge, die du für deinen Stall angelegt hast, etwa im Pferdetagebuch, bei Aufgaben, Terminen oder Notizen, gehören zum Stall und bleiben erhalten. Sie zeigen statt deines Namens „Gelöschter Nutzer“.</p>
 
     <h2>Stall-Admins</h2>
-    <p>Als Admin eines Stalls kannst du dein Konto nicht selbst löschen, weil der Stall an dir hängt. Schreib an <a href="mailto:{{CONTACT_EMAIL}}?subject=Stall%20l%C3%B6schen">{{CONTACT_EMAIL}}</a>, dann wird der Stall mit allen Daten gelöscht.</p>
+    <p>Bist du Admin eines Stalls und allein darin, wird der Stall mit allen Daten zusammen mit deinem Konto gelöscht. Hat der Stall weitere Mitglieder, kannst du dein Konto nicht selbst löschen, weil der Stall an dir hängt. Schreib dann an <a href="mailto:{{CONTACT_EMAIL}}?subject=Stall%20l%C3%B6schen">{{CONTACT_EMAIL}}</a>, dann wird der Stall mit allen Daten gelöscht.</p>
 
     <form class="delete-card" id="login-step" novalidate>
       <h2>Anmelden</h2>
@@ -179,7 +179,7 @@
       }
       const code = await errorCode(response);
       if (code === "STABLE_ADMIN") {
-        backToLogin("Als Admin eines Stalls kannst du dein Konto nicht selbst löschen. Schreib an {{CONTACT_EMAIL}}.");
+        backToLogin("Dein Stall hat noch weitere Mitglieder, darum kannst du dein Konto als Admin nicht selbst löschen. Schreib an {{CONTACT_EMAIL}}.");
       } else if (response.status === 401 || code === "WRONG_PASSWORD") {
         backToLogin("Deine Anmeldung ist abgelaufen. Bitte melde dich noch einmal an.");
       } else {

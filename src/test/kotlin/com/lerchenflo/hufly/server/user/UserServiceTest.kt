@@ -36,7 +36,7 @@ class UserServiceTest {
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
     private val refreshTokenRepository = FakeRefreshTokenRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val pictureStore = com.lerchenflo.hufly.server.core.picture.FakePictureStore()
     private val horseRepository = com.lerchenflo.hufly.server.repository.FakeHorseRepository()
     private val absenceRepository = com.lerchenflo.hufly.server.repository.FakeAbsenceRepository()
@@ -46,19 +46,28 @@ class UserServiceTest {
     )
     private val userSettingsRepository = com.lerchenflo.hufly.server.repository.FakeUserSettingsRepository()
     private val digestItemRepository = com.lerchenflo.hufly.server.repository.FakeDigestItemRepository()
+    private val joinRequestRepository = com.lerchenflo.hufly.server.repository.FakeJoinRequestRepository()
+    private val stableDeletionService = com.lerchenflo.hufly.server.stable.StableDeletionService(
+        stableRepository, userRepository, joinRequestRepository, digestItemRepository, horseRepository, tagRepository,
+        com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository(), com.lerchenflo.hufly.server.repository.FakeHorseLogRepository(), com.lerchenflo.hufly.server.repository.FakePaddockRepository(), com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository(),
+        com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository(), com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository(), com.lerchenflo.hufly.server.repository.FakeEventRepository(),
+        com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository(),
+        com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, pictureStore,
+    )
     private val userService = UserService(
-        userRepository, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
+        userRepository, userRepository.accounts, joinRequestRepository, stableRepository, stableDeletionService, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
         absenceService, pictureStore, accessService, hashEncoder, clock,
     )
 
     private val admin = testUser(email = "admin@hufly.test")
-    private val rider = testUser(email = "rider@hufly.test", hashedPassword = hashEncoder.encode("OldSecret1"))
+    private val rider = testUser(email = "rider@hufly.test")
     private val foreigner = testUser(email = "foreign@hufly.test", stableId = OTHER_STABLE_ID)
     private val roleTag = testTag()
 
     @BeforeTest
     fun setUp() {
         listOf(admin, rider, foreigner).forEach { userRepository.save(it) }
+        userRepository.saveWithLogin(rider, hashEncoder.encode("OldSecret1"))
         stableRepository.save(testStable(adminUserId = admin.id))
         tagRepository.save(roleTag)
         clock.advance(days(1))
@@ -69,6 +78,8 @@ class UserServiceTest {
     }
 
     private fun stored(id: ObjectId) = userRepository.findById(id)!!
+
+    private fun login(accountId: ObjectId) = userRepository.accounts.findById(accountId)!!
 
     private fun session(userId: ObjectId) = refreshTokenRepository.save(
         RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = Long.MAX_VALUE, createdAt = 0L)
@@ -87,7 +98,7 @@ class UserServiceTest {
         assertEquals(clock.millis(), user.updatedAt)
         assertEquals(admin.id, user.updatedBy)
         assertTrue(created.generatedPassword.length >= 12)
-        assertTrue(hashEncoder.matches(created.generatedPassword, user.hashedPassword))
+        assertTrue(hashEncoder.matches(created.generatedPassword, login(user.accountId).hashedPassword))
     }
 
     @Test
@@ -190,7 +201,8 @@ class UserServiceTest {
         assertEquals(DELETED_USER_NAME, user.displayName)
         assertEquals(null, user.phoneNumber)
         assertEquals(emptyList(), user.roleTagIds)
-        assertTrue(!hashEncoder.matches("OldSecret1", user.hashedPassword))
+        assertTrue(!hashEncoder.matches("OldSecret1", login(rider.id).hashedPassword))
+        assertTrue(login(rider.id).deleted)
         assertEquals(null, userSettingsRepository.findById(rider.id))
         assertTrue(digestItemRepository.items.isEmpty())
         assertEquals(null, pictureStore.load(com.lerchenflo.hufly.server.core.picture.PictureKind.USER, rider.id))
@@ -202,7 +214,7 @@ class UserServiceTest {
         session(rider.id)
         val adminSession = session(admin.id)
 
-        userService.deleteOwnAccount(rider, "OldSecret1")
+        userService.deleteOwnAccount(login(rider.id), "OldSecret1")
 
         val user = stored(rider.id)
         assertTrue(user.deleted)
@@ -213,7 +225,7 @@ class UserServiceTest {
 
     @Test
     fun `own account deletion with a wrong password is rejected without 401`() {
-        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(rider, "wrong") }
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(login(rider.id), "wrong") }
         assertEquals(HttpStatus.BAD_REQUEST, e.statusCode)
         assertEquals("WRONG_PASSWORD", e.code)
         assertTrue(!stored(rider.id).deleted)
@@ -221,11 +233,106 @@ class UserServiceTest {
 
     @Test
     fun `the stable admin cannot delete the own account`() {
-        val adminWithPassword = userRepository.save(admin.copy(hashedPassword = hashEncoder.encode("AdminSecret1")))
-        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(adminWithPassword, "AdminSecret1") }
+        userRepository.saveWithLogin(admin, hashEncoder.encode("AdminSecret1"))
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.deleteOwnAccount(login(admin.id), "AdminSecret1") }
         assertEquals(HttpStatus.CONFLICT, e.statusCode)
         assertEquals("STABLE_ADMIN", e.code)
         assertTrue(!stored(admin.id).deleted)
+    }
+
+    // Self-registered members own their login
+
+    private fun selfRegistered(): com.lerchenflo.hufly.server.user.model.User {
+        val login = userRepository.accounts.save(
+            com.lerchenflo.hufly.server.testdata.testAccount(email = "self@hufly.test", hashedPassword = hashEncoder.encode("SelfSecret1"))
+        )
+        return userRepository.save(testUser(email = "self@hufly.test").copy(accountId = login.id))
+    }
+
+    @Test
+    fun `the admin cannot reset the password of a self-registered member`() {
+        val member = selfRegistered()
+
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.resetPassword(admin, member.id) }
+
+        assertEquals(HttpStatus.FORBIDDEN, e.statusCode)
+        assertEquals("SELF_REGISTERED", e.code)
+        assertTrue(hashEncoder.matches("SelfSecret1", login(member.accountId).hashedPassword))
+    }
+
+    @Test
+    fun `the admin cannot change the login email of a self-registered member, other fields yes`() {
+        val member = selfRegistered()
+
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> {
+            userService.updateUser(admin, member.id, "other@hufly.test", "Self", null, emptyList())
+        }
+        assertEquals("SELF_REGISTERED", e.code)
+
+        userService.updateUser(admin, member.id, "self@hufly.test", "Neuer Name", "+43 1", listOf(roleTag.id))
+        assertEquals("Neuer Name", stored(member.id).displayName)
+        assertEquals("self@hufly.test", login(member.accountId).email)
+    }
+
+    @Test
+    fun `the admin changes the login email of members the stable created`() {
+        userService.updateUser(admin, rider.id, "Rider.New@hufly.test", "Rider", null, emptyList())
+
+        assertEquals("rider.new@hufly.test", stored(rider.id).email)
+        assertEquals("rider.new@hufly.test", login(rider.accountId).email)
+    }
+
+    @Test
+    fun `removing a self-registered member keeps their login, which then has no stable`() {
+        val member = selfRegistered()
+        session(member.accountId)
+
+        userService.deleteUser(admin, member.id)
+
+        assertTrue(stored(member.id).deleted)
+        val kept = login(member.accountId)
+        assertTrue(!kept.deleted)
+        assertEquals("self@hufly.test", kept.email)
+        assertEquals(1, refreshTokenRepository.tokens.size)
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { accessService.requester(member.accountId) }
+        assertEquals("NO_STABLE", e.code)
+    }
+
+    @Test
+    fun `own profile changes reach the login too`() {
+        userService.updateMe(rider, "Rider2@hufly.test", "Reiterin", null)
+
+        assertEquals("rider2@hufly.test", login(rider.accountId).email)
+        assertEquals("Reiterin", login(rider.accountId).displayName)
+    }
+
+    @Test
+    fun `erased addresses cannot be taken`() {
+        assertStatus(HttpStatus.BAD_REQUEST) { userService.updateMe(rider, "deleted-1@deleted.invalid", "X", null) }
+        assertStatus(HttpStatus.BAD_REQUEST) { userService.createUser(admin, "deleted-2@deleted.invalid", "X", null, emptyList()) }
+    }
+
+    @Test
+    fun `a member created by the admin gets an own login linked to the membership`() {
+        val created = userService.createUser(admin, "linked@hufly.test", "L", null, emptyList())
+
+        val linked = login(created.user.accountId)
+        assertEquals("linked@hufly.test", linked.email)
+        assertEquals(STABLE_ID, linked.createdByStableId)
+        assertEquals(created.user, accessService.requester(linked.id))
+    }
+
+    @Test
+    fun `an admin alone in the stable deletes the own account together with the stable`() {
+        userRepository.save(rider.copy(deleted = true))
+        userRepository.saveWithLogin(admin, hashEncoder.encode("AdminSecret1"))
+        horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse())
+
+        userService.deleteOwnAccount(login(admin.id), "AdminSecret1")
+
+        assertEquals(null, stableRepository.findById(STABLE_ID))
+        assertTrue(horseRepository.horses.none { it.stableId == STABLE_ID })
+        assertTrue(login(admin.id).deleted)
     }
 
     @Test
@@ -251,7 +358,7 @@ class UserServiceTest {
 
         val password = userService.resetPassword(admin, rider.id)
 
-        assertTrue(hashEncoder.matches(password, stored(rider.id).hashedPassword))
+        assertTrue(hashEncoder.matches(password, login(rider.id).hashedPassword))
         assertTrue(refreshTokenRepository.tokens.isEmpty())
     }
 
@@ -286,9 +393,9 @@ class UserServiceTest {
 
     @Test
     fun `user changes the own password with the old one`() {
-        userService.changePassword(rider, "OldSecret1", "NewSecret1", currentSessionId = null)
+        userService.changePassword(login(rider.id), "OldSecret1", "NewSecret1", currentSessionId = null)
 
-        assertTrue(hashEncoder.matches("NewSecret1", stored(rider.id).hashedPassword))
+        assertTrue(hashEncoder.matches("NewSecret1", login(rider.id).hashedPassword))
     }
 
     @Test
@@ -297,14 +404,14 @@ class UserServiceTest {
         session(rider.id)
         val adminSession = session(admin.id)
 
-        userService.changePassword(rider, "OldSecret1", "NewSecret1", currentSessionId = current.id)
+        userService.changePassword(login(rider.id), "OldSecret1", "NewSecret1", currentSessionId = current.id)
 
         assertEquals(setOf(current, adminSession), refreshTokenRepository.tokens.toSet())
     }
 
     @Test
     fun `password change with a wrong old password is rejected without 401`() {
-        assertStatus(HttpStatus.BAD_REQUEST) { userService.changePassword(rider, "wrong", "NewSecret1", currentSessionId = null) }
+        assertStatus(HttpStatus.BAD_REQUEST) { userService.changePassword(login(rider.id), "wrong", "NewSecret1", currentSessionId = null) }
     }
 
     // Profile picture (USR-6)
@@ -363,14 +470,15 @@ class UserServiceTest {
     @Test
     fun `admin-generated passwords ask for an own one until the user changes it`() {
         val created = userService.createUser(admin, "new@hufly.test", "Neu", null, emptyList())
-        assertTrue(stored(created.user.id).mustChangePassword)
+        val accountId = created.user.accountId
+        assertTrue(login(accountId).mustChangePassword)
 
-        userService.changePassword(stored(created.user.id), created.generatedPassword, "MyOwnSecret1", null)
-        assertEquals(false, stored(created.user.id).mustChangePassword)
+        userService.changePassword(login(accountId), created.generatedPassword, "MyOwnSecret1", null)
+        assertEquals(false, login(accountId).mustChangePassword)
 
         userService.resetPassword(admin, created.user.id)
-        assertTrue(stored(created.user.id).mustChangePassword)
-        assertEquals(false, stored(rider.id).mustChangePassword)
+        assertTrue(login(accountId).mustChangePassword)
+        assertEquals(false, login(rider.id).mustChangePassword)
     }
 
     @Test

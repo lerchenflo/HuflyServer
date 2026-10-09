@@ -47,7 +47,7 @@ class TaskServiceTest {
     private val tagRepository = FakeTagRepository()
     private val taskRepository = FakeTaskRepository()
     private val horseRepository = FakeHorseRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val assignmentRepository = FakePaddockAssignmentRepository()
     private val taskService = TaskService(

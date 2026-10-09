@@ -40,7 +40,7 @@ class NoteServiceTest {
     private val stableRepository = FakeStableRepository()
     private val tagRepository = FakeTagRepository()
     private val noteRepository = FakeNoteRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val published = mutableListOf<Any>()
     private val events = ApplicationEventPublisher { published += it }

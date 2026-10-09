@@ -38,8 +38,8 @@ class LoginRateLimitTest {
     @BeforeTest
     fun setUp() {
         userRepository.users.clear()
-        userRepository.save(testUser(email = "anna@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
-        userRepository.save(testUser(email = "ben@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        userRepository.saveWithLogin(testUser(email = "anna@hufly.test"), hashEncoder.encode("Secret123"))
+        userRepository.saveWithLogin(testUser(email = "ben@hufly.test"), hashEncoder.encode("Secret123"))
     }
 
     private fun login(email: String, password: String, ip: String = "203.0.113.7") = mockMvc.post("/auth/login") {

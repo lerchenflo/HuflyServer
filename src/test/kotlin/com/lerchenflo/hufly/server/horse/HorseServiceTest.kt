@@ -43,7 +43,7 @@ class HorseServiceTest {
     private val pictureStore = FakePictureStore()
     private val groupRepository = com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository()
     private val conflictRepository = com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, pictureStore, accessService, clock)
 
     private val admin = testUser()

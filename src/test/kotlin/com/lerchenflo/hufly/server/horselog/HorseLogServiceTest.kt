@@ -41,7 +41,7 @@ class HorseLogServiceTest {
     private val tagRepository = FakeTagRepository()
     private val horseRepository = FakeHorseRepository()
     private val logRepository = FakeHorseLogRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val logService = HorseLogService(logRepository, horseRepository, tagRepository, userRepository, accessService, versionCounterService, clock)
 

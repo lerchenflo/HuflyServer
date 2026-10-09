@@ -46,10 +46,11 @@ class NotificationServiceTest {
     private val eventRepository = FakeEventRepository()
     private val taskRepository = FakeTaskRepository()
     private val digestRepository = FakeDigestItemRepository()
+    private val stableRepository = com.lerchenflo.hufly.server.repository.FakeStableRepository()
     private val android = FakePushSender(PushPlatform.ANDROID)
     private val pushService = PushService(sessions, listOf(android), Executor { it.run() }, clock)
     private val service = NotificationService(
-        userRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, clock,
+        userRepository, userRepository.accounts, stableRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, clock,
     )
 
     private val anna = testUser(email = "anna@hufly.test")
@@ -89,6 +90,41 @@ class NotificationServiceTest {
         StableTask(stableId = STABLE_ID, title = "Misten", comment = "", dueAt = dueAt, assigneeUserIds = listOf(ben.id),
             horseIds = emptyList(), createdByUserId = anna.id, doneByUserId = null, doneAt = null, updatedAt = clock.millis(), updatedBy = anna.id)
     )
+
+    @Test
+    fun `a join request tells the stable admin who asks`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        val login = userRepository.accounts.save(com.lerchenflo.hufly.server.testdata.testAccount(email = "neu@hufly.test"))
+        val requestId = ObjectId.get()
+
+        service.on(com.lerchenflo.hufly.server.core.notification.JoinRequested(STABLE_ID, login.id, requestId))
+
+        val expected = PushMessage(
+            "Beitrittsanfrage", "neu möchte Hof Lerchenfeld beitreten",
+            mapOf("type" to "join_request", "joinRequestId" to requestId.toHexString()),
+        )
+        assertEquals(listOf(expected), sentTo(anna))
+        assertTrue(sentTo(ben).isEmpty() && sentTo(clara).isEmpty())
+    }
+
+    @Test
+    fun `an accepted request welcomes the new member on the devices of their login`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        val login = ObjectId.get()
+        val session = sessions.save(
+            RefreshToken(userId = login, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.millis() + days(30), createdAt = clock.millis())
+        )
+        pushService.register(login, session.id, PushPlatform.ANDROID, "token-neu")
+        val member = userRepository.save(testUser(email = "neu@hufly.test").copy(accountId = login))
+
+        service.on(com.lerchenflo.hufly.server.core.notification.JoinAccepted(STABLE_ID, anna.id, member.id))
+
+        val expected = PushMessage(
+            "Willkommen im Stall", "Deine Anfrage für Hof Lerchenfeld wurde angenommen",
+            mapOf("type" to "join_accepted", "stableId" to STABLE_ID.toHexString()),
+        )
+        assertEquals(listOf(expected), android.sent.filter { it.first == "token-neu" }.map { it.second })
+    }
 
     @Test
     fun `a new note goes to every live member of the stable but its author`() {

@@ -1,7 +1,7 @@
 package com.lerchenflo.hufly.server.stable
 
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
-import com.lerchenflo.hufly.server.repository.UserRepository
+import com.lerchenflo.hufly.server.repository.AccountRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class StableBootstrap(
-    private val userRepository: UserRepository,
+    private val accountRepository: AccountRepository,
     private val onboarding: StableOnboardingService,
 ) : ApplicationRunner {
 
@@ -28,7 +28,7 @@ class StableBootstrap(
 
     fun run(stableName: String, adminEmail: String, adminPassword: String) {
         if (stableName.isBlank() || adminEmail.isBlank() || adminPassword.isBlank()) return
-        if (userRepository.findByEmail(normalizeEmail(adminEmail)) != null) return
+        if (accountRepository.findByEmail(normalizeEmail(adminEmail)) != null) return
         onboarding.createStable(stableName, adminEmail, "Admin", adminPassword, mustChangePassword = false)
         log.info("Bootstrapped stable '{}' with admin {}", stableName, normalizeEmail(adminEmail))
     }

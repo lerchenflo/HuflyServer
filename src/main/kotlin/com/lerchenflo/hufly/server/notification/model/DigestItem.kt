@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 @Document("digestItems")
 data class DigestItem(
     @Id val id: ObjectId = ObjectId.get(),
+    /** The recipient's account id. */
     val userId: ObjectId,
     val title: String,
     val body: String,

@@ -5,11 +5,11 @@ import com.lerchenflo.hufly.server.core.security.CountingHashEncoder
 import com.lerchenflo.hufly.server.core.security.JwtService
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.core.security.TokenCipher
+import com.lerchenflo.hufly.server.repository.FakeAccountRepository
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
-import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.hours
-import com.lerchenflo.hufly.server.testdata.testUser
+import com.lerchenflo.hufly.server.testdata.testAccount
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
@@ -25,12 +25,12 @@ class AuthServiceTest {
     private val clock = MutableClock()
     private val jwtService = JwtService("test-secret-that-is-long-enough-for-hs256-signing", clock)
     private val hashEncoder = CountingHashEncoder()
-    private val userRepository = FakeUserRepository()
+    private val accounts = FakeAccountRepository()
     private val refreshTokenRepository = FakeRefreshTokenRepository()
     private val tokenCipher = TokenCipher("test-secret-that-is-long-enough-for-hs256-signing")
-    private val authService = AuthService(userRepository, refreshTokenRepository, jwtService, hashEncoder, tokenCipher, clock)
+    private val authService = AuthService(accounts, refreshTokenRepository, jwtService, hashEncoder, tokenCipher, clock)
 
-    private val anna = testUser(
+    private val anna = testAccount(
         id = ObjectId("66f000000000000000000001"),
         email = "anna@hufly.test",
         hashedPassword = hashEncoder.encode("Secret123"),
@@ -38,7 +38,7 @@ class AuthServiceTest {
 
     @BeforeTest
     fun setUp() {
-        userRepository.save(anna)
+        accounts.save(anna)
     }
 
     private fun assertUnauthorized(block: () -> Unit) {
@@ -81,14 +81,14 @@ class AuthServiceTest {
     @Test
     fun `refresh of a user deleted after login is unauthorized`() {
         val login = authService.login("anna@hufly.test", "Secret123")
-        userRepository.save(anna.copy(deleted = true))
+        accounts.save(anna.copy(deleted = true))
 
         assertUnauthorized { authService.refresh(login.refreshToken) }
     }
 
     @Test
     fun `login of a deleted user is unauthorized`() {
-        userRepository.save(anna.copy(deleted = true))
+        accounts.save(anna.copy(deleted = true))
 
         assertUnauthorized { authService.login("anna@hufly.test", "Secret123") }
     }
@@ -206,7 +206,7 @@ class AuthServiceTest {
     fun `retry of a deleted user is unauthorized`() {
         val login = authService.login("anna@hufly.test", "Secret123")
         authService.refresh(login.refreshToken)
-        userRepository.save(anna.copy(deleted = true))
+        accounts.save(anna.copy(deleted = true))
 
         assertUnauthorized { authService.refresh(login.refreshToken) }
     }
@@ -329,7 +329,7 @@ class AuthServiceTest {
 
     @Test
     fun `sessions of other users cannot be ended`() {
-        val bob = userRepository.save(testUser(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        val bob = accounts.save(testAccount(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
         val bobTokens = authService.login("bob@hufly.test", "Secret123", pixel)
 
         val error = assertFailsWith<ResponseStatusException> {
@@ -344,7 +344,7 @@ class AuthServiceTest {
     @Test
     fun `logout everywhere ends all own sessions only`() {
         val phone = authService.login("anna@hufly.test", "Secret123", pixel)
-        userRepository.save(testUser(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
+        accounts.save(testAccount(email = "bob@hufly.test", hashedPassword = hashEncoder.encode("Secret123")))
         val bob = authService.login("bob@hufly.test", "Secret123", pixel)
 
         authService.logoutEverywhere(anna.id)

@@ -58,7 +58,7 @@ class HorseEditOwnTest {
     private val logRepository = FakeHorseLogRepository()
     private val paddockRepository = FakePaddockRepository()
     private val assignmentRepository = FakePaddockAssignmentRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val horseService = HorseService(
         horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, FakePictureStore(), accessService, clock,

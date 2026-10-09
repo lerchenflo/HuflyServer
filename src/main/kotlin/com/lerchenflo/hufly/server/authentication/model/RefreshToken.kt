@@ -17,6 +17,7 @@ enum class DeviceType { ANDROID, IOS, WEB, OTHER }
 @Document("refreshTokens")
 data class RefreshToken(
     @Id val id: ObjectId = ObjectId.get(),
+    /** The account id (named before accounts existed; same values for older logins). */
     val userId: ObjectId,
     @Indexed(unique = true) val hashedToken: String,
     @Indexed(sparse = true) val previousHashedToken: String? = null,

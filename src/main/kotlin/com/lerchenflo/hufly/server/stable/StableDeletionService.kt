@@ -10,16 +10,17 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
 /**
- * Removes a stable for good (operator website): its users with their sessions, settings, held-back pushes and
- * pictures, then every collection's rows of the stable. Hard deletes, so no sync hints; the apps get 401.
- * The stable row goes last, so a run that fails halfway can simply be repeated.
+ * Removes a stable for good (operator website, or its admin deleting the own account while alone in it): its
+ * memberships with their pictures and held-back pushes, its join requests, then every collection's rows of the
+ * stable. The members' logins (accounts, sessions, settings) stay, so they can join or create another stable; their
+ * apps get 403 `NO_STABLE`. Hard deletes, so no sync hints. The stable row goes last, so a run that fails halfway can
+ * simply be repeated.
  */
 @Service
 class StableDeletionService(
     private val stableRepository: StableRepository,
     private val userRepository: UserRepository,
-    private val refreshTokenRepository: RefreshTokenRepository,
-    private val userSettingsRepository: UserSettingsRepository,
+    private val joinRequestRepository: JoinRequestRepository,
     private val digestItemRepository: DigestItemRepository,
     private val horseRepository: HorseRepository,
     private val tagRepository: TagRepository,
@@ -46,11 +47,11 @@ class StableDeletionService(
         val stable = stableRepository.findById(stableId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Stable not found")
         if (confirmName != stable.name) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name does not match the stable")
 
-        val userIds = userRepository.findByStableId(stableId).map { it.id }
-        refreshTokenRepository.deleteByUserIdIn(userIds)
-        userSettingsRepository.deleteByUserIdIn(userIds)
-        digestItemRepository.deleteByUserIdIn(userIds)
+        val members = userRepository.findByStableId(stableId)
+        val userIds = members.map { it.id }
+        digestItemRepository.deleteByUserIdIn(members.map { it.accountId })
         userIds.forEach { pictureStore.delete(PictureKind.USER, it) }
+        joinRequestRepository.deleteByStableId(stableId)
         horseRepository.findByStableId(stableId).forEach { pictureStore.delete(PictureKind.HORSE, it.id) }
 
         listOf(

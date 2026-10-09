@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.realtime
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.lerchenflo.hufly.server.repository.UserRepository
+import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
 import org.springframework.context.event.EventListener
 import org.springframework.messaging.simp.SimpMessagingTemplate
@@ -23,20 +24,30 @@ class ChangeNotifier(
     @JsonInclude(JsonInclude.Include.NON_NULL)
     data class ChangeHint(val type: String = "changed", val collection: String, val originSessionId: String? = null)
 
-    /** User id -> stable id of connected users, filled on connect so sending needs no database lookups. */
-    private val stableOfUser = ConcurrentHashMap<String, ObjectId>()
+    /**
+     * Account id (the STOMP principal) -> stable id of connected accounts with a stable, filled on connect and kept
+     * current when a connected account joins or leaves a stable, so sending needs no database lookups.
+     */
+    private val stableOfAccount = ConcurrentHashMap<String, ObjectId>()
 
     @EventListener
     fun onConnected(event: SessionConnectedEvent) {
-        val userId = event.user?.name?.takeIf(ObjectId::isValid) ?: return
-        userRepository.findById(ObjectId(userId))?.let { stableOfUser[userId] = it.stableId }
+        val accountId = event.user?.name?.takeIf(ObjectId::isValid) ?: return
+        userRepository.findFirstByAccountIdAndDeletedFalse(ObjectId(accountId))?.let { stableOfAccount[accountId] = it.stableId }
+    }
+
+    /** A saved membership: its account now gets this stable's hints (or none, once the membership is deleted). */
+    fun membershipChanged(member: User) {
+        val accountId = member.accountId.toHexString()
+        if (userRegistry.getUser(accountId) == null) return
+        if (member.deleted) stableOfAccount.remove(accountId, member.stableId) else stableOfAccount[accountId] = member.stableId
     }
 
     fun send(target: HintTarget, collection: String, originSessionId: ObjectId?) {
         val hint = ChangeHint(collection = collection, originSessionId = originSessionId?.toHexString())
         val userNames = when (target) {
-            is HintTarget.Stable -> userRegistry.users.map { it.name }.filter { stableOfUser[it] == target.stableId }
-            is HintTarget.User -> listOf(target.userId.toHexString()).filter { userRegistry.getUser(it) != null }
+            is HintTarget.Stable -> userRegistry.users.map { it.name }.filter { stableOfAccount[it] == target.stableId }
+            is HintTarget.Account -> listOf(target.accountId.toHexString()).filter { userRegistry.getUser(it) != null }
         }
         userNames.forEach { messagingTemplate.convertAndSendToUser(it, "/queue/changes", hint) }
     }
@@ -45,6 +56,6 @@ class ChangeNotifier(
 sealed interface HintTarget {
     /** Every connected member of the stable. */
     data class Stable(val stableId: ObjectId) : HintTarget
-    /** Only the user's own devices. */
-    data class User(val userId: ObjectId) : HintTarget
+    /** Only the account's own devices. */
+    data class Account(val accountId: ObjectId) : HintTarget
 }

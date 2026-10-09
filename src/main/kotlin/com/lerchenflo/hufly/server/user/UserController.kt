@@ -5,8 +5,6 @@ import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.picture.pictureResponse
 import com.lerchenflo.hufly.server.core.security.currentSessionId
 import com.lerchenflo.hufly.server.core.security.requireAuth
-import com.lerchenflo.hufly.server.stable.StableLookupService
-import com.lerchenflo.hufly.server.stable.model.toStableResponse
 import com.lerchenflo.hufly.server.core.sync.IdTimeStamp
 import com.lerchenflo.hufly.server.core.sync.SyncResponse
 import com.lerchenflo.hufly.server.core.sync.deltaSync
@@ -21,25 +19,25 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
-import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 
 @RestController
 @RequestMapping("/users")
 class UserController(
     private val accessService: AccessService,
-    private val stableLookupService: StableLookupService,
+    private val meService: MeService,
     private val userRepository: UserRepository,
     private val userService: UserService,
 ) {
@@ -75,14 +73,7 @@ class UserController(
 
     @GetMapping("/me")
     fun me(): MeResponse {
-        val requester = accessService.requester(requireAuth())
-        return MeResponse(
-            user = requester.toUserResponse(),
-            isAdmin = accessService.isAdmin(requester),
-            stable = stableLookupService.getById(requester.stableId).toStableResponse(),
-            permissions = accessService.effectivePermissions(requester),
-            mustChangePassword = requester.mustChangePassword,
-        )
+        return meService.me(accessService.requester(requireAuth()))
     }
 
     @PostMapping("/sync")
@@ -138,15 +129,14 @@ class UserController(
 
     @PostMapping("/me/password")
     fun changePassword(@Valid @RequestBody request: ChangePasswordRequest) {
-        val requester = accessService.requester(requireAuth())
-        userService.changePassword(requester, request.oldPassword, request.newPassword, currentSessionId())
+        val account = accessService.requireAccount(requireAuth())
+        userService.changePassword(account, request.oldPassword, request.newPassword, currentSessionId())
     }
 
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteOwnAccount(@Valid @RequestBody request: DeleteOwnAccountRequest) {
-        val requester = accessService.requester(requireAuth())
-        userService.deleteOwnAccount(requester, request.password)
+        userService.deleteOwnAccount(accessService.requireAccount(requireAuth()), request.password)
     }
 
     @PostMapping

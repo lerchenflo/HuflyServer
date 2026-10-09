@@ -36,6 +36,7 @@ class PushService(
     }
 
     /** Looks the devices up now and sends in the background, so a slow push service never holds a request. */
+    /** [userId] is the recipient's account id. */
     fun send(userId: ObjectId, message: PushMessage) {
         val now = clock.millis()
         val targets = sessionRepository.findByUserIdAndPushTokenNotNull(userId).filter { it.expiresAt > now }

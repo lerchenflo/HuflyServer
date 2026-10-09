@@ -70,6 +70,12 @@ class RealtimeIntegrationTest {
     @LocalServerPort var port: Int = 0
     @Autowired lateinit var jwtService: JwtService
     @Autowired lateinit var userRepository: UserRepository
+    @Autowired lateinit var accountRepository: com.lerchenflo.hufly.server.repository.AccountRepository
+    @Autowired lateinit var joinRequestRepository: com.lerchenflo.hufly.server.repository.JoinRequestRepository
+
+    /** Saves the membership with its login, as every member has one. */
+    private fun member(user: com.lerchenflo.hufly.server.user.model.User) =
+        userRepository.save(user).also { accountRepository.save(com.lerchenflo.hufly.server.testdata.testAccount(id = it.accountId, email = it.email)) }
     @Autowired lateinit var horseRepository: HorseRepository
     @Autowired lateinit var settingsRepository: UserSettingsRepository
     @Autowired lateinit var stableRepository: StableRepository
@@ -112,7 +118,7 @@ class RealtimeIntegrationTest {
 
     @Test
     fun `members of the stable get a hint when a horse changes, other stables do not`() {
-        val users = listOf(testUser(), testUser(), testUser(stableId = OTHER_STABLE_ID)).map { userRepository.save(it) }
+        val users = listOf(testUser(), testUser(), testUser(stableId = OTHER_STABLE_ID)).map { member(it) }
         val (anna, ben, foreigner) = users.map { subscribe(connect(it.id)) }
 
         horseRepository.save(testHorse())
@@ -123,9 +129,38 @@ class RealtimeIntegrationTest {
     }
 
     @Test
+    fun `a login connected without a stable gets the stable's hints as soon as it joins`() {
+        val stableId = ObjectId.get()
+        val login = ObjectId.get()
+        accountRepository.save(com.lerchenflo.hufly.server.testdata.testAccount(id = login))
+        val inbox = subscribe(connect(login))
+
+        userRepository.save(testUser(stableId = stableId).copy(accountId = login))
+        assertEquals(hint("users"), inbox.next())
+
+        horseRepository.save(testHorse(stableId = stableId))
+        assertEquals(hint("horses"), inbox.next())
+    }
+
+    @Test
+    fun `join requests send a hint to the stable`() {
+        val stableId = ObjectId.get()
+        val inbox = subscribe(connect(member(testUser(stableId = stableId)).id))
+
+        joinRequestRepository.save(
+            com.lerchenflo.hufly.server.account.model.JoinRequest(
+                accountId = ObjectId.get(), stableId = stableId,
+                status = com.lerchenflo.hufly.server.account.model.JoinRequestStatus.PENDING, createdAt = 0L, updatedAt = 0L,
+            )
+        )
+
+        assertEquals(hint("joinRequest"), inbox.next())
+    }
+
+    @Test
     fun `dates of series send hints under the client's collection names`() {
         val stableId = ObjectId.get()
-        val inbox = subscribe(connect(userRepository.save(testUser(stableId = stableId)).id))
+        val inbox = subscribe(connect(member(testUser(stableId = stableId)).id))
         val user = ObjectId.get()
         val at = millis("2026-10-20T16:00:00Z")
 
@@ -147,7 +182,7 @@ class RealtimeIntegrationTest {
     @Test
     fun `notes and their atomic read marks send hints under the collection name note`() {
         val stableId = ObjectId.get()
-        val reader = userRepository.save(testUser(stableId = stableId))
+        val reader = member(testUser(stableId = stableId))
         val inbox = subscribe(connect(reader.id))
         val at = millis("2026-10-05T08:00:00Z")
         val note = noteRepository.save(
@@ -164,7 +199,7 @@ class RealtimeIntegrationTest {
     @Test
     fun `absences send hints under the collection name absence`() {
         val stableId = ObjectId.get()
-        val member = userRepository.save(testUser(stableId = stableId))
+        val member = member(testUser(stableId = stableId))
         val inbox = subscribe(connect(member.id))
 
         absenceRepository.save(
@@ -179,8 +214,8 @@ class RealtimeIntegrationTest {
 
     @Test
     fun `settings hints go only to their owner`() {
-        val annaUser = userRepository.save(testUser())
-        val benUser = userRepository.save(testUser())
+        val annaUser = member(testUser())
+        val benUser = member(testUser())
         val anna = subscribe(connect(annaUser.id))
         val ben = subscribe(connect(benUser.id))
 
@@ -203,7 +238,7 @@ class RealtimeIntegrationTest {
 
     private fun adminOfNewStable(): Pair<ObjectId, ObjectId> {
         val stableId = ObjectId.get()
-        val admin = userRepository.save(testUser(stableId = stableId))
+        val admin = member(testUser(stableId = stableId))
         stableRepository.save(testStable(id = stableId, adminUserId = admin.id))
         return admin.id to stableId
     }
@@ -215,7 +250,7 @@ class RealtimeIntegrationTest {
     @Test
     fun `the hint of the document a request answers names the requesting session for every member`() {
         val (adminId, stableId) = adminOfNewStable()
-        val member = userRepository.save(testUser(stableId = stableId))
+        val member = member(testUser(stableId = stableId))
         val session = ObjectId.get()
         val adminInbox = subscribe(connect(adminId))
         val memberInbox = subscribe(connect(member.id))
@@ -253,7 +288,7 @@ class RealtimeIntegrationTest {
 
     @Test
     fun `a guarded settings save tells the owner's devices and names the session`() {
-        val owner = userRepository.save(testUser())
+        val owner = member(testUser())
         settingsRepository.save(UserSettings(owner.id, mapOf("theme" to "dark"), 1000))
         val session = ObjectId.get()
         val inbox = subscribe(connect(owner.id))
@@ -271,7 +306,7 @@ class RealtimeIntegrationTest {
             taskScheduler = ThreadPoolTaskScheduler().apply { initialize() }
         }
         val handshake = WebSocketHttpHeaders().apply {
-            setBearerAuth(jwtService.generateAccessToken(userRepository.save(testUser()).id))
+            setBearerAuth(jwtService.generateAccessToken(member(testUser()).id))
         }
         val connect = StompHeaders().apply { heartbeat = longArrayOf(10000, 10000) }
 
@@ -291,7 +326,7 @@ class RealtimeIntegrationTest {
 
     @Test
     fun `subscribing outside the own user queue closes the session`() {
-        val session = connect(userRepository.save(testUser()).id)
+        val session = connect(member(testUser()).id)
 
         subscribe(session, "/topic/stable/${OTHER_STABLE_ID.toHexString()}")
         Thread.sleep(500)
@@ -301,7 +336,7 @@ class RealtimeIntegrationTest {
 
     @Test
     fun `sending frames is not allowed`() {
-        val session = connect(userRepository.save(testUser()).id)
+        val session = connect(member(testUser()).id)
 
         session.send("/app/anything", "hello")
         Thread.sleep(500)

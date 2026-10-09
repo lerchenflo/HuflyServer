@@ -39,7 +39,7 @@ class FoodPlanServiceTest {
     private val tagRepository = FakeTagRepository()
     private val horseRepository = FakeHorseRepository()
     private val foodPlanRepository = FakeFoodPlanRepository()
-    private val accessService = AccessService(userRepository, stableRepository, tagRepository)
+    private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val foodPlanService = FoodPlanService(foodPlanRepository, horseRepository, tagRepository, accessService, clock)
 
     private val admin = testUser()

@@ -35,9 +35,7 @@ class AuthControllerTest {
     fun setUp() {
         userRepository.users.clear()
         refreshTokenRepository.tokens.clear()
-        userRepository.save(
-            testUser(id = annaId, email = "anna@hufly.test", hashedPassword = hashEncoder.encode("Secret123"))
-        )
+        userRepository.saveWithLogin(testUser(id = annaId, email = "anna@hufly.test"), hashEncoder.encode("Secret123"))
     }
 
     private fun postJson(path: String, json: String) = mockMvc.post(path) {

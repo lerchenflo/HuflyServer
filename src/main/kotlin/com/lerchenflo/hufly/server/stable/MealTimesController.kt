@@ -3,6 +3,7 @@ package com.lerchenflo.hufly.server.stable
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.requireAuth
+import com.lerchenflo.hufly.server.realtime.ChangeListener
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.stable.model.MealTimes
 import com.lerchenflo.hufly.server.stable.model.MealTimesResponse
@@ -24,6 +25,7 @@ class MealTimesController(
     private val accessService: AccessService,
     private val stableLookupService: StableLookupService,
     private val stableRepository: StableRepository,
+    private val changeListener: ChangeListener,
     private val clock: Clock,
 ) {
     data class MealTimesRequest(
@@ -47,14 +49,11 @@ class MealTimesController(
         if (!(request.morning < request.lunch && request.lunch < request.dinner && request.dinner < request.night)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Meal times must increase from morning to night")
         }
-        val stable = stableLookupService.getById(requester.stableId)
-        return stableRepository.save(
-            stable.copy(
-                mealTimes = MealTimes(request.morning, request.lunch, request.dinner, request.night),
-                updatedAt = clock.millis(),
-                updatedBy = requester.id,
-            )
-        ).toMealTimesResponse()
+        // Atomic, so it never brings back an invite code the admin replaced meanwhile.
+        stableRepository.setMealTimes(
+            requester.stableId, MealTimes(request.morning, request.lunch, request.dinner, request.night), clock.millis(), requester.id,
+        )
+        return stableLookupService.getById(requester.stableId).also(changeListener::publish).toMealTimesResponse()
     }
 }
 

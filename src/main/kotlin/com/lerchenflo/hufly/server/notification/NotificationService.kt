@@ -3,15 +3,19 @@ package com.lerchenflo.hufly.server.notification
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
+import com.lerchenflo.hufly.server.core.notification.JoinAccepted
+import com.lerchenflo.hufly.server.core.notification.JoinRequested
 import com.lerchenflo.hufly.server.core.notification.NotePosted
 import com.lerchenflo.hufly.server.core.notification.NotificationEvent
 import com.lerchenflo.hufly.server.core.notification.TaskAssigned
 import com.lerchenflo.hufly.server.notification.model.DigestItem
 import com.lerchenflo.hufly.server.notification.model.NotificationPreferences
 import com.lerchenflo.hufly.server.notification.model.PushMessage
+import com.lerchenflo.hufly.server.repository.AccountRepository
 import com.lerchenflo.hufly.server.repository.DigestItemRepository
 import com.lerchenflo.hufly.server.repository.EventRepository
 import com.lerchenflo.hufly.server.repository.NoteRepository
+import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
@@ -34,6 +38,8 @@ import kotlin.time.Instant
 @Service
 class NotificationService(
     private val userRepository: UserRepository,
+    private val accountRepository: AccountRepository,
+    private val stableRepository: StableRepository,
     private val settingsRepository: UserSettingsRepository,
     private val noteRepository: NoteRepository,
     private val eventRepository: EventRepository,
@@ -52,6 +58,8 @@ class NotificationService(
                 is EventInvited -> eventInvited(event)
                 is InvitationAnswered -> invitationAnswered(event)
                 is TaskAssigned -> taskAssigned(event)
+                is JoinRequested -> joinRequested(event)
+                is JoinAccepted -> joinAccepted(event)
             }
         } catch (e: Exception) {
             // A failing push must never fail the change that caused it.
@@ -105,6 +113,31 @@ class NotificationService(
         }
     }
 
+    private fun joinRequested(event: JoinRequested) {
+        val stable = stableRepository.findById(event.stableId)?.takeUnless { it.deleted } ?: return
+        val admin = userRepository.findById(stable.adminUserId)?.takeIf { it.stableId == stable.id && !it.deleted } ?: return
+        val name = accountRepository.findById(event.actorUserId)?.takeUnless { it.deleted }?.displayName ?: return
+        deliver(listOf(admin)) {
+            PushMessage(
+                "Beitrittsanfrage",
+                "$name möchte ${stable.name} beitreten",
+                mapOf("type" to "join_request", "joinRequestId" to event.joinRequestId.toHexString()),
+            )
+        }
+    }
+
+    private fun joinAccepted(event: JoinAccepted) {
+        val stable = stableRepository.findById(event.stableId)?.takeUnless { it.deleted } ?: return
+        val member = userRepository.findById(event.memberUserId)?.takeIf { it.stableId == stable.id && !it.deleted } ?: return
+        deliver(listOf(member)) {
+            PushMessage(
+                "Willkommen im Stall",
+                "Deine Anfrage für ${stable.name} wurde angenommen",
+                mapOf("type" to "join_accepted", "stableId" to stable.id.toHexString()),
+            )
+        }
+    }
+
     /** Live users of the event's stable among [userIds], without the actor. */
     private fun members(event: NotificationEvent, userIds: List<ObjectId>): List<User> = userIds.distinct()
         .filter { it != event.actorUserId }
@@ -112,13 +145,13 @@ class NotificationService(
 
     private fun deliver(recipients: List<User>, message: (TimeZone) -> PushMessage) {
         recipients.forEach { user ->
-            val preferences = NotificationPreferences.of(settingsRepository.findById(user.id)?.values)
+            val preferences = NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
             if (!preferences.enabled) return@forEach
             val push = message(preferences.zone)
             if (preferences.digest) {
-                digestRepository.save(DigestItem(userId = user.id, title = push.title, body = push.body, createdAt = clock.millis()))
+                digestRepository.save(DigestItem(userId = user.accountId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
-                pushService.send(user.id, push)
+                pushService.send(user.accountId, push)
             }
         }
     }
