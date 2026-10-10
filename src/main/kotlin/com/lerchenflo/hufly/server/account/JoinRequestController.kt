@@ -5,7 +5,7 @@ import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.parseObjectId
 import com.lerchenflo.hufly.server.core.security.requireAuth
 import com.lerchenflo.hufly.server.user.model.UserResponse
-import com.lerchenflo.hufly.server.user.model.toUserResponse
+import com.lerchenflo.hufly.server.user.UserResponses
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController
 class JoinRequestController(
     private val accessService: AccessService,
     private val joinRequestService: JoinRequestService,
+    private val userResponses: UserResponses,
 ) {
     data class AcceptRequest(@field:Size(max = 50) val roleTagIds: List<String> = emptyList())
 
@@ -33,7 +34,7 @@ class JoinRequestController(
     fun accept(@PathVariable requestId: String, @Valid @RequestBody(required = false) request: AcceptRequest?): UserResponse {
         val requester = accessService.requester(requireAuth())
         val roleTagIds = (request ?: AcceptRequest()).roleTagIds.map(::parseObjectId)
-        return joinRequestService.accept(requester, parseObjectId(requestId), roleTagIds).toUserResponse()
+        return userResponses.of(joinRequestService.accept(requester, parseObjectId(requestId), roleTagIds))
     }
 
     @PostMapping("/{requestId}/decline")

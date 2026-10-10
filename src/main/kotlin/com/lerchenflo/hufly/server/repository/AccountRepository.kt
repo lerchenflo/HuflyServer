@@ -9,5 +9,6 @@ interface AccountRepository : Repository<Account, ObjectId> {
     /** Fails with a duplicate key error if the email is taken meanwhile. */
     fun insert(account: Account): Account
     fun findById(id: ObjectId): Account?
+    fun findByIdIn(ids: Collection<ObjectId>): List<Account>
     fun findByEmail(email: String): Account?
 }

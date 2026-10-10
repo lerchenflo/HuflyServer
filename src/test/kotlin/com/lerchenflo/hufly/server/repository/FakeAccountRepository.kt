@@ -21,6 +21,8 @@ class FakeAccountRepository : AccountRepository {
 
     override fun findById(id: ObjectId): Account? = accounts.firstOrNull { it.id == id }
 
+    override fun findByIdIn(ids: Collection<ObjectId>): List<Account> = accounts.filter { it.id in ids }
+
     override fun findByEmail(email: String): Account? = accounts.firstOrNull { it.email == email }
 
     private fun requireFreeEmail(account: Account) {

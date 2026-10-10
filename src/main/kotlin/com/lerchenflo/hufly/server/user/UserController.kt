@@ -14,7 +14,6 @@ import com.lerchenflo.hufly.server.user.model.CreatedUserResponse
 import com.lerchenflo.hufly.server.user.model.GeneratedPasswordResponse
 import com.lerchenflo.hufly.server.user.model.MeResponse
 import com.lerchenflo.hufly.server.user.model.UserResponse
-import com.lerchenflo.hufly.server.user.model.toUserResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
@@ -40,6 +39,7 @@ class UserController(
     private val meService: MeService,
     private val userRepository: UserRepository,
     private val userService: UserService,
+    private val userResponses: UserResponses,
 ) {
 
     data class CreateUserRequest(
@@ -84,41 +84,42 @@ class UserController(
     ): SyncResponse<UserResponse> {
         val requester = accessService.requester(requireAuth())
         requireValidSyncRequest(page, pageSize, clientEntries)
+        val users = userRepository.findByStableIdAndDeletedFalse(requester.stableId)
+        val responses = userResponses.of(users)
         return deltaSync(
-            userRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toUserResponse() },
+            users, clientEntries, page, pageSize,
+            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { responses.getValue(it) },
         )
     }
 
     @PutMapping("/me")
     fun updateMe(@Valid @RequestBody request: UpdateMeRequest): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.updateMe(requester, request.email, request.displayName, request.phoneNumber)
-            .toUserResponse()
+        return userResponses.of(userService.updateMe(requester, request.email, request.displayName, request.phoneNumber))
     }
 
     @PutMapping("/me/picture")
     fun setMyPicture(@RequestParam("picture") picture: MultipartFile): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.setMyPicture(requester, picture.bytes).toUserResponse()
+        return userResponses.of(userService.setMyPicture(requester, picture.bytes))
     }
 
     @DeleteMapping("/me/picture")
     fun deleteMyPicture(): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.deleteMyPicture(requester).toUserResponse()
+        return userResponses.of(userService.deleteMyPicture(requester))
     }
 
     @PutMapping("/{userId}/picture")
     fun setPicture(@PathVariable userId: String, @RequestParam("picture") picture: MultipartFile): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.setPicture(requester, parseObjectId(userId), picture.bytes).toUserResponse()
+        return userResponses.of(userService.setPicture(requester, parseObjectId(userId), picture.bytes))
     }
 
     @DeleteMapping("/{userId}/picture")
     fun deletePicture(@PathVariable userId: String): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.deletePicture(requester, parseObjectId(userId)).toUserResponse()
+        return userResponses.of(userService.deletePicture(requester, parseObjectId(userId)))
     }
 
     @GetMapping("/{userId}/picture")
@@ -145,16 +146,16 @@ class UserController(
         val created = userService.createUser(
             requester, request.email, request.displayName, request.phoneNumber, request.roleTagIds.map(::parseObjectId),
         )
-        return CreatedUserResponse(created.user.toUserResponse(), created.generatedPassword)
+        return CreatedUserResponse(userResponses.of(created.user), created.generatedPassword)
     }
 
     @PutMapping("/{userId}")
     fun updateUser(@PathVariable userId: String, @Valid @RequestBody request: UpdateUserRequest): UserResponse {
         val requester = accessService.requester(requireAuth())
-        return userService.updateUser(
+        return userResponses.of(userService.updateUser(
             requester, parseObjectId(userId), request.email, request.displayName, request.phoneNumber,
             request.roleTagIds.map(::parseObjectId),
-        ).toUserResponse()
+        ))
     }
 
     @DeleteMapping("/{userId}")

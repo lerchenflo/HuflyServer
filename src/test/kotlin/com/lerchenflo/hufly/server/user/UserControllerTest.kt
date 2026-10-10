@@ -68,6 +68,14 @@ class UserControllerTest {
     }
 
     @Test
+    fun `me says the stable manages the login it created`() {
+        getMe(rider.id).andExpect {
+            status { isOk() }
+            jsonPath("$.user.loginManagedByStable") { value(true) }
+        }
+    }
+
+    @Test
     fun `me tells a member they are not admin and lists their permissions`() {
         getMe(rider.id).andExpect {
             jsonPath("$.isAdmin") { value(false) }

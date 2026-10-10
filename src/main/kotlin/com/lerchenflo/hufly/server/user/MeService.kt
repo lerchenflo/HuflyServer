@@ -5,7 +5,6 @@ import com.lerchenflo.hufly.server.stable.StableLookupService
 import com.lerchenflo.hufly.server.stable.model.toStableResponse
 import com.lerchenflo.hufly.server.user.model.MeResponse
 import com.lerchenflo.hufly.server.user.model.User
-import com.lerchenflo.hufly.server.user.model.toUserResponse
 import org.springframework.stereotype.Service
 
 /** `GET /users/me`, also answered after creating an own stable. */
@@ -13,9 +12,10 @@ import org.springframework.stereotype.Service
 class MeService(
     private val accessService: AccessService,
     private val stableLookupService: StableLookupService,
+    private val userResponses: UserResponses,
 ) {
     fun me(member: User) = MeResponse(
-        user = member.toUserResponse(),
+        user = userResponses.of(member),
         isAdmin = accessService.isAdmin(member),
         stable = stableLookupService.getById(member.stableId).toStableResponse(),
         permissions = accessService.effectivePermissions(member),

@@ -10,6 +10,7 @@ import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testStable
+import com.lerchenflo.hufly.server.testdata.testAccount
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
@@ -65,6 +66,20 @@ class UserSyncControllerTest {
             jsonPath("$.updatedEntries[1].id") { value(admin.id.toHexString()) }
             jsonPath("$.updatedEntries[0].hashedPassword") { doesNotExist() }
             jsonPath("$.moreEntries") { value(false) }
+        }
+    }
+
+    @Test
+    fun `user sync tells whether the stable manages each member's login`() {
+        val login = userRepository.accounts.save(testAccount(email = "self@hufly.test"))
+        val self = userRepository.save(testUser(email = "self@hufly.test", updatedAt = 50).copy(accountId = login.id))
+
+        sync("/users/sync", "[]").andExpect {
+            status { isOk() }
+            jsonPath("$.updatedEntries[0].id") { value(rider.id.toHexString()) }
+            jsonPath("$.updatedEntries[0].loginManagedByStable") { value(true) }
+            jsonPath("$.updatedEntries[2].id") { value(self.id.toHexString()) }
+            jsonPath("$.updatedEntries[2].loginManagedByStable") { value(false) }
         }
     }
 

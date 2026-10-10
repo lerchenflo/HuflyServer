@@ -11,9 +11,11 @@ data class UserResponse(
     val roleTagIds: List<String>,
     val updatedAt: Long,
     val updatedBy: String,
+    /** False for self-registered members: the admin cannot reset their password or change their login email. */
+    val loginManagedByStable: Boolean,
 )
 
-fun User.toUserResponse() = UserResponse(
+fun User.toUserResponse(loginManagedByStable: Boolean) = UserResponse(
     id = id.toHexString(),
     stableId = stableId.toHexString(),
     email = email,
@@ -23,4 +25,5 @@ fun User.toUserResponse() = UserResponse(
     roleTagIds = roleTagIds.map { it.toHexString() },
     updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
+    loginManagedByStable = loginManagedByStable,
 )
