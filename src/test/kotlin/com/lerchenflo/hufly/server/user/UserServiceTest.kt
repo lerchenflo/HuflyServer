@@ -57,6 +57,7 @@ class UserServiceTest {
     private val userService = UserService(
         userRepository, userRepository.accounts, joinRequestRepository, stableRepository, stableDeletionService, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
         absenceService, pictureStore, accessService, hashEncoder, clock,
+        com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter(4, clock),
     )
 
     private val admin = testUser(email = "admin@hufly.test")
@@ -439,6 +440,18 @@ class UserServiceTest {
         userService.deleteUser(admin, rider.id)
         assertStatus(HttpStatus.NOT_FOUND) { userService.picture(admin, rider.id) }
         assertTrue(pictureStore.pictures.isEmpty())
+    }
+
+    @Test
+    fun `a fifth profile picture upload within a minute answers 429`() {
+        val png = com.lerchenflo.hufly.server.core.picture.testPng()
+        repeat(4) { userService.setMyPicture(rider, png) }
+
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS) { userService.setMyPicture(rider, png) }
+        userService.setPicture(admin, rider.id, png)
+
+        clock.advance(minutes(1))
+        userService.setMyPicture(rider, png)
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
+import com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter
 import com.lerchenflo.hufly.server.core.picture.pictureUrl
 import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.horse.model.Horse
@@ -36,6 +37,7 @@ class HorseService(
     private val pictureStore: PictureStore,
     private val accessService: AccessService,
     private val clock: Clock,
+    private val pictureUploadLimiter: PictureUploadLimiter,
 ) {
     data class HorseData(
         val name: String,
@@ -120,6 +122,7 @@ class HorseService(
     /** HOR-3: whoever may edit the horse sets its picture. */
     fun setPicture(requester: User, horseId: ObjectId, upload: ByteArray): Horse {
         val horse = editableHorse(requester, horseId, Permission.HORSE_EDIT)
+        pictureUploadLimiter.upload(requester.accountId)
         pictureStore.save(PictureKind.HORSE, horse.id, toStoredPicture(upload))
         val now = clock.millis()
         return horseRepository.save(

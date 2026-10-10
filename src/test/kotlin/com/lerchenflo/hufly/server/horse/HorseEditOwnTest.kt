@@ -62,6 +62,7 @@ class HorseEditOwnTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val horseService = HorseService(
         horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, FakePictureStore(), accessService, clock,
+        com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter(4, clock),
     )
     private val foodPlanService = FoodPlanService(foodPlanRepository, horseRepository, tagRepository, accessService, clock)
     private val logService = HorseLogService(logRepository, horseRepository, tagRepository, userRepository, accessService, versionCounterService, clock)

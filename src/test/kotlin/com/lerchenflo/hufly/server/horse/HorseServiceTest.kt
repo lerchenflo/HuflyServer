@@ -17,6 +17,7 @@ import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.epochDay
+import com.lerchenflo.hufly.server.testdata.minutes
 import com.lerchenflo.hufly.server.testdata.seconds
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
@@ -44,7 +45,9 @@ class HorseServiceTest {
     private val groupRepository = com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository()
     private val conflictRepository = com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository()
     private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
-    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, pictureStore, accessService, clock)
+    private val horseService = HorseService(horseRepository, userRepository, foodPlanRepository, groupRepository, conflictRepository, pictureStore, accessService, clock,
+        com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter(4, clock),
+    )
 
     private val admin = testUser()
     private val editorTag = testTag(permissions = setOf(Permission.HORSE_EDIT))
@@ -284,6 +287,29 @@ class HorseServiceTest {
         assertStatus(HttpStatus.NOT_FOUND) { horseService.setPicture(admin, foreign.id, testPng()) }
         assertStatus(HttpStatus.NOT_FOUND) { horseService.setPicture(admin, removed.id, testPng()) }
         assertTrue(pictureStore.pictures.isEmpty())
+    }
+
+    @Test
+    fun `a fifth picture upload within a minute answers 429, broken uploads count too`() {
+        val horse = horseRepository.save(testHorse())
+        repeat(2) { assertStatus(HttpStatus.BAD_REQUEST) { horseService.setPicture(editor, horse.id, byteArrayOf(1)) } }
+        repeat(2) { horseService.setPicture(editor, horse.id, testPng()) }
+
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS) { horseService.setPicture(editor, horse.id, testPng()) }
+        horseService.setPicture(admin, horse.id, testPng())
+
+        clock.advance(minutes(1))
+        horseService.setPicture(editor, horse.id, testPng())
+    }
+
+    @Test
+    fun `refused picture uploads without permission do not count`() {
+        val horse = horseRepository.save(testHorse())
+        repeat(5) { assertStatus(HttpStatus.FORBIDDEN) { horseService.setPicture(rider, horse.id, testPng()) } }
+        val riderTag = tagRepository.save(testTag(permissions = setOf(Permission.HORSE_EDIT)))
+        val promoted = userRepository.save(rider.copy(roleTagIds = listOf(riderTag.id)))
+
+        horseService.setPicture(promoted, horse.id, testPng())
     }
 
     @Test

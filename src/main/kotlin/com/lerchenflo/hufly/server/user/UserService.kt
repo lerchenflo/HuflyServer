@@ -13,6 +13,7 @@ import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
 import com.lerchenflo.hufly.server.core.picture.pictureUrl
+import com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter
 import com.lerchenflo.hufly.server.core.picture.toStoredPicture
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.core.security.generatePassword
@@ -53,6 +54,7 @@ class UserService(
     private val accessService: AccessService,
     private val hashEncoder: HashEncoder,
     private val clock: Clock,
+    private val pictureUploadLimiter: PictureUploadLimiter,
 ) {
     data class CreatedUser(val user: User, val generatedPassword: String)
 
@@ -217,6 +219,7 @@ class UserService(
     }
 
     private fun storePicture(requester: User, target: User, upload: ByteArray): User {
+        pictureUploadLimiter.upload(requester.accountId)
         pictureStore.save(PictureKind.USER, target.id, toStoredPicture(upload))
         val now = clock.millis()
         return userRepository.save(
