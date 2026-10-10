@@ -165,6 +165,25 @@ class RealtimeIntegrationTest {
     }
 
     @Test
+    fun `a resolved join request also hints the applicant, a pending one does not`() {
+        val stableId = ObjectId.get()
+        val admin = member(testUser(stableId = stableId))
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(id = stableId, adminUserId = admin.id))
+        val applicant = member(testUser(stableId = ObjectId.get()))
+        val applicantInbox = subscribe(connect(applicant.id))
+        val request = com.lerchenflo.hufly.server.account.model.JoinRequest(
+            accountId = applicant.accountId, stableId = stableId,
+            status = com.lerchenflo.hufly.server.account.model.JoinRequestStatus.PENDING, createdAt = 0L, updatedAt = 0L,
+        )
+
+        joinRequestRepository.save(request)
+        assertTrue(applicantInbox.nothing())
+
+        joinRequestRepository.save(request.copy(status = com.lerchenflo.hufly.server.account.model.JoinRequestStatus.DECLINED, updatedAt = 1L))
+        assertEquals(hint("joinRequest"), applicantInbox.next())
+    }
+
+    @Test
     fun `a live connection closes once its login session ends`() {
         val user = member(testUser())
         val session = refreshTokenRepository.save(

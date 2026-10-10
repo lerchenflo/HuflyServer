@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.realtime
 
 import com.lerchenflo.hufly.server.absence.model.Absence
 import com.lerchenflo.hufly.server.account.model.JoinRequest
+import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
 import com.lerchenflo.hufly.server.event.model.EventOccurrence
@@ -58,7 +59,10 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
             is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
             is Absence -> Triple(HintTarget.Stable(saved.stableId), "absence", saved.id)
-            is JoinRequest -> Triple(HintTarget.StableAdmin(saved.stableId), "joinRequest", saved.id)
+            is JoinRequest -> {
+                if (saved.status != JoinRequestStatus.PENDING) queueOrSend(notifier, HintTarget.Account(saved.accountId), "joinRequest", saved.id)
+                Triple(HintTarget.StableAdmin(saved.stableId), "joinRequest", saved.id)
+            }
             else -> return
         }
         queueOrSend(notifier, target, collection, id)
