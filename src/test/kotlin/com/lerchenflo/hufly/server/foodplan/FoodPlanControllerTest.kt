@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.request
 import tools.jackson.databind.ObjectMapper
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** FOD-1..FOD-4: HTTP mapping, validation and sync. Business rules live in FoodPlanServiceTest. */
 @SpringBootTest
@@ -83,7 +85,22 @@ class FoodPlanControllerTest {
             jsonPath("$.entries[0].slot") { value("MORNING") }
             jsonPath("$.entries[0].foodTagId") { value(hay.id.toHexString()) }
             jsonPath("$.entries[0].amountComment") { value("2 Gabeln") }
+            jsonPath("$.createdByUserId") { value(admin.id.toHexString()) }
         }
+    }
+
+    @Test
+    fun `every food plan answer names its creator, null for plans from before`() {
+        val id = createPlan()
+        val creator = admin.id.toHexString()
+
+        call(HttpMethod.PUT, "/foodplans/$id", planJson(name = "Winter")).andExpect { jsonPath("$.createdByUserId") { value(creator) } }
+        call(HttpMethod.POST, "/foodplans/$id/copy", """{"name":"Kopie"}""").andExpect { jsonPath("$.createdByUserId") { value(creator) } }
+        foodPlanRepository.save(foodPlanRepository.plans.single { it.id.toHexString() == id }.copy(createdByUserId = null))
+        val synced = objectMapper.readTree(call(HttpMethod.POST, "/foodplans/sync", "[]").andReturn().response.contentAsString)["updatedEntries"]
+        val creators = synced.associate { it["id"].asString() to it["createdByUserId"] }
+        assertTrue(creators.getValue(id).isNull)
+        assertEquals(listOf(creator), creators.filterKeys { it != id }.values.map { it.asString() })
     }
 
     @Test

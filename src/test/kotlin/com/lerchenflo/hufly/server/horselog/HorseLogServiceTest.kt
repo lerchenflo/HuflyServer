@@ -101,6 +101,24 @@ class HorseLogServiceTest {
     }
 
     @Test
+    fun `co-riders write the log of their horse, only of that horse`() {
+        val shared = horseRepository.save(testHorse().copy(coRiderUserIds = listOf(rider.id)))
+        val other = testHorse().also { horseRepository.save(it) }
+
+        val entry = logService.createEntry(rider, data(horseId = shared.id))
+        logService.updateEntry(rider, entry.id, data(horseId = shared.id).copy(comment = "Tetanus"))
+        assertEquals("Tetanus", stored(entry.id).comment)
+
+        assertStatus(HttpStatus.FORBIDDEN) { logService.createEntry(rider, data(horseId = other.id)) }
+        assertStatus(HttpStatus.FORBIDDEN) { logService.updateEntry(rider, entry.id, data(horseId = other.id)) }
+        val foreignEntry = logService.createEntry(writer, data(horseId = other.id))
+        assertStatus(HttpStatus.FORBIDDEN) { logService.updateEntry(rider, foreignEntry.id, data(horseId = shared.id)) }
+
+        logService.deleteEntry(rider, entry.id)
+        assertTrue(stored(entry.id).deleted)
+    }
+
+    @Test
     fun `horse, activity tag and done-by user must belong to the own stable`() {
         val foreignHorse = horseRepository.save(testHorse(stableId = OTHER_STABLE_ID))
         val deletedHorse = horseRepository.save(testHorse(deleted = true))

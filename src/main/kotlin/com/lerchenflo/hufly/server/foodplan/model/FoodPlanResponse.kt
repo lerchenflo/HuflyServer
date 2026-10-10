@@ -13,6 +13,8 @@ data class FoodPlanResponse(
     val entries: List<FoodPlanEntryResponse>,
     val updatedAt: Long,
     val updatedBy: String,
+    /** Null for plans created before the creator was stored. */
+    val createdByUserId: String?,
 )
 
 fun FoodPlan.toFoodPlanResponse() = FoodPlanResponse(
@@ -22,4 +24,5 @@ fun FoodPlan.toFoodPlanResponse() = FoodPlanResponse(
     entries = entries.map { FoodPlanEntryResponse(it.slot, it.foodTagId.toHexString(), it.amountComment) },
     updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
+    createdByUserId = createdByUserId?.toHexString(),
 )

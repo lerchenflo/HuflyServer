@@ -23,7 +23,10 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
-/** Writing needs HORSE_LOG_WRITE, or HORSE_EDIT_OWN for entries of own horses; every member reads the whole log. */
+/**
+ * Writing needs HORSE_LOG_WRITE, or for entries of a horse HORSE_EDIT_OWN as its owner or being one of its co-riders;
+ * every member reads the whole log.
+ */
 @Service
 class HorseLogService(
     private val logRepository: HorseLogRepository,
@@ -120,8 +123,13 @@ class HorseLogService(
     }
 
     private fun requireWriter(requester: User, horseIds: List<ObjectId>) {
-        val ownerIds = horseIds.map { id -> horseRepository.findById(id)?.takeIf { it.stableId == requester.stableId }?.ownerUserId }
-        accessService.requireHorsePermission(requester, Permission.HORSE_LOG_WRITE, ownerIds)
+        if (Permission.HORSE_LOG_WRITE in accessService.effectivePermissions(requester)) return
+        val horses = horseIds.map { id -> horseRepository.findById(id)?.takeIf { it.stableId == requester.stableId } }
+        val allowed = horses.all { horse ->
+            horse != null && (requester.id in horse.coRiderUserIds ||
+                accessService.hasHorsePermission(requester, Permission.HORSE_LOG_WRITE, listOf(horse.ownerUserId)))
+        }
+        if (!allowed) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed")
     }
 
     private fun stableEntry(requester: User, entryId: ObjectId): HorseLogEntry =

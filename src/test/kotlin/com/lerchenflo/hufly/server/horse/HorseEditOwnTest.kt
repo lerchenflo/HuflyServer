@@ -150,13 +150,16 @@ class HorseEditOwnTest {
     // Horse log
 
     @Test
-    fun `an owner writes the log of their own horses only`() {
+    fun `an owner writes the log of their own horses only, and of horses they co-ride`() {
+        val wind = horseRepository.save(testHorse(name = "Wind").copy(ownerUserId = otherOwner.id))
         val entry = logService.createEntry(owner, logData(blitz))
         logService.updateEntry(owner, entry.id, logData(donner))
+        logService.updateEntry(owner, entry.id, logData(sturm))
+        logService.updateEntry(owner, entry.id, logData(blitz))
 
-        assertStatus(HttpStatus.FORBIDDEN) { logService.updateEntry(owner, entry.id, logData(sturm)) }
-        assertStatus(HttpStatus.FORBIDDEN) { logService.createEntry(owner, logData(sturm)) }
-        val foreign = logService.createEntry(admin, logData(sturm))
+        assertStatus(HttpStatus.FORBIDDEN) { logService.updateEntry(owner, entry.id, logData(wind)) }
+        assertStatus(HttpStatus.FORBIDDEN) { logService.createEntry(owner, logData(wind)) }
+        val foreign = logService.createEntry(admin, logData(wind))
         assertStatus(HttpStatus.FORBIDDEN) { logService.updateEntry(owner, foreign.id, logData(blitz)) }
         assertStatus(HttpStatus.FORBIDDEN) { logService.deleteEntry(owner, foreign.id) }
         logService.deleteEntry(owner, entry.id)
