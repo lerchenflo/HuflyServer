@@ -72,6 +72,8 @@ class RealtimeIntegrationTest {
     @Autowired lateinit var userRepository: UserRepository
     @Autowired lateinit var accountRepository: com.lerchenflo.hufly.server.repository.AccountRepository
     @Autowired lateinit var joinRequestRepository: com.lerchenflo.hufly.server.repository.JoinRequestRepository
+    @Autowired lateinit var refreshTokenRepository: com.lerchenflo.hufly.server.repository.RefreshTokenRepository
+    @Autowired lateinit var socketSessions: SocketSessions
 
     /** Saves the membership with its login, as every member has one. */
     private fun member(user: com.lerchenflo.hufly.server.user.model.User) =
@@ -97,14 +99,14 @@ class RealtimeIntegrationTest {
         fun nothing(): Boolean = messages.poll(500, TimeUnit.MILLISECONDS) == null
     }
 
-    private fun connect(userId: ObjectId?): StompSession {
+    private fun connect(userId: ObjectId?, sessionId: ObjectId? = null): StompSession {
         val client = WebSocketStompClient(StandardWebSocketClient()).apply {
             messageConverter = object : StringMessageConverter() {
                 override fun supportsMimeType(headers: MessageHeaders?) = true
             }
         }
         val headers = WebSocketHttpHeaders()
-        if (userId != null) headers.setBearerAuth(jwtService.generateAccessToken(userId))
+        if (userId != null) headers.setBearerAuth(jwtService.generateAccessToken(userId, sessionId))
         return client.connectAsync("ws://localhost:$port/ws", headers, object : StompSessionHandlerAdapter() {})
             .get(5, TimeUnit.SECONDS)
     }
@@ -143,9 +145,13 @@ class RealtimeIntegrationTest {
     }
 
     @Test
-    fun `join requests send a hint to the stable`() {
+    fun `join requests send a hint only to the stable admin's devices`() {
         val stableId = ObjectId.get()
-        val inbox = subscribe(connect(member(testUser(stableId = stableId)).id))
+        val admin = member(testUser(stableId = stableId))
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(id = stableId, adminUserId = admin.id))
+        val other = member(testUser(stableId = stableId))
+        val adminInbox = subscribe(connect(admin.id))
+        val memberInbox = subscribe(connect(other.id))
 
         joinRequestRepository.save(
             com.lerchenflo.hufly.server.account.model.JoinRequest(
@@ -154,7 +160,48 @@ class RealtimeIntegrationTest {
             )
         )
 
-        assertEquals(hint("joinRequest"), inbox.next())
+        assertEquals(hint("joinRequest"), adminInbox.next())
+        assertTrue(memberInbox.nothing())
+    }
+
+    @Test
+    fun `a live connection closes once its login session ends`() {
+        val user = member(testUser())
+        val session = refreshTokenRepository.save(
+            com.lerchenflo.hufly.server.authentication.model.RefreshToken(
+                userId = user.accountId, hashedToken = ObjectId.get().toHexString(), expiresAt = Long.MAX_VALUE, createdAt = 0L,
+            )
+        )
+        val stomp = connect(user.id, session.id)
+        val other = connect(user.id, refreshTokenRepository.save(session.copy(id = ObjectId.get(), hashedToken = "other")).id)
+
+        socketSessions.closeEnded()
+        assertTrue(stomp.isConnected)
+
+        refreshTokenRepository.deleteById(session.id)
+        socketSessions.closeEnded()
+
+        assertTrue(waitUntil { !stomp.isConnected })
+        assertTrue(other.isConnected)
+    }
+
+    @Test
+    fun `live connections close once the login is deleted`() {
+        val user = member(testUser())
+        val stomp = connect(user.id)
+
+        accountRepository.save(accountRepository.findById(user.accountId)!!.copy(deleted = true))
+        socketSessions.closeEnded()
+
+        assertTrue(waitUntil { !stomp.isConnected })
+    }
+
+    private fun waitUntil(condition: () -> Boolean): Boolean {
+        repeat(30) {
+            if (condition()) return true
+            Thread.sleep(100)
+        }
+        return condition()
     }
 
     @Test

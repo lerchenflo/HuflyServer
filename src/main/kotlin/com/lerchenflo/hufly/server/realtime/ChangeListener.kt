@@ -58,8 +58,7 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is TaskOccurrence -> Triple(HintTarget.Stable(saved.stableId), "taskoccurrences", saved.id)
             is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
             is Absence -> Triple(HintTarget.Stable(saved.stableId), "absence", saved.id)
-            // Every member gets the hint, but only the admin may list the requests.
-            is JoinRequest -> Triple(HintTarget.Stable(saved.stableId), "joinRequest", saved.id)
+            is JoinRequest -> Triple(HintTarget.StableAdmin(saved.stableId), "joinRequest", saved.id)
             else -> return
         }
         queueOrSend(notifier, target, collection, id)

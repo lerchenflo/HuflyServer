@@ -13,15 +13,17 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration
 
 /**
  * STOMP over WebSocket at `/ws`. The handshake passes the normal security chain, so it needs a Bearer access token;
  * the user's id becomes the session principal. Clients only receive: they may subscribe to their own
- * `/user/queue/changes` and nothing else, and they cannot send.
+ * `/user/queue/changes` and nothing else, and they cannot send. Sockets whose login session ended are closed
+ * ([SocketSessions]).
  */
 @Configuration
 @EnableWebSocketMessageBroker
-class StompConfig : WebSocketMessageBrokerConfigurer {
+class StompConfig(private val socketSessions: SocketSessions) : WebSocketMessageBrokerConfigurer {
 
     // iOS clients get no WebSocket pings, so STOMP heart-beats are how they notice a dead socket.
     private val heartbeatScheduler = ThreadPoolTaskScheduler().apply {
@@ -39,6 +41,10 @@ class StompConfig : WebSocketMessageBrokerConfigurer {
             .setHeartbeatValue(longArrayOf(HEARTBEAT_MILLIS, HEARTBEAT_MILLIS))
             .setTaskScheduler(heartbeatScheduler)
         registry.setUserDestinationPrefix("/user")
+    }
+
+    override fun configureWebSocketTransport(registration: WebSocketTransportRegistration) {
+        registration.addDecoratorFactory(socketSessions)
     }
 
     override fun configureClientInboundChannel(registration: ChannelRegistration) {
