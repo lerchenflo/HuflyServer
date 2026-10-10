@@ -6,20 +6,20 @@ import org.bson.types.ObjectId
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.mongodb.core.MongoTemplate
-import org.springframework.data.mongodb.core.query.Criteria
-import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.mongodb.core.query.Update
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor
+import org.springframework.context.annotation.Bean
+import org.springframework.data.mongodb.MongoDatabaseFactory
 import org.springframework.stereotype.Component
 
 /**
  * Moves logins out of `users` into `accounts` (same id, so tokens and sessions stay valid) and gives every stable an
  * invite code. Runs while the context starts, before the web server accepts requests; idempotent. A failure stops
- * the startup: a membership saved without its account would lose the password for good.
+ * the startup: a membership saved without its account would lose the password for good. Works on the raw database
+ * and runs before `mongoTemplate`, whose index creation needs the migrated data (unique `users.accountId`).
  */
 @Component
 class AccountMigration(
-    private val mongoTemplate: MongoTemplate,
+    private val databaseFactory: MongoDatabaseFactory,
     @Value("\${migration.accounts.enabled:true}") private val enabled: Boolean,
 ) : InitializingBean {
 
@@ -30,7 +30,8 @@ class AccountMigration(
     }
 
     fun migrate() {
-        val users = mongoTemplate.getCollection("users")
+        val database = databaseFactory.mongoDatabase
+        val users = database.getCollection("users")
         val legacy = Document("hashedPassword", Document("\$exists", true))
         val pending = users.countDocuments(legacy)
         if (pending > 0) {
@@ -61,21 +62,29 @@ class AccountMigration(
         if (users.listIndexes().any { it.getString("name") == "email" }) users.dropIndex("email")
         addInviteCodes()
 
-        val accountIds = mongoTemplate.getCollection("accounts").distinct("_id", ObjectId::class.java).toSet()
+        val accountIds = database.getCollection("accounts").distinct("_id", ObjectId::class.java).toSet()
         val orphans = users.distinct("accountId", ObjectId::class.java).count { it !in accountIds }
         check(orphans == 0) { "$orphans memberships without an account" }
     }
 
     private fun addInviteCodes() {
-        val missing = Query(Criteria.where("inviteCode").exists(false))
-        mongoTemplate.find(missing, Document::class.java, "stables").forEach { stable ->
+        val stables = databaseFactory.mongoDatabase.getCollection("stables")
+        val missing = Document("inviteCode", Document("\$exists", false))
+        stables.find(missing).forEach { stable ->
             val code = generateSequence { InviteCodes.generate() }
-                .first { !mongoTemplate.exists(Query(Criteria.where("inviteCode").`is`(it)), "stables") }
-            mongoTemplate.updateFirst(
-                Query(Criteria.where("_id").`is`(stable["_id"]).and("inviteCode").exists(false)),
-                Update().set("inviteCode", code),
-                "stables",
-            )
+                .first { stables.countDocuments(Document("inviteCode", it)) == 0L }
+            stables.updateOne(Document("_id", stable["_id"]).append("inviteCode", Document("\$exists", false)), Document("\$set", Document("inviteCode", code)))
+        }
+    }
+
+    companion object {
+        @Bean
+        @JvmStatic
+        fun migrateBeforeMongoTemplate() = BeanFactoryPostProcessor { beanFactory ->
+            if (beanFactory.containsBeanDefinition("mongoTemplate")) {
+                val template = beanFactory.getBeanDefinition("mongoTemplate")
+                template.setDependsOn(*template.dependsOn.orEmpty(), "accountMigration")
+            }
         }
     }
 }
