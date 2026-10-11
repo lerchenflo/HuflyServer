@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.account
 
 import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.account.model.AccountResponse
+import com.lerchenflo.hufly.server.account.model.MembershipResponse
 import com.lerchenflo.hufly.server.account.model.JoinRequest
 import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
 import com.lerchenflo.hufly.server.account.model.OwnJoinRequestResponse
@@ -12,7 +13,7 @@ import com.lerchenflo.hufly.server.core.notification.JoinRequested
 import com.lerchenflo.hufly.server.core.security.LoginGuard
 import com.lerchenflo.hufly.server.repository.JoinRequestRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
-import com.lerchenflo.hufly.server.repository.UserRepository
+import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.stable.InviteCodes
 import com.lerchenflo.hufly.server.stable.StableOnboardingService
 import com.lerchenflo.hufly.server.stable.model.Stable
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Service
 /** What an account does for itself before (and besides) being in a stable: its join request and an own stable. */
 @Service
 class AccountService(
-    private val userRepository: UserRepository,
+    private val accessService: AccessService,
     private val stableRepository: StableRepository,
     private val joinRequestRepository: JoinRequestRepository,
     private val onboarding: StableOnboardingService,
@@ -40,15 +41,26 @@ class AccountService(
         joinRequest = joinRequestRepository.findFirstByAccountIdOrderByCreatedAtDesc(account.id)
             ?.takeIf { it.status == JoinRequestStatus.PENDING || it.status == JoinRequestStatus.DECLINED }
             ?.let { request -> stableRepository.findById(request.stableId)?.takeUnless { it.deleted }?.let { toOwnResponse(request, it) } },
+        memberships = accessService.memberships(account.id).mapNotNull { member ->
+            val stable = stableRepository.findById(member.stableId)?.takeUnless { it.deleted } ?: return@mapNotNull null
+            MembershipResponse(
+                userId = member.id.toHexString(),
+                stableId = stable.id.toHexString(),
+                stableName = stable.name,
+                stablePlace = stable.place,
+                isAdmin = stable.adminUserId == member.id,
+                createdAt = member.createdAt,
+            )
+        },
     )
 
     /**
      * Asks the stable with invite code [codeInput] to take the account in, replacing an earlier request. Wrong codes
      * count per account (429 after too many), so codes cannot be guessed. The admin hears about it by push, but only
-     * once a day per stable, so asking again after a decline does not spam them.
+     * once a day per stable, so asking again after a decline does not spam them. Members of other stables may ask too,
+     * up to the stable limit.
      */
     fun requestToJoin(account: Account, codeInput: String): OwnJoinRequestResponse {
-        if (userRepository.findFirstByAccountIdAndDeletedFalse(account.id) != null) throw StableOnboardingService.alreadyMember()
         val key = account.id.toHexString()
         loginGuard.checkJoinCode(key)
         val stable = InviteCodes.normalize(codeInput)?.let(stableRepository::findByInviteCodeAndDeletedFalse)
@@ -56,6 +68,8 @@ class AccountService(
             loginGuard.joinCodeFailed(key)
             throw CodedException(HttpStatus.NOT_FOUND, INVALID_CODE, "Unknown invite code")
         }
+        if (accessService.memberships(account.id).any { it.stableId == stable.id }) throw StableOnboardingService.alreadyMember()
+        onboarding.requireRoomForStable(account.id)
         val now = clock.millis()
         val askedRecently = joinRequestRepository.findByAccountIdAndStableId(account.id, stable.id).any { it.createdAt > now - MILLIS_PER_DAY }
         val request = JoinRequest(accountId = account.id, stableId = stable.id, status = JoinRequestStatus.PENDING, createdAt = now, updatedAt = now)

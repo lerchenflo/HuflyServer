@@ -39,6 +39,12 @@ class MongoLegacyStartupTest {
                         .append("roleTagIds", java.util.ArrayList<ObjectId>()).append("createdAt", 1L)
                         .append("updatedAt", 2L).append("updatedBy", id).append("deleted", false)
                 })
+                // The index of the one-stable-per-account days must give way to the per-stable one.
+                users.createIndex(
+                    Document("accountId", 1),
+                    com.mongodb.client.model.IndexOptions().name("one_membership_per_account").unique(true)
+                        .partialFilterExpression(Document("deleted", false).append("accountId", Document("\$exists", true))),
+                )
             }
         }
     }
@@ -46,9 +52,12 @@ class MongoLegacyStartupTest {
     @Autowired lateinit var mongoTemplate: MongoTemplate
 
     @Test
-    fun `legacy members get their accounts and the one-membership index`() {
+    fun `legacy members get their accounts and the per-stable membership index`() {
         assertEquals(2L, mongoTemplate.getCollection("accounts").countDocuments())
-        val index = mongoTemplate.getCollection("users").listIndexes().first { it.getString("name") == "one_membership_per_account" }
+        val indexes = mongoTemplate.getCollection("users").listIndexes().toList()
+        val index = indexes.first { it.getString("name") == "one_membership_per_stable" }
         assertEquals(true, index.getBoolean("unique"))
+        assertEquals(Document("accountId", 1).append("stableId", 1), index.get("key", Document::class.java))
+        assertEquals(null, indexes.firstOrNull { it.getString("name") == "one_membership_per_account" })
     }
 }

@@ -23,15 +23,21 @@ class AccessService(
     private val tagRepository: TagRepository,
 ) {
     /**
-     * The requester's stable membership; call with the id from `requireAuth()`. An account without a stable answers
-     * 403 `NO_STABLE`, so it never reaches stable data. A deleted account keeps a valid access token for up to 15
-     * minutes and answers 401.
+     * The requester's stable membership; call with the id from `requireAuth()`. [stableId] (header `X-Stable-Id`)
+     * picks one of several; without it the oldest membership answers, so older apps keep working. No live membership
+     * there answers 403 `NO_STABLE`, so an account never reaches other stables' data. A deleted account keeps a valid
+     * access token for up to 15 minutes and answers 401.
      */
-    fun requester(accountId: ObjectId): User {
+    fun requester(accountId: ObjectId, stableId: ObjectId? = requestedStableId()): User {
         val account = requireAccount(accountId)
-        return userRepository.findFirstByAccountIdAndDeletedFalse(account.id)
-            ?: throw CodedException(HttpStatus.FORBIDDEN, NO_STABLE, "Not a member of a stable")
+        val memberships = memberships(account.id)
+        return (if (stableId == null) memberships.firstOrNull() else memberships.firstOrNull { it.stableId == stableId })
+            ?: throw CodedException(HttpStatus.FORBIDDEN, NO_STABLE, "Not a member of this stable")
     }
+
+    /** The account's live memberships, oldest first. */
+    fun memberships(accountId: ObjectId): List<User> =
+        userRepository.findByAccountIdAndDeletedFalse(accountId).sortedWith(compareBy({ it.createdAt }, { it.id }))
 
     /** For account-level endpoints (sessions, push tokens, settings, password) that work without a stable too. */
     fun requireAccount(accountId: ObjectId): Account =

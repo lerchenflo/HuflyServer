@@ -26,8 +26,9 @@ class AccountServiceTest {
     private val joinRequests = FakeJoinRequestRepository()
     private val published = mutableListOf<Any>()
     private val service = AccountService(
-        userRepository, stableRepository, joinRequests,
-        StableOnboardingService(userRepository, userRepository.accounts, stableRepository, joinRequests, HashEncoder(), clock),
+        com.lerchenflo.hufly.server.core.access.AccessService(userRepository, userRepository.accounts, stableRepository, com.lerchenflo.hufly.server.repository.FakeTagRepository()),
+        stableRepository, joinRequests,
+        StableOnboardingService(userRepository, userRepository.accounts, stableRepository, HashEncoder(), clock),
         LoginGuard(1000, 1000, 1000, 1000, 1000, clock),
         ApplicationEventPublisher { published += it },
         clock,

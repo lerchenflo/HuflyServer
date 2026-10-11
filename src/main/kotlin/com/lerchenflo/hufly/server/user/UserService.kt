@@ -138,26 +138,22 @@ class UserService(
     }
 
     /**
-     * Self-service deletion of the login (app and website), with or without a stable. The admin of a stable with
-     * other members must stay (only the operator can remove them); an admin alone in the stable deletes it with them.
+     * Self-service deletion of the login (app and website), with or without stables. The admin of a stable with
+     * other members must stay (only the operator can remove them), checked for every stable before anything changes;
+     * an admin alone in a stable deletes it with them.
      */
     fun deleteOwnAccount(account: Account, password: String) {
         if (!hashEncoder.matches(password, account.hashedPassword)) {
             throw CodedException(HttpStatus.BAD_REQUEST, "WRONG_PASSWORD", "Password is wrong")
         }
-        val membership = userRepository.findFirstByAccountIdAndDeletedFalse(account.id)
-        if (membership != null) {
-            if (accessService.isAdmin(membership)) {
-                val othersRemain = userRepository.findByStableIdAndDeletedFalse(membership.stableId).any { it.id != membership.id }
-                if (othersRemain) {
-                    throw CodedException(HttpStatus.CONFLICT, "STABLE_ADMIN", "The stable admin cannot delete the own account")
-                }
-                val stable = stableRepository.findById(membership.stableId)
-                if (stable != null) stableDeletionService.deleteStable(stable.id, stable.name)
-            } else {
-                eraseMembership(membership, membership.id)
-            }
+        val (adminOf, memberOf) = accessService.memberships(account.id).partition { accessService.isAdmin(it) }
+        if (adminOf.any { admin -> userRepository.findByStableIdAndDeletedFalse(admin.stableId).any { it.id != admin.id } }) {
+            throw CodedException(HttpStatus.CONFLICT, "STABLE_ADMIN", "The stable admin cannot delete the own account")
         }
+        adminOf.forEach { admin ->
+            stableRepository.findById(admin.stableId)?.let { stableDeletionService.deleteStable(it.id, it.name) }
+        }
+        memberOf.forEach { eraseMembership(it, it.id) }
         eraseAccount(account)
     }
 

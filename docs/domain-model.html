@@ -204,7 +204,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "user",
    "kind": "class",
    "name": "User",
-   "note": "A stable membership. Login data (email, password) lives in Account; accountId links them (one live membership per account for now, unique partial index; older memberships share their account's id). email is a display copy of the account's. Stables are separate user bases: nobody, admins included, sees another stable. The stable admin is Stable.adminUserId and bypasses role tags. Role is computed: ADMIN if id == Stable.adminUserId, else MEMBER.",
+   "note": "A stable membership. Login data (email, password) lives in Account; accountId links them (one live membership per account and stable, unique partial index; at most 10 stables per account; older memberships share their account's id). email is a display copy of the account's. Stables are separate user bases: nobody, admins included, sees another stable. The stable admin is Stable.adminUserId and bypasses role tags. Role is computed: ADMIN if id == Stable.adminUserId, else MEMBER.",
    "pkg": "user",
    "x": 29,
    "y": 30

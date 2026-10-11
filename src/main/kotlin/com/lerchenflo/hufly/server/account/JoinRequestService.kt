@@ -4,6 +4,7 @@ import com.lerchenflo.hufly.server.account.model.JoinRequest
 import com.lerchenflo.hufly.server.account.model.JoinRequestResponse
 import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
 import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.notification.JoinAccepted
 import com.lerchenflo.hufly.server.realtime.ChangeListener
@@ -27,6 +28,7 @@ class JoinRequestService(
     private val accountRepository: AccountRepository,
     private val userRepository: UserRepository,
     private val userService: UserService,
+    private val onboarding: StableOnboardingService,
     private val accessService: AccessService,
     private val changeListener: ChangeListener,
     private val events: ApplicationEventPublisher,
@@ -42,7 +44,10 @@ class JoinRequestService(
             }
     }
 
-    /** The account becomes a member with [roleTagIds]; 409 `ALREADY_MEMBER` if it got a stable meanwhile. */
+    /**
+     * The account becomes a member with [roleTagIds]; 409 `ALREADY_MEMBER` if it joined this stable meanwhile,
+     * `STABLE_LIMIT` if it reached the stable limit. Both close the request.
+     */
     fun accept(requester: User, requestId: ObjectId, roleTagIds: List<ObjectId>): User {
         accessService.requireAdmin(requester)
         userService.requireRoleTags(requester.stableId, roleTagIds)
@@ -51,6 +56,12 @@ class JoinRequestService(
         if (account == null) {
             resolve(request, JoinRequestStatus.WITHDRAWN)
             throw notFound()
+        }
+        try {
+            onboarding.requireRoomForStable(account.id)
+        } catch (e: CodedException) {
+            resolve(request, JoinRequestStatus.WITHDRAWN)
+            throw e
         }
         val now = clock.millis()
         val member = try {

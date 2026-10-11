@@ -15,6 +15,7 @@ import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
+import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.epochDay
 import com.lerchenflo.hufly.server.testdata.millis
 import com.lerchenflo.hufly.server.testdata.testHorse
@@ -125,8 +126,8 @@ class RealtimeIntegrationTest {
 
         horseRepository.save(testHorse())
 
-        assertEquals("""{"type":"changed","collection":"horses"}""", anna.next())
-        assertEquals("""{"type":"changed","collection":"horses"}""", ben.next())
+        assertEquals(hint("horses", STABLE_ID), anna.next())
+        assertEquals(hint("horses", STABLE_ID), ben.next())
         assertTrue(foreigner.nothing())
     }
 
@@ -138,10 +139,28 @@ class RealtimeIntegrationTest {
         val inbox = subscribe(connect(login))
 
         userRepository.save(testUser(stableId = stableId).copy(accountId = login))
-        assertEquals(hint("users"), inbox.next())
+        assertEquals(hint("users", stableId), inbox.next())
 
         horseRepository.save(testHorse(stableId = stableId))
-        assertEquals(hint("horses"), inbox.next())
+        assertEquals(hint("horses", stableId), inbox.next())
+    }
+
+    @Test
+    fun `an account in several stables gets the hints of each, until it leaves one`() {
+        val first = member(testUser(stableId = ObjectId.get()))
+        val secondStable = ObjectId.get()
+        val second = userRepository.save(testUser(stableId = secondStable).copy(accountId = first.accountId))
+        val inbox = subscribe(connect(first.accountId))
+
+        horseRepository.save(testHorse(stableId = first.stableId))
+        assertEquals(hint("horses", first.stableId), inbox.next())
+        horseRepository.save(testHorse(stableId = secondStable))
+        assertEquals(hint("horses", secondStable), inbox.next())
+
+        userRepository.save(second.copy(deleted = true))
+        horseRepository.save(testHorse(stableId = secondStable))
+        horseRepository.save(testHorse(stableId = first.stableId))
+        assertEquals(hint("horses", first.stableId), generateSequence { inbox.next() }.first { "\"users\"" !in it })
     }
 
     @Test
@@ -160,7 +179,7 @@ class RealtimeIntegrationTest {
             )
         )
 
-        assertEquals(hint("joinRequest"), adminInbox.next())
+        assertEquals(hint("joinRequest", stableId), adminInbox.next())
         assertTrue(memberInbox.nothing())
     }
 
@@ -180,7 +199,7 @@ class RealtimeIntegrationTest {
         assertTrue(applicantInbox.nothing())
 
         joinRequestRepository.save(request.copy(status = com.lerchenflo.hufly.server.account.model.JoinRequestStatus.DECLINED, updatedAt = 1L))
-        assertEquals(hint("joinRequest"), applicantInbox.next())
+        assertEquals(hint("joinRequest", stableId), applicantInbox.next())
     }
 
     @Test
@@ -240,9 +259,9 @@ class RealtimeIntegrationTest {
         )
         taskOccurrenceRepository.save(TaskOccurrence(stableId = stableId, taskId = ObjectId.get(), occurrenceDueAt = at, updatedAt = at, updatedBy = user))
 
-        assertEquals(hint("eventoccurrences"), inbox.next())
-        assertEquals(hint("eventoccurrenceanswers"), inbox.next())
-        assertEquals(hint("taskoccurrences"), inbox.next())
+        assertEquals(hint("eventoccurrences", stableId), inbox.next())
+        assertEquals(hint("eventoccurrenceanswers", stableId), inbox.next())
+        assertEquals(hint("taskoccurrences", stableId), inbox.next())
     }
 
     @Test
@@ -255,11 +274,11 @@ class RealtimeIntegrationTest {
             com.lerchenflo.hufly.server.note.model.StableNote(stableId = stableId, title = "Hufschmied", body = "", pinned = false,
                 visibleUntil = null, createdByUserId = ObjectId.get(), createdAt = at, updatedAt = at, updatedBy = ObjectId.get())
         )
-        assertEquals(hint("note"), inbox.next())
+        assertEquals(hint("note", stableId), inbox.next())
 
         noteService.markRead(reader, note.id)
 
-        assertEquals(hint("note"), inbox.next())
+        assertEquals(hint("note", stableId), inbox.next())
     }
 
     @Test
@@ -275,7 +294,7 @@ class RealtimeIntegrationTest {
             )
         )
 
-        assertEquals(hint("absence"), inbox.next())
+        assertEquals(hint("absence", stableId), inbox.next())
     }
 
     @Test
@@ -287,7 +306,7 @@ class RealtimeIntegrationTest {
 
         settingsRepository.save(UserSettings(annaUser.id, mapOf("theme" to "dark"), 0L))
 
-        assertEquals("""{"type":"changed","collection":"usersettings"}""", anna.next())
+        assertEquals(hint("usersettings", null), anna.next())
         assertTrue(ben.nothing())
     }
 
@@ -309,9 +328,11 @@ class RealtimeIntegrationTest {
         return admin.id to stableId
     }
 
-    private fun hint(collection: String, origin: ObjectId? = null) =
-        if (origin == null) """{"type":"changed","collection":"$collection"}"""
-        else """{"type":"changed","collection":"$collection","originSessionId":"${origin.toHexString()}"}"""
+    /** The JSON of a hint; [stableId] is null only for account data like settings. */
+    private fun hint(collection: String, stableId: ObjectId?, origin: ObjectId? = null) =
+        """{"type":"changed","collection":"$collection"""" +
+            (stableId?.let { ""","stableId":"${it.toHexString()}"""" } ?: "") +
+            (origin?.let { ""","originSessionId":"${it.toHexString()}"""" } ?: "") + "}"
 
     @Test
     fun `the hint of the document a request answers names the requesting session for every member`() {
@@ -324,8 +345,8 @@ class RealtimeIntegrationTest {
         val status = call("POST", "/tags", adminId, session, """{"name":"Hufschmied","type":"ACTIVITY","color":"#8d6e63"}""")
 
         assertEquals(200, status)
-        assertEquals(hint("tags", session), adminInbox.next())
-        assertEquals(hint("tags", session), memberInbox.next())
+        assertEquals(hint("tags", stableId, session), adminInbox.next())
+        assertEquals(hint("tags", stableId, session), memberInbox.next())
     }
 
     @Test
@@ -339,17 +360,17 @@ class RealtimeIntegrationTest {
         val status = call("DELETE", "/horses/${horse.id.toHexString()}", adminId, session)
 
         assertEquals(200, status)
-        assertEquals(setOf(hint("horses", session), hint("horsegroups")), setOf(inbox.next(), inbox.next()))
+        assertEquals(setOf(hint("horses", stableId, session), hint("horsegroups", stableId)), setOf(inbox.next(), inbox.next()))
     }
 
     @Test
     fun `a token without a session sends no origin`() {
-        val (adminId, _) = adminOfNewStable()
+        val (adminId, stableId) = adminOfNewStable()
         val inbox = subscribe(connect(adminId))
 
         call("POST", "/tags", adminId, null, """{"name":"Hafer","type":"FOOD","color":"#8d6e63"}""")
 
-        assertEquals(hint("tags"), inbox.next())
+        assertEquals(hint("tags", stableId), inbox.next())
     }
 
     @Test
@@ -362,7 +383,7 @@ class RealtimeIntegrationTest {
         val status = call("PUT", "/users/me/settings", owner.id, session, """{"values":{"theme":"light"},"expectedUpdatedAt":1000}""")
 
         assertEquals(200, status)
-        assertEquals(hint("usersettings", session), inbox.next())
+        assertEquals(hint("usersettings", null, session), inbox.next())
     }
 
     @Test

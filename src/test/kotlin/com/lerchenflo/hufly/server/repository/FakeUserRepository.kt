@@ -43,13 +43,13 @@ class FakeUserRepository(val accounts: FakeAccountRepository = FakeAccountReposi
     override fun findById(id: ObjectId): User? = users.firstOrNull { it.id == id }
 
     override fun insert(user: User): User {
-        val accountTaken = !user.deleted && users.any { it.accountId == user.accountId && !it.deleted }
-        if (accountTaken || users.any { it.id == user.id }) throw DuplicateKeyException("accountId")
+        val memberAlready = !user.deleted && users.any { it.accountId == user.accountId && it.stableId == user.stableId && !it.deleted }
+        if (memberAlready || users.any { it.id == user.id }) throw DuplicateKeyException("accountId_stableId")
         return save(user)
     }
 
-    override fun findFirstByAccountIdAndDeletedFalse(accountId: ObjectId): User? =
-        users.firstOrNull { it.accountId == accountId && !it.deleted }
+    override fun findByAccountIdAndDeletedFalse(accountId: ObjectId): List<User> =
+        users.filter { it.accountId == accountId && !it.deleted }
 
     override fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<User> =
         users.filter { it.stableId == stableId && !it.deleted }

@@ -1,7 +1,6 @@
 package com.lerchenflo.hufly.server.stable
 
 import com.lerchenflo.hufly.server.account.model.Account
-import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
 import com.lerchenflo.hufly.server.authentication.AuthService
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
 import com.lerchenflo.hufly.server.authentication.requireUsableEmail
@@ -9,7 +8,6 @@ import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.CodedException
 import com.lerchenflo.hufly.server.core.security.HashEncoder
 import com.lerchenflo.hufly.server.repository.AccountRepository
-import com.lerchenflo.hufly.server.repository.JoinRequestRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.stable.model.Stable
@@ -29,7 +27,6 @@ class StableOnboardingService(
     private val userRepository: UserRepository,
     private val accountRepository: AccountRepository,
     private val stableRepository: StableRepository,
-    private val joinRequestRepository: JoinRequestRepository,
     private val hashEncoder: HashEncoder,
     private val clock: Clock,
 ) {
@@ -66,16 +63,20 @@ class StableOnboardingService(
         return create(stableId, stableName, place = null, account)
     }
 
-    /** Self-service: the account becomes the admin of a new stable; 409 `ALREADY_MEMBER` if it has a stable already. */
+    /** Self-service: the account becomes the admin of a new stable; 409 `STABLE_LIMIT` at [MAX_STABLES_PER_ACCOUNT]. */
     fun createStableForAccount(account: Account, stableName: String, place: String?): CreatedStable {
-        val created = create(ObjectId.get(), stableName, place, account)
-        joinRequestRepository.findByAccountIdAndStatus(account.id, JoinRequestStatus.PENDING).forEach {
-            joinRequestRepository.save(it.copy(status = JoinRequestStatus.WITHDRAWN, updatedAt = clock.millis()))
-        }
-        return created
+        requireRoomForStable(account.id)
+        return create(ObjectId.get(), stableName, place, account)
     }
 
-    /** The membership goes in first: it claims the account (one stable per account), so two parallel calls cannot both win. */
+    /** 409 `STABLE_LIMIT` once the account is in [MAX_STABLES_PER_ACCOUNT] stables. Parallel joins may pass it by one or two. */
+    fun requireRoomForStable(accountId: ObjectId) {
+        if (userRepository.findByAccountIdAndDeletedFalse(accountId).size >= MAX_STABLES_PER_ACCOUNT) {
+            throw CodedException(HttpStatus.CONFLICT, STABLE_LIMIT, "The account is in $MAX_STABLES_PER_ACCOUNT stables already")
+        }
+    }
+
+    /** The membership goes in first, so a failed stable save can mark it deleted again. */
     private fun create(stableId: ObjectId, stableName: String, place: String?, account: Account): CreatedStable {
         val now = clock.millis()
         val admin = insertMembership(
@@ -126,7 +127,9 @@ class StableOnboardingService(
 
     companion object {
         const val ALREADY_MEMBER = "ALREADY_MEMBER"
+        const val STABLE_LIMIT = "STABLE_LIMIT"
+        const val MAX_STABLES_PER_ACCOUNT = 10
 
-        fun alreadyMember() = CodedException(HttpStatus.CONFLICT, ALREADY_MEMBER, "The account has a stable already")
+        fun alreadyMember() = CodedException(HttpStatus.CONFLICT, ALREADY_MEMBER, "The account is a member of this stable already")
     }
 }

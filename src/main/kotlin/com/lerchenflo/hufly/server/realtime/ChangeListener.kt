@@ -60,7 +60,7 @@ class ChangeListener(private val notifier: ChangeNotifier) : AbstractMongoEventL
             is StableNote -> Triple(HintTarget.Stable(saved.stableId), "note", saved.id)
             is Absence -> Triple(HintTarget.Stable(saved.stableId), "absence", saved.id)
             is JoinRequest -> {
-                if (saved.status != JoinRequestStatus.PENDING) queueOrSend(notifier, HintTarget.Account(saved.accountId), "joinRequest", saved.id)
+                if (saved.status != JoinRequestStatus.PENDING) queueOrSend(notifier, HintTarget.Account(saved.accountId, saved.stableId), "joinRequest", saved.id)
                 Triple(HintTarget.StableAdmin(saved.stableId), "joinRequest", saved.id)
             }
             else -> return

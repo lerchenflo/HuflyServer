@@ -53,13 +53,15 @@ class MongoAccountRepositoriesTest {
     }
 
     @Test
-    fun `a login has at most one live membership, removed ones do not count`() {
+    fun `a login has one live membership per stable, removed ones do not count`() {
         val login = ObjectId.get()
-        val removed = userRepository.insert(testUser().copy(accountId = login, deleted = true))
-        val live = userRepository.insert(testUser().copy(accountId = login))
+        val stable = ObjectId.get()
+        val removed = userRepository.insert(testUser(stableId = stable).copy(accountId = login, deleted = true))
+        val live = userRepository.insert(testUser(stableId = stable).copy(accountId = login))
+        val elsewhere = userRepository.insert(testUser(stableId = ObjectId.get()).copy(accountId = login))
 
-        assertFailsWith<DuplicateKeyException> { userRepository.insert(testUser().copy(accountId = login)) }
-        assertEquals(live.id, userRepository.findFirstByAccountIdAndDeletedFalse(login)!!.id)
+        assertFailsWith<DuplicateKeyException> { userRepository.insert(testUser(stableId = stable).copy(accountId = login)) }
+        assertEquals(setOf(live.id, elsewhere.id), userRepository.findByAccountIdAndDeletedFalse(login).map { it.id }.toSet())
         assertTrue(removed.id != live.id)
     }
 

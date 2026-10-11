@@ -71,6 +71,43 @@ class AccessServiceTest {
         assertEquals(member, accessService.requester(login.id))
     }
 
+    // Several stables per account
+
+    private fun secondMembership(): Pair<com.lerchenflo.hufly.server.user.model.User, com.lerchenflo.hufly.server.user.model.User> {
+        val first = userRepository.save(testUser().copy(createdAt = 100))
+        val second = userRepository.save(testUser(stableId = OTHER_STABLE_ID).copy(accountId = first.accountId, createdAt = 200))
+        return first to second
+    }
+
+    @Test
+    fun `with several memberships the requested stable picks the membership`() {
+        val (first, second) = secondMembership()
+
+        assertEquals(second, accessService.requester(first.accountId, OTHER_STABLE_ID))
+        assertEquals(first, accessService.requester(first.accountId, first.stableId))
+    }
+
+    @Test
+    fun `without a requested stable the oldest membership answers`() {
+        val (first, second) = secondMembership()
+        userRepository.users.remove(first)
+        userRepository.users += first
+
+        assertEquals(first, accessService.requester(second.accountId, null))
+    }
+
+    @Test
+    fun `a requested stable the account is not a live member of answers 403 NO_STABLE`() {
+        val (first, second) = secondMembership()
+        userRepository.save(second.copy(deleted = true))
+
+        for (stableId in listOf(OTHER_STABLE_ID, org.bson.types.ObjectId.get())) {
+            val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { accessService.requester(first.accountId, stableId) }
+            assertEquals(HttpStatus.FORBIDDEN, e.statusCode)
+            assertEquals("NO_STABLE", e.code)
+        }
+    }
+
     @Test
     fun `requester of an unknown id is unauthorized`() {
         assertStatus(HttpStatus.UNAUTHORIZED) { accessService.requester(testUser().id) }

@@ -9,8 +9,8 @@ interface UserRepository : Repository<User, ObjectId> {
     fun deleteByStableId(stableId: ObjectId): Long
     fun save(user: User): User
     fun findById(id: ObjectId): User?
-    /** Fails with a duplicate key error if the account has a live membership already (one stable per account for now). */
+    /** Fails with a duplicate key error if the account has a live membership in that stable already. */
     fun insert(user: User): User
-    fun findFirstByAccountIdAndDeletedFalse(accountId: ObjectId): User?
+    fun findByAccountIdAndDeletedFalse(accountId: ObjectId): List<User>
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<User>
 }

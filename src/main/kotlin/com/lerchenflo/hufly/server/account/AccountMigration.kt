@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
  * Moves logins out of `users` into `accounts` (same id, so tokens and sessions stay valid) and gives every stable an
  * invite code. Runs while the context starts, before the web server accepts requests; idempotent. A failure stops
  * the startup: a membership saved without its account would lose the password for good. Works on the raw database
- * and runs before `mongoTemplate`, whose index creation needs the migrated data (unique `users.accountId`).
+ * and runs before `mongoTemplate`, whose index creation needs the migrated data (unique `users.accountId` per stable).
  */
 @Component
 class AccountMigration(
@@ -59,7 +59,10 @@ class AccountMigration(
             Document("accountId", Document("\$exists", false)),
             listOf(Document("\$set", Document("accountId", "\$_id"))),
         )
-        if (users.listIndexes().any { it.getString("name") == "email" }) users.dropIndex("email")
+        // "one_membership_per_account" allowed a single stable per account; "one_membership_per_stable" replaces it.
+        listOf("email", "one_membership_per_account").forEach { name ->
+            if (users.listIndexes().any { it.getString("name") == name }) users.dropIndex(name)
+        }
         addInviteCodes()
 
         val accountIds = database.getCollection("accounts").distinct("_id", ObjectId::class.java).toSet()

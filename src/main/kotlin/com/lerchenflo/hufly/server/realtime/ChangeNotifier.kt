@@ -23,32 +23,40 @@ class ChangeNotifier(
     private val userRepository: UserRepository,
     private val stableRepository: StableRepository,
 ) {
+    /** [stableId] names the stable whose data changed, so an app with several stables syncs the right one; null for account data. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    data class ChangeHint(val type: String = "changed", val collection: String, val originSessionId: String? = null)
+    data class ChangeHint(val type: String = "changed", val collection: String, val stableId: String? = null, val originSessionId: String? = null)
 
     /**
-     * Account id (the STOMP principal) -> stable id of connected accounts with a stable, filled on connect and kept
-     * current when a connected account joins or leaves a stable, so sending needs no database lookups.
+     * Account id (the STOMP principal) -> stable ids of connected accounts, filled on connect and kept current when a
+     * connected account joins or leaves a stable, so sending needs no database lookups.
      */
-    private val stableOfAccount = ConcurrentHashMap<String, ObjectId>()
+    private val stablesOfAccount = ConcurrentHashMap<String, MutableSet<ObjectId>>()
 
     @EventListener
     fun onConnected(event: SessionConnectedEvent) {
         val accountId = event.user?.name?.takeIf(ObjectId::isValid) ?: return
-        userRepository.findFirstByAccountIdAndDeletedFalse(ObjectId(accountId))?.let { stableOfAccount[accountId] = it.stableId }
+        val stableIds = userRepository.findByAccountIdAndDeletedFalse(ObjectId(accountId)).map { it.stableId }
+        stablesOfAccount[accountId] = ConcurrentHashMap.newKeySet<ObjectId>().apply { addAll(stableIds) }
     }
 
-    /** A saved membership: its account now gets this stable's hints (or none, once the membership is deleted). */
+    /** A saved membership: its account now gets this stable's hints (or no longer, once the membership is deleted). */
     fun membershipChanged(member: User) {
         val accountId = member.accountId.toHexString()
         if (userRegistry.getUser(accountId) == null) return
-        if (member.deleted) stableOfAccount.remove(accountId, member.stableId) else stableOfAccount[accountId] = member.stableId
+        val stableIds = stablesOfAccount.computeIfAbsent(accountId) { ConcurrentHashMap.newKeySet() }
+        if (member.deleted) stableIds.remove(member.stableId) else stableIds.add(member.stableId)
     }
 
     fun send(target: HintTarget, collection: String, originSessionId: ObjectId?) {
-        val hint = ChangeHint(collection = collection, originSessionId = originSessionId?.toHexString())
+        val stableId = when (target) {
+            is HintTarget.Stable -> target.stableId
+            is HintTarget.StableAdmin -> target.stableId
+            is HintTarget.Account -> target.stableId
+        }
+        val hint = ChangeHint(collection = collection, stableId = stableId?.toHexString(), originSessionId = originSessionId?.toHexString())
         val userNames = when (target) {
-            is HintTarget.Stable -> userRegistry.users.map { it.name }.filter { stableOfAccount[it] == target.stableId }
+            is HintTarget.Stable -> userRegistry.users.map { it.name }.filter { stablesOfAccount[it]?.contains(target.stableId) == true }
             is HintTarget.Account -> listOf(target.accountId.toHexString()).filter { userRegistry.getUser(it) != null }
             is HintTarget.StableAdmin -> listOfNotNull(
                 stableRepository.findById(target.stableId)?.adminUserId?.let(userRepository::findById)?.accountId?.toHexString()
@@ -63,6 +71,6 @@ sealed interface HintTarget {
     data class Stable(val stableId: ObjectId) : HintTarget
     /** Only the devices of the stable admin's account. */
     data class StableAdmin(val stableId: ObjectId) : HintTarget
-    /** Only the account's own devices. */
-    data class Account(val accountId: ObjectId) : HintTarget
+    /** Only the account's own devices; [stableId] when the change belongs to a stable. */
+    data class Account(val accountId: ObjectId, val stableId: ObjectId? = null) : HintTarget
 }

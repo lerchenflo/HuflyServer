@@ -8,6 +8,18 @@ data class AccountResponse(
     val mustChangePassword: Boolean,
     /** The latest PENDING or DECLINED request; null once accepted, withdrawn or never sent. */
     val joinRequest: OwnJoinRequestResponse?,
+    /** Live memberships, oldest first; the first one answers requests without `X-Stable-Id`. */
+    val memberships: List<MembershipResponse>,
+)
+
+data class MembershipResponse(
+    val userId: String,
+    val stableId: String,
+    val stableName: String,
+    val stablePlace: String?,
+    val isAdmin: Boolean,
+    /** Epoch milliseconds. */
+    val createdAt: Long,
 )
 
 data class OwnJoinRequestResponse(

@@ -146,7 +146,8 @@ class NotificationService(
     private fun deliver(recipients: List<User>, message: (TimeZone) -> PushMessage) {
         recipients.forEach { user ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
-            val push = message(preferences.zone)
+            // The stable lets an app with several stables open the right one on a tap.
+            val push = message(preferences.zone).let { it.copy(data = it.data + ("stableId" to user.stableId.toHexString())) }
             val type = push.data["type"]
             if (!preferences.enabled) {
                 log.info("Notification {} for account {}: muted", type, user.accountId)

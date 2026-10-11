@@ -30,14 +30,14 @@ class StableOnboardingServiceTest {
     private val stableRepository = FakeStableRepository()
     private val joinRequests = FakeJoinRequestRepository()
     private val accessService = AccessService(userRepository, accounts, stableRepository, FakeTagRepository())
-    private val onboarding = StableOnboardingService(userRepository, accounts, stableRepository, joinRequests, hashEncoder, clock)
+    private val onboarding = StableOnboardingService(userRepository, accounts, stableRepository, hashEncoder, clock)
 
     @Test
     fun `creates a stable with its admin and a login for them`() {
         val created = onboarding.createStable("Hof Lerchenfeld", " Chef@Hufly.test ", "Chef", "Secret123")
 
         val login = accounts.findByEmail("chef@hufly.test")!!
-        val admin = userRepository.findFirstByAccountIdAndDeletedFalse(login.id)!!
+        val admin = userRepository.findByAccountIdAndDeletedFalse(login.id).single()
         assertEquals(created.stable.id, admin.stableId)
         assertEquals(admin.id, created.stable.adminUserId)
         assertEquals("Chef", admin.displayName)
@@ -100,19 +100,20 @@ class StableOnboardingServiceTest {
     }
 
     @Test
-    fun `an account with a stable cannot create a second one`() {
+    fun `an account creates up to 10 stables, then STABLE_LIMIT`() {
         val login = accounts.save(testAccount())
-        onboarding.createStableForAccount(login, "Erster", null)
+        repeat(10) { onboarding.createStableForAccount(login, "Stall $it", null) }
 
-        val error = assertFailsWith<CodedException> { onboarding.createStableForAccount(login, "Zweiter", null) }
+        val error = assertFailsWith<CodedException> { onboarding.createStableForAccount(login, "Elfter", null) }
 
         assertEquals(HttpStatus.CONFLICT, error.statusCode)
-        assertEquals("ALREADY_MEMBER", error.code)
-        assertEquals(listOf("Erster"), stableRepository.stables.map { it.name })
+        assertEquals("STABLE_LIMIT", error.code)
+        assertEquals(10, stableRepository.stables.size)
+        assertEquals(10, userRepository.findByAccountIdAndDeletedFalse(login.id).size)
     }
 
     @Test
-    fun `creating an own stable withdraws an open join request`() {
+    fun `creating an own stable keeps an open join request`() {
         val login = accounts.save(testAccount())
         val request = joinRequests.save(
             JoinRequest(accountId = login.id, stableId = org.bson.types.ObjectId.get(), status = JoinRequestStatus.PENDING, createdAt = 0L, updatedAt = 0L)
@@ -120,6 +121,6 @@ class StableOnboardingServiceTest {
 
         onboarding.createStableForAccount(login, "Stall", null)
 
-        assertEquals(JoinRequestStatus.WITHDRAWN, joinRequests.findById(request.id)!!.status)
+        assertEquals(JoinRequestStatus.PENDING, joinRequests.findById(request.id)!!.status)
     }
 }

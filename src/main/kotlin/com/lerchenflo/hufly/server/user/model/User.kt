@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 
 /** A stable membership. Login data lives in [com.lerchenflo.hufly.server.account.model.Account]. */
 @Document("users")
-@CompoundIndex(name = "one_membership_per_account", def = "{ 'accountId': 1 }", unique = true, partialFilter = "{ 'deleted': false }")
+@CompoundIndex(name = "one_membership_per_stable", def = "{ 'accountId': 1, 'stableId': 1 }", unique = true, partialFilter = "{ 'deleted': false }")
 data class User(
     @Id val id: ObjectId = ObjectId.get(),
     @Indexed val stableId: ObjectId,

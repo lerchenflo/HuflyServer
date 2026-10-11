@@ -101,7 +101,7 @@ class NotificationServiceTest {
 
         val expected = PushMessage(
             "Beitrittsanfrage", "neu möchte Hof Lerchenfeld beitreten",
-            mapOf("type" to "join_request", "joinRequestId" to requestId.toHexString()),
+            mapOf("type" to "join_request", "joinRequestId" to requestId.toHexString(), "stableId" to STABLE_ID.toHexString()),
         )
         assertEquals(listOf(expected), sentTo(anna))
         assertTrue(sentTo(ben).isEmpty() && sentTo(clara).isEmpty())
@@ -132,7 +132,7 @@ class NotificationServiceTest {
 
         service.on(NotePosted(STABLE_ID, anna.id, note.id))
 
-        val expected = PushMessage("Neuer Aushang", "Hufschmied kommt", mapOf("type" to "note", "noteId" to note.id.toHexString()))
+        val expected = PushMessage("Neuer Aushang", "Hufschmied kommt", mapOf("type" to "note", "noteId" to note.id.toHexString(), "stableId" to STABLE_ID.toHexString()))
         assertEquals(listOf(expected), sentTo(ben))
         assertEquals(listOf(expected), sentTo(clara))
         assertTrue(sentTo(anna).isEmpty() && sentTo(gone).isEmpty() && sentTo(foreigner).isEmpty())
@@ -145,7 +145,7 @@ class NotificationServiceTest {
         service.on(EventInvited(STABLE_ID, anna.id, event.id, listOf(ben.id, anna.id, foreigner.id), occurrenceStartAt = null))
 
         assertEquals(
-            listOf(PushMessage("Einladung: Springstunde", "Fr. 09.10. 17:00 · von anna", mapOf("type" to "event_invitation", "eventId" to event.id.toHexString()))),
+            listOf(PushMessage("Einladung: Springstunde", "Fr. 09.10. 17:00 · von anna", mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "stableId" to STABLE_ID.toHexString()))),
             sentTo(ben),
         )
         assertTrue(sentTo(anna).isEmpty() && sentTo(foreigner).isEmpty() && sentTo(clara).isEmpty())
@@ -160,7 +160,7 @@ class NotificationServiceTest {
 
         assertEquals(
             PushMessage("Einladung: Springstunde", "Fr. 16.10. 17:00 · von anna",
-                mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toString())),
+                mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toString(), "stableId" to STABLE_ID.toHexString())),
             sentTo(ben).single(),
         )
     }

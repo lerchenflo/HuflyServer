@@ -23,7 +23,7 @@ class StableBootstrapTest {
     private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, FakeTagRepository())
     private val bootstrap = StableBootstrap(
         userRepository.accounts,
-        StableOnboardingService(userRepository, userRepository.accounts, stableRepository, FakeJoinRequestRepository(), hashEncoder, clock),
+        StableOnboardingService(userRepository, userRepository.accounts, stableRepository, hashEncoder, clock),
     )
 
     @Test
@@ -31,7 +31,7 @@ class StableBootstrapTest {
         bootstrap.run("Teststall", " Admin@Hufly.test ", "Secret123")
 
         val login = userRepository.accounts.findByEmail("admin@hufly.test")!!
-        val admin = userRepository.findFirstByAccountIdAndDeletedFalse(login.id)!!
+        val admin = userRepository.findByAccountIdAndDeletedFalse(login.id).single()
         val stable = stableRepository.findById(admin.stableId)!!
         assertEquals("Teststall", stable.name)
         assertEquals(admin.id, stable.adminUserId)

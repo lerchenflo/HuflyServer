@@ -61,9 +61,10 @@ class SignupControllerTest {
         stableRepository.save(testStable(adminUserId = admin.id).copy(inviteCode = "ABCD2345", place = "Dornbirn"))
     }
 
-    private fun call(method: HttpMethod, path: String, body: String? = null, as_: ObjectId? = null): ResultActionsDsl =
+    private fun call(method: HttpMethod, path: String, body: String? = null, as_: ObjectId? = null, stable: String? = null): ResultActionsDsl =
         mockMvc.request(method, path) {
             if (as_ != null) header("Authorization", "Bearer ${jwtService.generateAccessToken(as_)}")
+            if (stable != null) header("X-Stable-Id", stable)
             if (body != null) {
                 contentType = MediaType.APPLICATION_JSON
                 content = body
@@ -91,7 +92,7 @@ class SignupControllerTest {
         assertEquals("Neu", login.displayName)
         assertTrue(hashEncoder.matches("Secret123", login.hashedPassword))
         assertNull(login.createdByStableId)
-        assertNull(userRepository.findFirstByAccountIdAndDeletedFalse(login.id))
+        assertTrue(userRepository.findByAccountIdAndDeletedFalse(login.id).isEmpty())
 
         call(HttpMethod.POST, "/auth/login", """{"email":"neu@hufly.test","password":"Secret123"}""").andExpect { status { isOk() } }
     }
@@ -177,15 +178,12 @@ class SignupControllerTest {
     }
 
     @Test
-    fun `a member cannot ask to join and cannot create a stable`() {
+    fun `a member cannot ask to join the own stable again`() {
         call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"ABCD2345"}""", as_ = rider.id).andExpect {
             status { isConflict() }
             jsonPath("$.code") { value("ALREADY_MEMBER") }
         }
-        call(HttpMethod.POST, "/accounts/me/stable", """{"name":"Zweiter"}""", as_ = rider.id).andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("ALREADY_MEMBER") }
-        }
+        assertTrue(joinRequestRepository.requests.isEmpty())
     }
 
     @Test
@@ -270,10 +268,10 @@ class SignupControllerTest {
     }
 
     @Test
-    fun `accepting a login that got a stable meanwhile answers 409 and closes the request`() {
+    fun `accepting a login that became a member meanwhile answers 409 and closes the request`() {
         val login = registered()
         val requestId = json(call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"ABCD2345"}""", as_ = login))["id"].asString()
-        userRepository.save(testUser(stableId = ObjectId.get()).copy(accountId = login))
+        userRepository.save(testUser().copy(accountId = login))
 
         call(HttpMethod.POST, "/stables/me/joinrequests/$requestId/accept", as_ = admin.id).andExpect {
             status { isConflict() }
@@ -342,6 +340,135 @@ class SignupControllerTest {
         assertEquals("ABCD2345", stableRepository.findById(STABLE_ID)!!.inviteCode)
         call(HttpMethod.PUT, "/stables/me", """{"name":"X"}""", as_ = rider.id).andExpect { status { isForbidden() } }
         call(HttpMethod.PUT, "/stables/me", """{"name":""}""", as_ = admin.id).andExpect { status { isBadRequest() } }
+    }
+
+    // Several stables per account
+
+    /** [login] creates [count] own stables; answers their ids in order. */
+    private fun ownStables(login: ObjectId, count: Int): List<String> = (1..count).map {
+        json(call(HttpMethod.POST, "/accounts/me/stable", """{"name":"Stall $it"}""", as_ = login).andExpect { status { isCreated() } })["stable"]["id"].asString()
+    }
+
+    @Test
+    fun `a member asks to join another stable and creates an own one`() {
+        val other = stableRepository.save(testStable(id = ObjectId.get(), adminUserId = ObjectId.get(), name = "Anderer").copy(inviteCode = "WXYZ6789"))
+
+        call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"WXYZ6789"}""", as_ = rider.id).andExpect {
+            status { isOk() }
+            jsonPath("$.stableId") { value(other.id.toHexString()) }
+        }
+        call(HttpMethod.POST, "/accounts/me/stable", """{"name":"Zweiter"}""", as_ = rider.id).andExpect {
+            status { isCreated() }
+            jsonPath("$.isAdmin") { value(true) }
+            jsonPath("$.stable.name") { value("Zweiter") }
+        }
+        assertEquals(JoinRequestStatus.PENDING, joinRequestRepository.requests.single().status, "creating a stable keeps the open request")
+    }
+
+    @Test
+    fun `the X-Stable-Id header picks the membership, without it the oldest one answers`() {
+        val own = ownStables(rider.id, 1).single()
+
+        call(HttpMethod.GET, "/users/me", as_ = rider.id).andExpect {
+            jsonPath("$.stable.id") { value(STABLE_ID.toHexString()) }
+            jsonPath("$.isAdmin") { value(false) }
+        }
+        call(HttpMethod.GET, "/users/me", as_ = rider.id, stable = own).andExpect {
+            status { isOk() }
+            jsonPath("$.stable.id") { value(own) }
+            jsonPath("$.isAdmin") { value(true) }
+        }
+        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id, stable = own).andExpect { status { isOk() } }
+        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id, stable = STABLE_ID.toHexString()).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `a malformed X-Stable-Id answers 400, a stable the account is not in answers 403 NO_STABLE`() {
+        call(HttpMethod.GET, "/users/me", as_ = rider.id, stable = "not-an-id").andExpect { status { isBadRequest() } }
+        call(HttpMethod.GET, "/users/me", as_ = rider.id, stable = ObjectId.get().toHexString()).andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("NO_STABLE") }
+        }
+    }
+
+    @Test
+    fun `account-level endpoints ignore the X-Stable-Id header`() {
+        val login = registered()
+
+        call(HttpMethod.GET, "/accounts/me", as_ = login, stable = ObjectId.get().toHexString()).andExpect { status { isOk() } }
+        call(HttpMethod.GET, "/users/me/settings", as_ = login, stable = "not-an-id").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `the account lists its memberships, oldest first`() {
+        val own = ownStables(rider.id, 1).single()
+
+        call(HttpMethod.GET, "/accounts/me", as_ = rider.id).andExpect {
+            status { isOk() }
+            jsonPath("$.memberships.length()") { value(2) }
+            jsonPath("$.memberships[0].userId") { value(rider.id.toHexString()) }
+            jsonPath("$.memberships[0].stableId") { value(STABLE_ID.toHexString()) }
+            jsonPath("$.memberships[0].stableName") { value("Hof Lerchenfeld") }
+            jsonPath("$.memberships[0].stablePlace") { value("Dornbirn") }
+            jsonPath("$.memberships[0].isAdmin") { value(false) }
+            jsonPath("$.memberships[0].createdAt") { value(0) }
+            jsonPath("$.memberships[1].stableId") { value(own) }
+            jsonPath("$.memberships[1].stableName") { value("Stall 1") }
+            jsonPath("$.memberships[1].isAdmin") { value(true) }
+        }
+        call(HttpMethod.GET, "/accounts/me", as_ = registered()).andExpect { jsonPath("$.memberships.length()") { value(0) } }
+    }
+
+    @Test
+    fun `an account has at most 10 stables`() {
+        val login = registered()
+        ownStables(login, 10)
+
+        call(HttpMethod.POST, "/accounts/me/stable", """{"name":"Elfter"}""", as_ = login).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("STABLE_LIMIT") }
+        }
+        call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"ABCD2345"}""", as_ = login).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("STABLE_LIMIT") }
+        }
+    }
+
+    @Test
+    fun `accepting a login that reached the limit meanwhile answers 409 STABLE_LIMIT and closes the request`() {
+        val login = registered()
+        val requestId = json(call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"ABCD2345"}""", as_ = login))["id"].asString()
+        ownStables(login, 10)
+
+        call(HttpMethod.POST, "/stables/me/joinrequests/$requestId/accept", as_ = admin.id).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("STABLE_LIMIT") }
+        }
+        assertEquals(JoinRequestStatus.WITHDRAWN, joinRequestRepository.requests.single().status)
+    }
+
+    @Test
+    fun `deleting the account leaves every stable, the admin of a stable with others must stay`() {
+        val password = """{"password":"Secret123"}"""
+        val login = registered()
+        val requestId = json(call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"ABCD2345"}""", as_ = login))["id"].asString()
+        call(HttpMethod.POST, "/stables/me/joinrequests/$requestId/accept", as_ = admin.id).andExpect { status { isOk() } }
+        val own = ObjectId(ownStables(login, 1).single())
+        val guest = userRepository.save(testUser(stableId = own))
+
+        call(HttpMethod.DELETE, "/users/me", password, as_ = login).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("STABLE_ADMIN") }
+        }
+        assertTrue(userRepository.findByAccountIdAndDeletedFalse(login).size == 2, "nothing changes on 409")
+
+        userRepository.save(guest.copy(deleted = true))
+        call(HttpMethod.DELETE, "/users/me", password, as_ = login).andExpect { status { isNoContent() } }
+
+        assertTrue(userRepository.findByAccountIdAndDeletedFalse(login).isEmpty())
+        assertTrue(stableRepository.findById(own)?.deleted ?: true, "the own stable without others goes")
+        assertTrue(stableRepository.findById(STABLE_ID)!!.deleted.not())
+        assertTrue(userRepository.accounts.findById(login)!!.deleted)
     }
 
     // Account deletion without a stable
