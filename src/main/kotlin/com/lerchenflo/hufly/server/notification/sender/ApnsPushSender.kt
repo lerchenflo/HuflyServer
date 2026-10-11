@@ -33,6 +33,7 @@ class ApnsPushSender(
 ) : PlatformPushSender {
     override val platform = PushPlatform.IOS
     private val log = LoggerFactory.getLogger(javaClass)
+    private val environment = if (production) "production" else "sandbox"
 
     private val client: ApnsClient? = if (listOf(keyFile, teamId, keyId, bundleId).any { it.isBlank() } || !File(keyFile).isFile) {
         log.warn("APNs off: push.apns.key-file, team-id, key-id and bundle-id are needed")
@@ -42,7 +43,7 @@ class ApnsPushSender(
             .setApnsServer(if (production) ApnsClientBuilder.PRODUCTION_APNS_HOST else ApnsClientBuilder.DEVELOPMENT_APNS_HOST)
             .setSigningKey(ApnsSigningKey.loadFromPkcs8File(File(keyFile), teamId, keyId))
             .build()
-            .also { log.info("APNs loaded (bundle {}, {})", bundleId, if (production) "production" else "sandbox") }
+            .also { log.info("APNs loaded (bundle {}, {})", bundleId, environment) }
     } catch (e: Exception) {
         log.error("APNs off: loading {} failed: {}", keyFile, e.message)
         null
@@ -61,11 +62,11 @@ class ApnsPushSender(
         )
         return try {
             val response = client.sendNotification(notification).get()
-            when {
-                response.isAccepted -> PushResult.SENT
-                response.rejectionReason.orElse("") in INVALID_TOKEN_REASONS -> PushResult.INVALID_TOKEN
-                else -> PushResult.FAILED.also { log.warn("APNs rejected: {}", response.rejectionReason.orElse("")) }
-            }
+            if (response.isAccepted) return PushResult.SENT
+            val reason = response.rejectionReason.orElse("")
+            // BadDeviceToken mostly means a sandbox token on the production host or the other way round.
+            log.warn("APNs ({}) rejected: {}", environment, reason)
+            if (reason in INVALID_TOKEN_REASONS) PushResult.INVALID_TOKEN else PushResult.FAILED
         } catch (e: Exception) {
             log.warn("APNs send failed: {}", e.message)
             PushResult.FAILED

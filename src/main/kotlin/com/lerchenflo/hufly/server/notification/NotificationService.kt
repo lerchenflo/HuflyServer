@@ -146,9 +146,14 @@ class NotificationService(
     private fun deliver(recipients: List<User>, message: (TimeZone) -> PushMessage) {
         recipients.forEach { user ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
-            if (!preferences.enabled) return@forEach
             val push = message(preferences.zone)
+            val type = push.data["type"]
+            if (!preferences.enabled) {
+                log.info("Notification {} for account {}: muted", type, user.accountId)
+                return@forEach
+            }
             if (preferences.digest) {
+                log.info("Notification {} for account {}: held for the digest", type, user.accountId)
                 digestRepository.save(DigestItem(userId = user.accountId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
                 pushService.send(user.accountId, push)

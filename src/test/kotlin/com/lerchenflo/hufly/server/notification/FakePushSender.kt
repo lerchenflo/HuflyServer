@@ -8,9 +8,11 @@ import com.lerchenflo.hufly.server.notification.sender.PushResult
 class FakePushSender(override val platform: PushPlatform) : PlatformPushSender {
     val sent = mutableListOf<Pair<String, PushMessage>>()
     val invalidTokens = mutableSetOf<String>()
+    val failingTokens = mutableSetOf<String>()
 
     override fun send(token: String, message: PushMessage): PushResult {
         if (token in invalidTokens) return PushResult.INVALID_TOKEN
+        if (token in failingTokens) return PushResult.FAILED
         sent += token to message
         return PushResult.SENT
     }

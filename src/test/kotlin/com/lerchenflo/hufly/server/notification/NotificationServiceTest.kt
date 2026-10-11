@@ -215,4 +215,22 @@ class NotificationServiceTest {
         assertEquals(clara.id, item.userId)
         assertEquals("Einladung: Springstunde" to "Fr. 09.10. 16:00 · von anna", item.title to item.body)
     }
+
+    @Test
+    fun `muted and digest recipients are logged`() {
+        val logs = com.lerchenflo.hufly.server.testdata.LogCapture(NotificationService::class.java)
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationsEnabled" to "false"), clock.millis()))
+        settingsRepository.save(UserSettings(clara.id, mapOf("notificationDigest" to "true"), clock.millis()))
+
+        service.on(EventInvited(STABLE_ID, anna.id, event().id, listOf(ben.id, clara.id), null))
+        logs.close()
+
+        assertEquals(
+            listOf(
+                "INFO Notification event_invitation for account ${ben.id}: muted",
+                "INFO Notification event_invitation for account ${clara.id}: held for the digest",
+            ),
+            logs.lines,
+        )
+    }
 }

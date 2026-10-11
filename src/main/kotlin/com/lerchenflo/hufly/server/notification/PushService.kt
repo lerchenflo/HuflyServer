@@ -40,14 +40,26 @@ class PushService(
     fun send(userId: ObjectId, message: PushMessage) {
         val now = clock.millis()
         val targets = sessionRepository.findByUserIdAndPushTokenNotNull(userId).filter { it.expiresAt > now }
+        // Never log the push's text, it holds names.
+        val push = "Push ${message.data["type"]} to account $userId"
+        if (targets.isEmpty()) log.info("{}: no device", push)
         targets.forEach { session ->
             val token = session.pushToken ?: return@forEach
-            val sender = senders.firstOrNull { it.platform == session.pushPlatform } ?: return@forEach
+            val device = "${session.pushPlatform}, session ${session.id}"
+            val sender = senders.firstOrNull { it.platform == session.pushPlatform }
+                ?: return@forEach log.warn("{}: no sender ({})", push, device)
             executor.execute {
                 try {
-                    if (sender.send(token, message) == PushResult.INVALID_TOKEN) sessionRepository.clearPushToken(token)
+                    when (sender.send(token, message)) {
+                        PushResult.SENT -> log.info("{} sent ({})", push, device)
+                        PushResult.INVALID_TOKEN -> {
+                            sessionRepository.clearPushToken(token)
+                            log.warn("{}: token rejected ({}), removed", push, device)
+                        }
+                        PushResult.FAILED -> log.warn("{} failed ({})", push, device)
+                    }
                 } catch (e: Exception) {
-                    log.warn("Push to {} failed: {}", session.pushPlatform, e.message)
+                    log.warn("{} failed ({}): {}", push, device, e.message)
                 }
             }
         }

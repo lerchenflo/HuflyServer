@@ -5,16 +5,19 @@ import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.repository.FakeRefreshTokenRepository
+import com.lerchenflo.hufly.server.testdata.LogCapture
 import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.minutes
 import org.bson.types.ObjectId
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.util.concurrent.Executor
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Push tokens live on the session, so ending a session stops its pushes. */
 class PushServiceTest {
@@ -28,6 +31,12 @@ class PushServiceTest {
     private val anna = ObjectId.get()
     private val ben = ObjectId.get()
     private val message = PushMessage("Neuer Aushang", "Hufschmied kommt", mapOf("type" to "note"))
+    private val logs = LogCapture(PushService::class.java)
+
+    @AfterTest
+    fun detachLogs() {
+        logs.close()
+    }
 
     private fun session(userId: ObjectId, expiresIn: Long = days(30)) = sessions.save(
         RefreshToken(userId = userId, hashedToken = ObjectId.get().toHexString(), expiresAt = clock.millis().plus(expiresIn), createdAt = clock.millis())
@@ -95,6 +104,49 @@ class PushServiceTest {
         assertEquals(
             HttpStatus.NOT_FOUND,
             assertFailsWith<ResponseStatusException> { pushService.register(anna, ObjectId.get(), PushPlatform.ANDROID, "x") }.statusCode,
+        )
+    }
+
+    // Logging, to see on the server why a phone gets nothing; never the push's text, it holds names.
+
+    @Test
+    fun `every push attempt is logged with type, account, platform and session`() {
+        val phone = session(anna)
+        val tablet = session(anna)
+        val stale = session(anna)
+        pushService.register(anna, phone.id, PushPlatform.ANDROID, "fcm-1")
+        pushService.register(anna, tablet.id, PushPlatform.IOS, "apns-1")
+        pushService.register(anna, stale.id, PushPlatform.IOS, "apns-stale")
+        ios.invalidTokens += "apns-stale"
+
+        pushService.send(anna, message)
+
+        assertEquals(
+            setOf(
+                "INFO Push note to account $anna sent (ANDROID, session ${phone.id})",
+                "INFO Push note to account $anna sent (IOS, session ${tablet.id})",
+                "WARN Push note to account $anna: token rejected (IOS, session ${stale.id}), removed",
+            ),
+            logs.lines.toSet(),
+        )
+        assertTrue(logs.lines.none { "Neuer Aushang" in it || "Hufschmied" in it })
+    }
+
+    @Test
+    fun `a push without a device and a failed push are logged`() {
+        pushService.send(ben, message)
+        val phone = session(anna)
+        pushService.register(anna, phone.id, PushPlatform.IOS, "apns-1")
+        ios.failingTokens += "apns-1"
+
+        pushService.send(anna, message)
+
+        assertEquals(
+            listOf(
+                "INFO Push note to account $ben: no device",
+                "WARN Push note to account $anna failed (IOS, session ${phone.id})",
+            ),
+            logs.lines,
         )
     }
 }

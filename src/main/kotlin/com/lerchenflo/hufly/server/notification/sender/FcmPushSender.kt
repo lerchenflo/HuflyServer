@@ -55,9 +55,10 @@ class FcmPushSender(@Value("\${push.fcm.credentials-file:}") credentialsFile: St
             messaging.send(fcmMessage)
             PushResult.SENT
         } catch (e: FirebaseMessagingException) {
+            log.warn("FCM send failed: {} {}", e.messagingErrorCode, e.message)
             when (e.messagingErrorCode) {
                 MessagingErrorCode.UNREGISTERED, MessagingErrorCode.INVALID_ARGUMENT, MessagingErrorCode.SENDER_ID_MISMATCH -> PushResult.INVALID_TOKEN
-                else -> PushResult.FAILED.also { log.warn("FCM send failed: {} {}", e.messagingErrorCode, e.message) }
+                else -> PushResult.FAILED
             }
         }
     }
