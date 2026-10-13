@@ -34,6 +34,11 @@ interface TaskOccurrenceRepository : Repository<TaskOccurrence, ObjectId> {
     fun save(occurrence: TaskOccurrence): TaskOccurrence
     fun findByTaskIdAndOccurrenceDueAt(taskId: ObjectId, occurrenceDueAt: Long): TaskOccurrence?
     fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence>
+    fun findByTaskIdInAndDeletedFalse(taskIds: Collection<ObjectId>): List<TaskOccurrence>
+
+    /** Live dates of every stable moved to a time in (from, to]. */
+    @Query("{ 'deleted': false, 'dueAt': { '\$gt': ?0, '\$lte': ?1 } }")
+    fun findMovedDue(from: Long, to: Long): List<TaskOccurrence>
 
     /** Live dates that name [userId] among their own assignees. */
     @Query("{ 'assigneeUserIds': ?0, 'deleted': false }")

@@ -25,6 +25,7 @@ import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.hours
 import com.lerchenflo.hufly.server.testdata.millis
+import com.lerchenflo.hufly.server.testdata.minutes
 import com.lerchenflo.hufly.server.testdata.testUser
 import com.lerchenflo.hufly.server.user.model.User
 import com.lerchenflo.hufly.server.user.model.UserSettings
@@ -46,11 +47,12 @@ class NotificationServiceTest {
     private val eventRepository = FakeEventRepository()
     private val taskRepository = FakeTaskRepository()
     private val digestRepository = FakeDigestItemRepository()
+    private val sentReminders = com.lerchenflo.hufly.server.repository.FakeSentReminderRepository()
     private val stableRepository = com.lerchenflo.hufly.server.repository.FakeStableRepository()
     private val android = FakePushSender(PushPlatform.ANDROID)
     private val pushService = PushService(sessions, listOf(android), Executor { it.run() }, clock)
     private val service = NotificationService(
-        userRepository, userRepository.accounts, stableRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, clock,
+        userRepository, userRepository.accounts, stableRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, sentReminders, clock,
     )
 
     private val anna = testUser(email = "anna@hufly.test")
@@ -236,6 +238,35 @@ class NotificationServiceTest {
         service.on(com.lerchenflo.hufly.server.core.notification.JoinAccepted(STABLE_ID, anna.id, ben.id))
 
         assertEquals(listOf("join_accepted"), sentTo(ben).map { it.data["type"] })
+    }
+
+    @Test
+    fun `an assignment push naming a time inside the reminder window counts as the reminder`() {
+        settingsRepository.save(UserSettings(clara.id, mapOf("notificationDigest" to "true"), clock.millis()))
+        val dueAt = clock.millis() + minutes(30)
+        val task = taskRepository.save(task(dueAt).copy(assigneeUserIds = listOf(ben.id, clara.id)))
+
+        service.on(TaskAssigned(STABLE_ID, anna.id, task.id, listOf(ben.id, clara.id), null))
+
+        assertEquals(listOf(ben.id to dueAt), sentReminders.reminders.map { it.userId to it.dueAt })
+    }
+
+    @Test
+    fun `a stand-in push inside the window counts for that date`() {
+        val task = task(clock.millis() - days(1))
+        val date = clock.millis() + minutes(30)
+
+        service.on(TaskAssigned(STABLE_ID, anna.id, task.id, listOf(clara.id), date))
+
+        assertEquals(listOf(clara.id to date), sentReminders.reminders.map { it.userId to it.dueAt })
+    }
+
+    @Test
+    fun `an assignment push for a later time leaves the reminder to come`() {
+        service.on(TaskAssigned(STABLE_ID, anna.id, task().id, listOf(ben.id), null))
+
+        assertEquals(1, sentTo(ben).size)
+        assertTrue(sentReminders.reminders.isEmpty())
     }
 
     @Test

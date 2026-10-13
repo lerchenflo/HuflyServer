@@ -137,4 +137,18 @@ class MongoOccurrenceRepositoryTest {
         assertEquals(task.recurrence, taskRepository.findById(task.id)?.recurrence)
         assertEquals(listOf(task.id), taskRepository.findByIdIn(listOf(task.id, ObjectId.get())).map { it.id })
     }
+
+    @Test
+    fun `task dates load by their series and by a time they were moved to`() {
+        val series = ObjectId.get()
+        val other = ObjectId.get()
+        taskOccurrenceRepository.save(taskOccurrence(1, series))
+        taskOccurrenceRepository.save(taskOccurrence(2, series).copy(occurrenceDueAt = key + 1, deleted = true))
+        taskOccurrenceRepository.save(taskOccurrence(3, other).copy(dueAt = 5_000_050L))
+        taskOccurrenceRepository.save(taskOccurrence(4).copy(dueAt = 5_000_000L))
+        taskOccurrenceRepository.save(taskOccurrence(5).copy(dueAt = 5_000_050L, deleted = true))
+
+        assertEquals(listOf(series), taskOccurrenceRepository.findByTaskIdInAndDeletedFalse(listOf(series)).map { it.taskId })
+        assertEquals(listOf(other), taskOccurrenceRepository.findMovedDue(5_000_000L, 5_000_100L).map { it.taskId })
+    }
 }

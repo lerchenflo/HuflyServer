@@ -38,6 +38,7 @@ class StableDeletionService(
     private val taskOccurrenceRepository: TaskOccurrenceRepository,
     private val noteRepository: NoteRepository,
     private val absenceRepository: AbsenceRepository,
+    private val sentReminderRepository: SentReminderRepository,
     private val pictureStore: PictureStore,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -61,7 +62,7 @@ class StableDeletionService(
             paddockAssignmentRepository::deleteByStableId, eventRepository::deleteByStableId,
             eventInvitationRepository::deleteByStableId, eventOccurrenceRepository::deleteByStableId,
             eventOccurrenceAnswerRepository::deleteByStableId, taskRepository::deleteByStableId,
-            taskOccurrenceRepository::deleteByStableId, noteRepository::deleteByStableId, absenceRepository::deleteByStableId,
+            taskOccurrenceRepository::deleteByStableId, noteRepository::deleteByStableId, absenceRepository::deleteByStableId, sentReminderRepository::deleteByStableId,
         ).forEach { it(stableId) }
         stableRepository.deleteById(stableId)
         log.info("Stable {} \"{}\" deleted with {} users", stableId, stable.name, userIds.size)

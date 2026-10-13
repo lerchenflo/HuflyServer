@@ -23,6 +23,12 @@ class FakeTaskRepository : TaskRepository {
 
     override fun findByIdIn(ids: Collection<ObjectId>): List<StableTask> = tasks.filter { it.id in ids }
 
+    override fun findOpenSingleDue(from: Long, to: Long): List<StableTask> =
+        tasks.filter { !it.deleted && it.recurrence == null && it.doneAt == null && it.dueAt != null && it.dueAt > from && it.dueAt <= to }
+
+    override fun findSeriesStartingBy(to: Long): List<StableTask> =
+        tasks.filter { !it.deleted && it.recurrence != null && it.dueAt != null && it.dueAt <= to }
+
     override fun findByTurnoutAssignmentIdAndDeletedFalse(turnoutAssignmentId: ObjectId): List<StableTask> =
         tasks.filter { it.turnoutAssignmentId == turnoutAssignmentId && !it.deleted }
 

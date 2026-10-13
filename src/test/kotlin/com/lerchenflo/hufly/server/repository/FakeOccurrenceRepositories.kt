@@ -82,6 +82,12 @@ class FakeTaskOccurrenceRepository : TaskOccurrenceRepository {
     override fun findByTaskIdAndDeletedFalse(taskId: ObjectId): List<TaskOccurrence> =
         occurrences.filter { it.taskId == taskId && !it.deleted }
 
+    override fun findByTaskIdInAndDeletedFalse(taskIds: Collection<ObjectId>): List<TaskOccurrence> =
+        occurrences.filter { it.taskId in taskIds && !it.deleted }
+
+    override fun findMovedDue(from: Long, to: Long): List<TaskOccurrence> =
+        occurrences.filter { !it.deleted && it.dueAt != null && it.dueAt > from && it.dueAt <= to }
+
     override fun findCoveredBy(userId: ObjectId): List<TaskOccurrence> =
         occurrences.filter { it.assigneeUserIds?.contains(userId) == true && !it.deleted }
 

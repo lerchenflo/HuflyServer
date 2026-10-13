@@ -11,14 +11,17 @@ import com.lerchenflo.hufly.server.core.notification.TaskAssigned
 import com.lerchenflo.hufly.server.notification.model.DigestItem
 import com.lerchenflo.hufly.server.notification.model.NotificationPreferences
 import com.lerchenflo.hufly.server.notification.model.PushMessage
+import com.lerchenflo.hufly.server.notification.model.SentReminder
 import com.lerchenflo.hufly.server.repository.AccountRepository
 import com.lerchenflo.hufly.server.repository.DigestItemRepository
+import com.lerchenflo.hufly.server.repository.SentReminderRepository
 import com.lerchenflo.hufly.server.repository.EventRepository
 import com.lerchenflo.hufly.server.repository.NoteRepository
 import com.lerchenflo.hufly.server.repository.StableRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.repository.UserSettingsRepository
+import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.user.model.User
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
@@ -27,6 +30,7 @@ import kotlinx.datetime.toLocalDateTime
 import org.bson.types.ObjectId
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import kotlin.time.Instant
 
@@ -46,6 +50,7 @@ class NotificationService(
     private val taskRepository: TaskRepository,
     private val pushService: PushService,
     private val digestRepository: DigestItemRepository,
+    private val sentReminders: SentReminderRepository,
     private val clock: Clock,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -101,7 +106,11 @@ class NotificationService(
 
     private fun taskAssigned(event: TaskAssigned) {
         val task = taskRepository.findById(event.taskId)?.takeIf { it.stableId == event.stableId && !it.deleted } ?: return
-        deliver(members(event, event.userIds)) { zone ->
+        val namedDueAt = event.occurrenceDueAt ?: task.dueAt
+        val onPushed = { user: User, preferences: NotificationPreferences ->
+            if (namedDueAt != null) markReminded(task, namedDueAt, user, preferences)
+        }
+        deliver(members(event, event.userIds), onPushed) { zone ->
             val dueAt = task.dueAt
             val (title, body) = when {
                 event.occurrenceDueAt != null -> "Vertretung: ${task.title}" to "Am ${format(event.occurrenceDueAt, zone)}"
@@ -143,7 +152,23 @@ class NotificationService(
         .filter { it != event.actorUserId }
         .mapNotNull { id -> userRepository.findById(id)?.takeIf { it.stableId == event.stableId && !it.deleted } }
 
-    private fun deliver(recipients: List<User>, message: (TimeZone) -> PushMessage) {
+    /** A push that named a due time already inside the user's reminder window replaces that reminder. */
+    private fun markReminded(task: StableTask, dueAt: Long, user: User, preferences: NotificationPreferences) {
+        val remindAt = preferences.taskReminderAt(dueAt) ?: return
+        val now = clock.millis()
+        if (now < remindAt || now >= dueAt) return
+        try {
+            sentReminders.insert(SentReminder(stableId = task.stableId, taskId = task.id, dueAt = dueAt, userId = user.id))
+        } catch (e: DuplicateKeyException) {
+            // Reminded already.
+        }
+    }
+
+    private fun deliver(
+        recipients: List<User>,
+        onPushed: (User, NotificationPreferences) -> Unit = { _, _ -> },
+        message: (TimeZone) -> PushMessage,
+    ) {
         recipients.forEach { user ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
             // The stable lets an app with several stables open the right one on a tap.
@@ -158,6 +183,7 @@ class NotificationService(
                 digestRepository.save(DigestItem(userId = user.accountId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
                 pushService.send(user.accountId, push)
+                onPushed(user, preferences)
             }
         }
     }
@@ -168,15 +194,15 @@ class NotificationService(
         if (occurrenceAt != null) put("occurrenceAt", occurrenceAt.toString())
     }
 
-    /** Like "Fr. 09.10. 17:00". */
-    private fun format(at: Long, zone: TimeZone): String {
-        val local = Instant.fromEpochMilliseconds(at).toLocalDateTime(zone)
-        fun Int.twoDigits() = toString().padStart(2, '0')
-        return "${WEEKDAYS[local.dayOfWeek.isoDayNumber - 1]} ${local.day.twoDigits()}.${local.month.number.twoDigits()}. " +
-            "${local.hour.twoDigits()}:${local.minute.twoDigits()}"
-    }
+    private fun format(at: Long, zone: TimeZone) = formatPushTime(at, zone)
+}
 
-    companion object {
-        private val WEEKDAYS = listOf("Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So.")
-    }
+private val WEEKDAYS = listOf("Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So.")
+
+/** Like "Fr. 09.10. 17:00". */
+internal fun formatPushTime(at: Long, zone: TimeZone): String {
+    val local = Instant.fromEpochMilliseconds(at).toLocalDateTime(zone)
+    fun Int.twoDigits() = toString().padStart(2, '0')
+    return "${WEEKDAYS[local.dayOfWeek.isoDayNumber - 1]} ${local.day.twoDigits()}.${local.month.number.twoDigits()}. " +
+        "${local.hour.twoDigits()}:${local.minute.twoDigits()}"
 }

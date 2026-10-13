@@ -3,7 +3,6 @@
 Open work only; finished items live in git history. Client-side product TODOs live in the Hufly app repo (`../Hufly/TODO.md`). Requirements: `../Hufly/REQUIREMENTS.md`. Data model: `docs/domain-model.html`.
 
 ## Push notifications
-- [ ] Task due reminders and per-type muting (decided 2026-10-13): a scheduler pushes to the effective assignees of open tasks and occurrences `taskReminderMinutes` (per-user settings key, default 60, 0 = off) before `dueAt`, with a sent-once record; always instant, also for digest users; settings keys mute each push type. Medications have no times, so no horse care reminders.
 - [ ] Anyone who knows another install's push token could register it on their own session (the token moves). Tokens are not public, so accepted for now.
 
 ## Open decisions

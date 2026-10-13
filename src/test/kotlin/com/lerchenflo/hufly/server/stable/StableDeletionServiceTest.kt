@@ -29,12 +29,13 @@ class StableDeletionServiceTest {
     private val horses = FakeHorseRepository()
     private val tags = FakeTagRepository()
     private val pictures = FakePictureStore()
+    private val sentReminders = com.lerchenflo.hufly.server.repository.FakeSentReminderRepository()
 
     private val service = StableDeletionService(
         stables, users, joinRequests, digestItems, horses, tags, FakeFoodPlanRepository(), FakeHorseLogRepository(),
         FakePaddockRepository(), FakeHorseGroupRepository(), FakeHorseConflictRepository(), FakePaddockAssignmentRepository(),
         FakeEventRepository(), FakeEventInvitationRepository(), FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), pictures,
+        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, pictures,
     )
 
     private val stableId = ObjectId.get()
@@ -58,6 +59,9 @@ class StableDeletionServiceTest {
         listOf(horse, otherHorse).forEach { horses.save(it); pictures.save(PictureKind.HORSE, it.id, byteArrayOf(1)) }
         tags.save(testTag(stableId = stableId))
         tags.save(testTag(stableId = otherStableId))
+        listOf(stableId, otherStableId).forEach {
+            sentReminders.insert(com.lerchenflo.hufly.server.notification.model.SentReminder(stableId = it, taskId = ObjectId.get(), dueAt = 0L, userId = ObjectId.get()))
+        }
     }
 
     @Test
@@ -79,6 +83,7 @@ class StableDeletionServiceTest {
         assertEquals(listOf(otherHorse.id), horses.horses.map { it.id })
         assertTrue(tags.tags.all { it.stableId == otherStableId } && tags.tags.size == 1)
         assertEquals(setOf(PictureKind.USER to otherUser.id, PictureKind.HORSE to otherHorse.id), pictures.pictures.keys)
+        assertEquals(listOf(otherStableId), sentReminders.reminders.map { it.stableId })
     }
 
     @Test

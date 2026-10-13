@@ -14,12 +14,18 @@ data class NotificationPreferences(
     val zone: TimeZone = TimeZone.of("Europe/Vienna"),
     /** Push types (`data.type`) the user never wants, not even in the digest. */
     val mutedTypes: Set<String> = emptySet(),
+    /** Lead time of task due reminders; 0 turns them off. */
+    val taskReminderMinutes: Int = 60,
 ) {
+    /** When to remind of a task due at [dueAt], null when reminders are off. */
+    fun taskReminderAt(dueAt: Long): Long? = if (taskReminderMinutes == 0) null else dueAt - taskReminderMinutes * 60_000L
+
     fun mutes(type: String?): Boolean = type != null && type !in UNMUTABLE_TYPES && type in mutedTypes
 
     companion object {
         /** The applicant waits for this answer. */
         private val UNMUTABLE_TYPES = setOf("join_accepted")
+        const val MAX_TASK_REMINDER_MINUTES = 1440
 
         fun of(values: Map<String, String>?): NotificationPreferences {
             val defaults = NotificationPreferences()
@@ -34,6 +40,8 @@ data class NotificationPreferences(
                     try { TimeZone.of(it) } catch (e: IllegalTimeZoneException) { null }
                 } ?: defaults.zone,
                 mutedTypes = values["notificationMutedTypes"].orEmpty().split(',').map { it.trim() }.filterTo(mutableSetOf()) { it.isNotEmpty() },
+                taskReminderMinutes = values["taskReminderMinutes"]?.toIntOrNull()?.takeIf { it in 0..MAX_TASK_REMINDER_MINUTES }
+                    ?: defaults.taskReminderMinutes,
             )
         }
     }
