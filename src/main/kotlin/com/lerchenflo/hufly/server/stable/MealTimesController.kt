@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.stable
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -10,13 +11,11 @@ import com.lerchenflo.hufly.server.stable.model.MealTimesResponse
 import com.lerchenflo.hufly.server.stable.model.toMealTimesResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Pattern
-import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 
 /** Feeding times of the own stable: every member reads, only the admin sets them (last write wins). */
 @RestController
@@ -47,7 +46,7 @@ class MealTimesController(
         accessService.requireAdmin(requester)
         // Zero-padded "HH:mm" sorts like the time itself.
         if (!(request.morning < request.lunch && request.lunch < request.dinner && request.dinner < request.night)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Meal times must increase from morning to night")
+            throw badRequest("Meal times must increase from morning to night")
         }
         // Atomic, so it never brings back an invite code the admin replaced meanwhile.
         stableRepository.setMealTimes(

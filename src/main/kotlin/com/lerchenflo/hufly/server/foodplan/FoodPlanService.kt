@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.foodplan
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -89,7 +90,7 @@ class FoodPlanService(
             tagRepository.findById(entry.foodTagId)
                 ?.let { it.stableId == requester.stableId && !it.deleted && it.type == TagType.FOOD } == true
         }
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown food tag")
+        if (!valid) throw badRequest("Unknown food tag")
     }
 
     private fun stablePlan(requester: User, planId: ObjectId): FoodPlan =

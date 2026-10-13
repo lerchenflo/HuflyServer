@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.absence.AbsenceService
 import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
@@ -129,7 +130,7 @@ class UserService(
 
     fun deleteUser(requester: User, userId: ObjectId) {
         accessService.requireAdmin(requester)
-        if (userId == requester.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The admin cannot be deleted")
+        if (userId == requester.id) throw badRequest("The admin cannot be deleted")
         val target = stableMember(requester, userId)
         eraseMembership(target, requester.id)
         val account = accountRepository.findById(target.accountId)
@@ -280,7 +281,7 @@ class UserService(
     /** Ends every other session (USR-5); the device that changed the password stays logged in. */
     fun changePassword(account: Account, oldPassword: String, newPassword: String, currentSessionId: ObjectId?) {
         if (!hashEncoder.matches(oldPassword, account.hashedPassword)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Old password is wrong")
+            throw badRequest("Old password is wrong")
         }
         accountRepository.save(
             account.copy(hashedPassword = hashEncoder.encode(newPassword), mustChangePassword = false, updatedAt = clock.millis())
@@ -325,7 +326,7 @@ class UserService(
         val valid = roleTagIds.all { id ->
             tagRepository.findById(id)?.let { it.stableId == stableId && !it.deleted && it.type == TagType.USER_ROLE } == true
         }
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown role tag")
+        if (!valid) throw badRequest("Unknown role tag")
     }
 
     /** 404 for users of other stables too, so ids from other stables are indistinguishable from unknown ones. */

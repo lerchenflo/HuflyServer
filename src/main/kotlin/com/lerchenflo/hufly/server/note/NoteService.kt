@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.note
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -95,10 +96,6 @@ class NoteService(
         val rows = noteRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
-            visible = { true },
             toResponse = { it.toNoteResponse(requester.id, isAdmin || it.createdByUserId == requester.id) },
         )
     }
@@ -110,7 +107,7 @@ class NoteService(
         versionCounterService.withVersion(SyncCollection.NOTES) { version -> noteRepository.save(note.copy(version = version)) }
 
     private fun requireTitle(title: String): String =
-        title.trim().takeIf { it.length in 1..MAX_TITLE_LENGTH } ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid title")
+        title.trim().takeIf { it.length in 1..MAX_TITLE_LENGTH } ?: throw badRequest("Invalid title")
 
     private fun stableNote(requester: User, noteId: ObjectId): StableNote =
         noteRepository.findById(noteId)?.takeIf { it.stableId == requester.stableId && !it.deleted }

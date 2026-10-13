@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
@@ -23,7 +24,6 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 
 @RestController
 class EventController(
@@ -60,7 +59,7 @@ class EventController(
     ) {
         fun split(): EventSplit? {
             if ((splitFromEventId == null) != (splitFromOccurrenceStartAt == null)) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "splitFromEventId and splitFromOccurrenceStartAt go together")
+                throw badRequest("splitFromEventId and splitFromOccurrenceStartAt go together")
             }
             if (splitFromEventId == null || splitFromOccurrenceStartAt == null) return null
             return EventSplit(parseObjectId(splitFromEventId), splitFromOccurrenceStartAt)

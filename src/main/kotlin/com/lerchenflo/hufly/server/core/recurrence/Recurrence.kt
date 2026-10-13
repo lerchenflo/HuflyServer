@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.core.recurrence
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.requireEpochDay
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.IllegalTimeZoneException
@@ -11,8 +12,6 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
 import kotlin.time.Instant
 
 enum class RecurrenceFrequency { DAILY, WEEKLY }
@@ -120,8 +119,6 @@ fun Recurrence?.requireOccurrence(firstStart: Long, key: Long) {
     if (this == null) throw badRequest("Not a series")
     if (!isOccurrence(firstStart, key)) throw badRequest("Not a date of this series")
 }
-
-private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 
 const val MAX_RECURRENCE_INTERVAL = 99
 const val MAX_RECURRENCE_COUNT = 999

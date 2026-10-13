@@ -153,7 +153,7 @@ class HorseController(
         val showMedications = horseService.medicationVisibility(requester)
         return deltaSync(
             horseRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseResponse(showMedications(it)) },
+            toResponse = { it.toHorseResponse(showMedications(it)) },
         )
     }
 }

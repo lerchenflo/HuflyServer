@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event.model
 
+import com.lerchenflo.hufly.server.core.sync.VersionSynced
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -14,7 +15,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 @CompoundIndex(name = "eventId_occurrenceStartAt", def = "{'eventId': 1, 'occurrenceStartAt': 1}", unique = true)
 data class EventOccurrence(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     val eventId: ObjectId,
     val occurrenceStartAt: Long,
@@ -26,18 +27,18 @@ data class EventOccurrence(
     val horseIds: List<ObjectId>?,
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
     /** Series invitees not taking part on this date; their answers for it are kept but ignored. */
     val removedUserIds: List<ObjectId>? = null,
-)
+) : VersionSynced
 
 /** An invitee's answer for one date of a series invitation; wins over the invitation's own status for that date. */
 @Document("eventOccurrenceAnswers")
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 @CompoundIndex(name = "invitationId_occurrenceStartAt", def = "{'invitationId': 1, 'occurrenceStartAt': 1}", unique = true)
 data class EventOccurrenceAnswer(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     @Indexed val eventId: ObjectId,
     val invitationId: ObjectId,
@@ -47,9 +48,9 @@ data class EventOccurrenceAnswer(
     val respondedAt: Long,
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
-)
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
+) : VersionSynced
 
 /** Timestamps are epoch milliseconds. */
 data class EventOccurrenceResponse(

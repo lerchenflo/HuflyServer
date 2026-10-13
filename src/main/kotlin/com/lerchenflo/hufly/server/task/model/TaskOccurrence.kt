@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task.model
 
+import com.lerchenflo.hufly.server.core.sync.VersionSynced
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -14,7 +15,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 @CompoundIndex(name = "taskId_occurrenceDueAt", def = "{'taskId': 1, 'occurrenceDueAt': 1}", unique = true)
 data class TaskOccurrence(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     val taskId: ObjectId,
     val occurrenceDueAt: Long,
@@ -29,9 +30,9 @@ data class TaskOccurrence(
     val doneAt: Long? = null,
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
-)
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
+) : VersionSynced
 
 /** Timestamps are epoch milliseconds. */
 data class TaskOccurrenceResponse(

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.stable
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.user.restampCreatingMembership
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
@@ -50,7 +51,7 @@ class StableDeletionService(
     /** [confirmName] must repeat the stable's name exactly, against deleting the wrong stable. */
     fun deleteStable(stableId: ObjectId, confirmName: String) {
         val stable = stableRepository.findById(stableId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Stable not found")
-        if (confirmName != stable.name) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name does not match the stable")
+        if (confirmName != stable.name) throw badRequest("Name does not match the stable")
 
         val members = userRepository.findByStableId(stableId)
         val userIds = members.map { it.id }

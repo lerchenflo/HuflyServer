@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.tag.model
 
+import com.lerchenflo.hufly.server.core.sync.TimestampSynced
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -32,7 +33,7 @@ enum class Permission(val impliedView: Permission? = null) {
 @Document("tags")
 @CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class Tag(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     @Indexed val stableId: ObjectId,
     val name: String,
     val type: TagType,
@@ -43,9 +44,9 @@ data class Tag(
     val defaultIntervalDays: Int? = null,
     /** Icon key the client draws; never interpreted here, null means the client's default. */
     val icon: String? = null,
-    val updatedAt: Long,
+    override val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
-)
+) : TimestampSynced

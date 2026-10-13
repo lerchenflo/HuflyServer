@@ -1,6 +1,6 @@
 package com.lerchenflo.hufly.server.core.picture
 
-import org.springframework.http.HttpStatus
+import com.lerchenflo.hufly.server.core.badRequest
 import org.springframework.web.server.ResponseStatusException
 import java.awt.Color
 import java.awt.RenderingHints
@@ -86,4 +86,4 @@ private fun encodeJpeg(image: BufferedImage): ByteArray {
     return output.toByteArray()
 }
 
-private fun invalidPicture() = ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid picture")
+private fun invalidPicture() = badRequest("Invalid picture")

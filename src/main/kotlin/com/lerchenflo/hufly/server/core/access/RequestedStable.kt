@@ -1,10 +1,9 @@
 package com.lerchenflo.hufly.server.core.access
 
+import com.lerchenflo.hufly.server.core.badRequest
 import org.bson.types.ObjectId
-import org.springframework.http.HttpStatus
 import org.springframework.web.context.request.RequestContextHolder
 import org.springframework.web.context.request.ServletRequestAttributes
-import org.springframework.web.server.ResponseStatusException
 
 const val STABLE_HEADER = "X-Stable-Id"
 
@@ -12,6 +11,6 @@ const val STABLE_HEADER = "X-Stable-Id"
 fun requestedStableId(): ObjectId? {
     val value = (RequestContextHolder.getRequestAttributes() as? ServletRequestAttributes)?.request?.getHeader(STABLE_HEADER)
         ?: return null
-    if (!ObjectId.isValid(value)) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid $STABLE_HEADER")
+    if (!ObjectId.isValid(value)) throw badRequest("Invalid $STABLE_HEADER")
     return ObjectId(value)
 }

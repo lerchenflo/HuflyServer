@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.tag
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -83,7 +84,7 @@ class TagService(
 
     private fun requirePermissionsFit(type: TagType, permissions: Set<Permission>) {
         if (type != TagType.USER_ROLE && permissions.isNotEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Only USER_ROLE tags carry permissions")
+            throw badRequest("Only USER_ROLE tags carry permissions")
         }
     }
 

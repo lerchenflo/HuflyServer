@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 
 /** Settings belong to the login (account), so they work without a stable too. Each user reads and replaces only their own; the last write wins unless the client sends expectedUpdatedAt. */
 @RestController
@@ -54,11 +54,11 @@ class UserSettingsController(
     fun putSettings(@Valid @RequestBody request: SettingsRequest): ResponseEntity<UserSettingsResponse> {
         val account = accessService.requireAccount(requireAuth())
         if (request.values.any { (key, value) -> key.length > 100 || value.length > 5000 }) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Setting key or value too long")
+            throw badRequest("Setting key or value too long")
         }
         // Mongo cannot store map keys with dots or a leading $ (it would answer 500, and clients retry 500s forever).
         if (request.values.keys.any { it.isEmpty() || '.' in it || it.startsWith('$') }) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Setting key not allowed")
+            throw badRequest("Setting key not allowed")
         }
         return when (val result = settingsService.put(account.id, request.values, request.condition())) {
             is UserSettingsService.PutResult.Saved -> {

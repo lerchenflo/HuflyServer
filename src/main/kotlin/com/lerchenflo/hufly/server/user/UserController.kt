@@ -88,7 +88,7 @@ class UserController(
         val responses = userResponses.of(users)
         return deltaSync(
             users, clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { responses.getValue(it) },
+            toResponse = { responses.getValue(it) },
         )
     }
 

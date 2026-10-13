@@ -111,7 +111,7 @@ class PaddockController(
         requireValidSyncRequest(page, pageSize, clientEntries)
         return deltaSync(
             paddockRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toPaddockResponse() },
+            toResponse = { it.toPaddockResponse() },
         )
     }
 
@@ -146,7 +146,7 @@ class PaddockController(
         requireValidSyncRequest(page, pageSize, clientEntries)
         return deltaSync(
             groupRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseGroupResponse() },
+            toResponse = { it.toHorseGroupResponse() },
         )
     }
 
@@ -182,7 +182,7 @@ class PaddockController(
         requireValidSyncRequest(page, pageSize, clientEntries)
         return deltaSync(
             conflictRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toHorseConflictResponse() },
+            toResponse = { it.toHorseConflictResponse() },
         )
     }
 

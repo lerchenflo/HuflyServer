@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.core.sync
 
+import org.bson.types.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,11 +9,19 @@ import kotlin.test.assertTrue
 /** OFF-2, OFF-3 */
 class VersionSyncTest {
 
-    private data class Row(val id: String, val version: Long, val deleted: Boolean = false, val visible: Boolean = true)
+    private data class Row(
+        val name: String,
+        override val version: Long,
+        override val deleted: Boolean = false,
+        val visible: Boolean = true,
+        override val id: ObjectId = ObjectId.get(),
+    ) : VersionSynced
 
-    private fun sync(rows: List<Row>, since: Long = 0, pageSize: Int = 2) =
-        versionSync(rows, since, pageSize, id = { it.id }, version = { it.version }, deleted = { it.deleted },
-            visible = { it.visible }, toResponse = { it.id })
+    private fun sync(rows: List<Row>, since: Long = 0, pageSize: Int = 2): VersionSyncResponse<String> {
+        val result = versionSync(rows, since, pageSize, visible = { it.visible }) { it.name }
+        val names = rows.associate { it.id.toHexString() to it.name }
+        return result.copy(deletedEntries = result.deletedEntries.map(names::getValue))
+    }
 
     @Test
     fun `returns one page and says more follow when the query found an extra row`() {

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horselog
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -101,10 +102,6 @@ class HorseLogService(
         val rows = logRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
-            visible = { true },
             toResponse = { it.toHorseLogEntryResponse() },
         )
     }
@@ -136,5 +133,4 @@ class HorseLogService(
         logRepository.findById(entryId)?.takeIf { it.stableId == requester.stableId && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Log entry not found")
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }

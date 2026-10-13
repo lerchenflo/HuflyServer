@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
@@ -20,7 +21,6 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -30,7 +30,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 
 @RestController
 @RequestMapping("/tasks")
@@ -62,11 +61,11 @@ class TaskController(
     ) {
         fun turnoutLink(): TurnoutLink? {
             if ((turnoutAssignmentId == null) != (turnoutKind == null)) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "turnoutAssignmentId and turnoutKind go together")
+                throw badRequest("turnoutAssignmentId and turnoutKind go together")
             }
             if (turnoutAssignmentId == null || turnoutKind == null) return null
             val kind = TurnoutKind.entries.firstOrNull { it.name == turnoutKind }
-                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown turnoutKind")
+                ?: throw badRequest("Unknown turnoutKind")
             return TurnoutLink(parseObjectId(turnoutAssignmentId), kind)
         }
     }

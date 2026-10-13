@@ -1,7 +1,6 @@
 package com.lerchenflo.hufly.server.core.sync
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
+import com.lerchenflo.hufly.server.core.badRequest
 
 /** What the client already has: an entity id and its `updatedAt` in epoch milliseconds. */
 data class IdTimeStamp(
@@ -22,39 +21,37 @@ const val MAX_SYNC_CLIENT_ENTRIES = 10_000
 
 fun requireValidSyncRequest(page: Int, pageSize: Int, clientEntries: List<IdTimeStamp>) {
     if (page < 0 || pageSize !in 1..MAX_SYNC_PAGE_SIZE) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid page or page_size")
+        throw badRequest("Invalid page or page_size")
     }
     if (clientEntries.size > MAX_SYNC_CLIENT_ENTRIES) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Too many sync entries")
+        throw badRequest("Too many sync entries")
     }
     if (clientEntries.any { it.id.isBlank() || it.id.length > MAX_SYNC_ID_LENGTH }) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid sync entry id")
+        throw badRequest("Invalid sync entry id")
     }
 }
 
 const val MAX_SYNC_ID_LENGTH = 100
 
 /** [serverEntries] must already be limited to the requester's stable and exclude soft-deleted rows. */
-fun <E, R> deltaSync(
+fun <E : TimestampSynced, R> deltaSync(
     serverEntries: List<E>,
     clientEntries: List<IdTimeStamp>,
     page: Int,
     pageSize: Int,
-    id: (E) -> String,
-    updatedAt: (E) -> Long,
     toResponse: (E) -> R,
 ): SyncResponse<R> {
     val clientTimestamps = clientEntries.associate { it.id to it.timeStamp }
     val changed = serverEntries
         .filter { entry ->
-            val clientMillis = clientTimestamps[id(entry)] ?: return@filter true
-            updatedAt(entry) > clientMillis
+            val clientMillis = clientTimestamps[entry.id.toHexString()] ?: return@filter true
+            entry.updatedAt > clientMillis
         }
-        .sortedByDescending(updatedAt)
+        .sortedByDescending { it.updatedAt }
 
     val start = page.toLong() * pageSize
     val paged = changed.drop(start.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).take(pageSize)
-    val serverIds = serverEntries.mapTo(mutableSetOf(), id)
+    val serverIds = serverEntries.mapTo(mutableSetOf()) { it.id.toHexString() }
     return SyncResponse(
         updatedEntries = paged.map(toResponse),
         deletedEntries = if (page == 0) clientTimestamps.keys.filter { it !in serverIds } else emptyList(),

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horse
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -191,5 +192,4 @@ class HorseService(
         horseRepository.findById(horseId)?.takeIf { it.stableId == requester.stableId && !it.deleted }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Horse not found")
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -60,11 +61,7 @@ class TaskService(
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         return idempotentCreate(clientId, { taskRepository.findByStableIdAndClientId(requester.stableId, it) }) {
-            requireDateIfRepeating(dueAt, recurrence)
-            requireAssignees(requester, assigneeUserIds)
-            requireHorses(requester, horseIds)
-            requireCategory(requester, categoryTagId)
-            requireTurnout(requester, turnout, recurrence)
+            validate(requester, dueAt, recurrence, assigneeUserIds, horseIds, categoryTagId, turnout)
             save(
                 StableTask(
                     stableId = requester.stableId,
@@ -104,11 +101,7 @@ class TaskService(
     ): StableTask {
         accessService.requirePermission(requester, Permission.TASK_EDIT)
         val task = stableTask(requester, taskId)
-        requireDateIfRepeating(dueAt, recurrence)
-        requireAssignees(requester, assigneeUserIds)
-        requireHorses(requester, horseIds)
-        requireCategory(requester, categoryTagId)
-        requireTurnout(requester, turnout, recurrence)
+        validate(requester, dueAt, recurrence, assigneeUserIds, horseIds, categoryTagId, turnout)
         val saved = save(
             task.copy(
                 title = title,
@@ -147,7 +140,7 @@ class TaskService(
     fun setDone(requester: User, taskId: ObjectId, done: Boolean): StableTask {
         val task = stableTask(requester, taskId)
         requireMayTick(requester, task.assigneeUserIds)
-        if (task.recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates of a series are ticked one by one")
+        if (task.recurrence != null) throw badRequest("Dates of a series are ticked one by one")
         val now = clock.millis()
         return save(
             task.copy(
@@ -171,9 +164,6 @@ class TaskService(
         )
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { seesAll || requester.id in it.assigneeUserIds || it.id in coveredTaskIds },
             toResponse = { it.toTaskResponse() },
         )
@@ -208,14 +198,14 @@ class TaskService(
         val valid = assigneeUserIds.isNotEmpty() && assigneeUserIds.all { id ->
             userRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown or missing assignee")
+        if (!valid) throw badRequest("Unknown or missing assignee")
     }
 
     internal fun requireHorses(requester: User, horseIds: List<ObjectId>) {
         val valid = horseIds.all { id ->
             horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true
         }
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown horse")
+        if (!valid) throw badRequest("Unknown horse")
     }
 
     private fun rotates(requested: Boolean, recurrence: Recurrence?, assigneeUserIds: List<ObjectId>) =
@@ -225,18 +215,34 @@ class TaskService(
         if (dueAt == null && recurrence != null) throw repeatingTaskNeedsDate()
     }
 
+    private fun validate(
+        requester: User,
+        dueAt: Long?,
+        recurrence: Recurrence?,
+        assigneeUserIds: List<ObjectId>,
+        horseIds: List<ObjectId>,
+        categoryTagId: ObjectId?,
+        turnout: TurnoutLink?,
+    ) {
+        requireDateIfRepeating(dueAt, recurrence)
+        requireAssignees(requester, assigneeUserIds)
+        requireHorses(requester, horseIds)
+        requireCategory(requester, categoryTagId)
+        requireTurnout(requester, turnout, recurrence)
+    }
+
     private fun requireCategory(requester: User, categoryTagId: ObjectId?) {
         if (categoryTagId == null) return
         val valid = tagRepository.findById(categoryTagId)
             ?.let { it.stableId == requester.stableId && !it.deleted && it.type == TagType.TASK_CATEGORY } == true
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown task category")
+        if (!valid) throw badRequest("Unknown task category")
     }
 
     private fun requireTurnout(requester: User, turnout: TurnoutLink?, recurrence: Recurrence?) {
         if (turnout == null) return
-        if (recurrence != null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A turnout chore cannot repeat")
+        if (recurrence != null) throw badRequest("A turnout chore cannot repeat")
         val known = assignmentRepository.findById(turnout.assignmentId)?.let { it.stableId == requester.stableId && !it.deleted } == true
-        if (!known) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown paddock assignment")
+        if (!known) throw badRequest("Unknown paddock assignment")
     }
 
     internal fun stableTask(requester: User, taskId: ObjectId): StableTask =
@@ -244,4 +250,4 @@ class TaskService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found")
 }
 
-internal fun repeatingTaskNeedsDate() = ResponseStatusException(HttpStatus.BAD_REQUEST, "A repeating task needs a date")
+internal fun repeatingTaskNeedsDate() = badRequest("A repeating task needs a date")

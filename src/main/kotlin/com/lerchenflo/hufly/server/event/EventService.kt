@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
@@ -201,9 +202,6 @@ class EventService(
         val rows = eventRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { seesAll || it.creatorUserId == requester.id || it.id in invitedEventIds },
             toResponse = { it.toEventResponse() },
         )
@@ -216,9 +214,6 @@ class EventService(
         val rows = invitationRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { seesAll || it.eventId in visibleEventIds },
             toResponse = { it.toEventInvitationResponse() },
         )
@@ -346,7 +341,6 @@ class EventService(
         if (liveInvitations > MAX_INVITATIONS_PER_EVENT) throw badRequest("At most $MAX_INVITATIONS_PER_EVENT invitations per event")
     }
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }
 
 const val MAX_INVITATIONS_PER_EVENT = 500

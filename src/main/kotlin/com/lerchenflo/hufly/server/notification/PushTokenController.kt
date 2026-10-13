@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.notification
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.security.currentSessionId
 import com.lerchenflo.hufly.server.core.security.requireAuth
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 
 /** The push token of the calling install, stored on its session (the access token's `sid`). */
 @RestController
@@ -42,5 +42,5 @@ class PushTokenController(
         pushService.unregister(account.id, requireSession())
     }
 
-    private fun requireSession() = currentSessionId() ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Token without session")
+    private fun requireSession() = currentSessionId() ?: throw badRequest("Token without session")
 }

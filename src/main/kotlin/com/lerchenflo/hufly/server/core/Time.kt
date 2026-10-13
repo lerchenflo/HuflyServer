@@ -1,8 +1,5 @@
 package com.lerchenflo.hufly.server.core
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
-
 /**
  * All times are plain Longs: instants as epoch milliseconds (UTC), calendar dates as epoch days (days since
  * 1970-01-01, negative before). They are stored and sent like that; only zone-aware calendar math uses kotlinx-datetime.
@@ -25,12 +22,12 @@ fun interface Clock {
 
 /** An epoch-millisecond path or body value; 400 outside 0..[MAX_EPOCH_MILLIS]. */
 fun requireEpochMillis(millis: Long): Long {
-    if (millis !in 0..MAX_EPOCH_MILLIS) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Time out of range")
+    if (millis !in 0..MAX_EPOCH_MILLIS) throw badRequest("Time out of range")
     return millis
 }
 
 /** An epoch-day body value; 400 outside -[MAX_EPOCH_DAYS]..[MAX_EPOCH_DAYS]. */
 fun requireEpochDay(day: Long): Long {
-    if (day !in -MAX_EPOCH_DAYS..MAX_EPOCH_DAYS) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Date out of range")
+    if (day !in -MAX_EPOCH_DAYS..MAX_EPOCH_DAYS) throw badRequest("Date out of range")
     return day
 }

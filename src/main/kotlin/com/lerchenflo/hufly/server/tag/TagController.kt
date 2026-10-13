@@ -65,7 +65,7 @@ class TagController(
         requireValidSyncRequest(page, pageSize, clientEntries)
         return deltaSync(
             tagRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toTagResponse() },
+            toResponse = { it.toTagResponse() },
         )
     }
 

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.task
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
@@ -94,9 +95,6 @@ class TaskOccurrenceService(
             .filter { requester.id in it.assigneeUserIds }.mapTo(taskService.coveredTaskIds(requester.id).toMutableSet()) { it.id }
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { seesAll || it.taskId in visibleTaskIds },
             toResponse = { it.toTaskOccurrenceResponse() },
         )
@@ -129,7 +127,6 @@ class TaskOccurrenceService(
         }
     }
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }
 
 private const val MAX_HORSES = 50

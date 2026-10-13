@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.core.sync
 
+import org.bson.types.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,12 +9,22 @@ import kotlin.test.assertTrue
 /** OFF-2, OFF-3 */
 class DeltaSyncTest {
 
-    private data class Item(val id: String, val updatedAt: Long)
+    private data class Item(val name: String, override val id: ObjectId, override val updatedAt: Long) : TimestampSynced
 
-    private fun item(id: String, millis: Long) = Item(id, millis)
+    /** Readable names in the tests, real ids in the sync. */
+    private val ids = mutableMapOf<String, ObjectId>()
 
-    private fun sync(server: List<Item>, client: List<IdTimeStamp>, page: Int = 0, pageSize: Int = 400) =
-        deltaSync(server, client, page, pageSize, id = { it.id }, updatedAt = { it.updatedAt }, toResponse = { it.id })
+    private fun idOf(name: String) = ids.getOrPut(name) { ObjectId.get() }
+
+    private fun item(name: String, millis: Long) = Item(name, idOf(name), millis)
+
+    private fun stamp(name: String, millis: Long) = IdTimeStamp(idOf(name).toHexString(), millis)
+
+    private fun sync(server: List<Item>, client: List<IdTimeStamp>, page: Int = 0, pageSize: Int = 400): SyncResponse<String> {
+        val names = ids.entries.associate { (name, id) -> id.toHexString() to name }
+        val result = deltaSync(server, client, page, pageSize) { it.name }
+        return result.copy(deletedEntries = result.deletedEntries.map(names::getValue))
+    }
 
     @Test
     fun `returns entries the client does not know`() {
@@ -26,7 +37,7 @@ class DeltaSyncTest {
     fun `returns only entries newer than the client timestamp`() {
         val result = sync(
             listOf(item("old", 5), item("new", 9)),
-            listOf(IdTimeStamp("old", 5), IdTimeStamp("new", 8)),
+            listOf(stamp("old", 5), stamp("new", 8)),
         )
 
         assertEquals(listOf("new"), result.updatedEntries)
@@ -34,7 +45,7 @@ class DeltaSyncTest {
 
     @Test
     fun `reports client ids the server no longer has as deleted`() {
-        val result = sync(listOf(item("a", 1)), listOf(IdTimeStamp("a", 1), IdTimeStamp("gone", 1)))
+        val result = sync(listOf(item("a", 1)), listOf(stamp("a", 1), stamp("gone", 1)))
 
         assertEquals(listOf("gone"), result.deletedEntries)
     }
@@ -54,7 +65,7 @@ class DeltaSyncTest {
 
     @Test
     fun `reports deletions only on the first page`() {
-        val result = sync(listOf(item("a", 1)), listOf(IdTimeStamp("gone", 1)), page = 1, pageSize = 1)
+        val result = sync(listOf(item("a", 1)), listOf(stamp("gone", 1)), page = 1, pageSize = 1)
 
         assertEquals(emptyList(), result.deletedEntries)
     }

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.authentication
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.authentication.model.DeviceType
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
@@ -21,7 +22,7 @@ fun normalizeEmail(email: String): String = email.trim().lowercase()
 
 /** Erased accounts get `deleted-<id>@deleted.invalid`; nobody may take such an address, or that erase would fail. */
 fun requireUsableEmail(normalizedEmail: String) {
-    if (normalizedEmail.endsWith("@$ERASED_EMAIL_DOMAIN")) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Email not allowed")
+    if (normalizedEmail.endsWith("@$ERASED_EMAIL_DOMAIN")) throw badRequest("Email not allowed")
 }
 
 fun erasedEmail(id: ObjectId) = "deleted-${id.toHexString()}@$ERASED_EMAIL_DOMAIN"

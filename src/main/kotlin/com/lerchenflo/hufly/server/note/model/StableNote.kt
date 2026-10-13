@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.note.model
 
+import com.lerchenflo.hufly.server.core.sync.VersionSynced
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
@@ -10,7 +11,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 @CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class StableNote(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     val title: String,
     val body: String,
@@ -23,8 +24,8 @@ data class StableNote(
     val readByUserIds: List<ObjectId> = emptyList(),
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
-)
+) : VersionSynced

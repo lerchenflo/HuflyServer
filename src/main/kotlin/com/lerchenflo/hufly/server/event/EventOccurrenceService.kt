@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_MILLIS
 import com.lerchenflo.hufly.server.core.access.AccessService
@@ -124,9 +125,6 @@ class EventOccurrenceService(
         val watermark = versionCounterService.safeWatermark(SyncCollection.EVENT_OCCURRENCES)
         return versionSync(
             occurrenceRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1)), since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { visible(it.eventId) },
             toResponse = { it.toEventOccurrenceResponse() },
         )
@@ -137,9 +135,6 @@ class EventOccurrenceService(
         val watermark = versionCounterService.safeWatermark(SyncCollection.EVENT_OCCURRENCE_ANSWERS)
         return versionSync(
             answerRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1)), since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
             visible = { visible(it.eventId) },
             toResponse = { it.toEventOccurrenceAnswerResponse() },
         )
@@ -169,7 +164,6 @@ class EventOccurrenceService(
         if (!seriesInvitees.containsAll(userIds)) throw badRequest("Not invited to the series")
     }
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }
 
 /** Two concurrent first writes of the same date: the loser finds the winner's row on the second try. */

@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.event.model
 
+import com.lerchenflo.hufly.server.core.sync.VersionSynced
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import org.bson.types.ObjectId
 import org.springframework.data.annotation.Id
@@ -12,7 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 @CompoundIndex(name = "stableId_clientId", def = "{'stableId': 1, 'clientId': 1}", unique = true, partialFilter = "{'clientId': {\$type: 'string'}}")
 data class Event(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     @Indexed val creatorUserId: ObjectId,
     val title: String,
@@ -25,14 +26,14 @@ data class Event(
     val createdAt: Long,
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
     /** Set when the client split this series off [splitFromEventId] ("Diesen und alle folgenden"), see [EventSplit]. */
     val splitFromEventId: ObjectId? = null,
     val splitFromOccurrenceStartAt: Long? = null,
-)
+) : VersionSynced
 
 /** Invitees of the old series take their answers from [occurrenceStartAt] on over to the new one. */
 data class EventSplit(val eventId: ObjectId, val occurrenceStartAt: Long)
@@ -42,7 +43,7 @@ enum class InvitationStatus { PENDING, ACCEPTED, DECLINED }
 @Document("eventInvitations")
 @CompoundIndex(def = "{'stableId': 1, 'version': 1}")
 data class EventInvitation(
-    @Id val id: ObjectId = ObjectId.get(),
+    @Id override val id: ObjectId = ObjectId.get(),
     val stableId: ObjectId,
     @Indexed val eventId: ObjectId,
     @Indexed val userId: ObjectId,
@@ -53,6 +54,6 @@ data class EventInvitation(
     val occurrenceStartAt: Long? = null,
     val updatedAt: Long,
     val updatedBy: ObjectId,
-    val deleted: Boolean = false,
-    val version: Long = 0,
-)
+    override val deleted: Boolean = false,
+    override val version: Long = 0,
+) : VersionSynced

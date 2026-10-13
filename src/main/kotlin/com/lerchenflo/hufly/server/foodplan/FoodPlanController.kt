@@ -85,7 +85,7 @@ class FoodPlanController(
         requireValidSyncRequest(page, pageSize, clientEntries)
         return deltaSync(
             foodPlanRepository.findByStableIdAndDeletedFalse(requester.stableId), clientEntries, page, pageSize,
-            id = { it.id.toHexString() }, updatedAt = { it.updatedAt }, toResponse = { it.toFoodPlanResponse() },
+            toResponse = { it.toFoodPlanResponse() },
         )
     }
 }

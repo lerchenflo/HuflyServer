@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.absence
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.absence.model.Absence
 import com.lerchenflo.hufly.server.absence.model.AbsenceResponse
 import com.lerchenflo.hufly.server.absence.model.toAbsenceResponse
@@ -82,10 +83,6 @@ class AbsenceService(
         val rows = absenceRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
-            visible = { true },
             toResponse = { it.toAbsenceResponse() },
         )
     }
@@ -107,5 +104,4 @@ class AbsenceService(
     private fun save(absence: Absence): Absence =
         versionCounterService.withVersion(SyncCollection.ABSENCES) { version -> absenceRepository.save(absence.copy(version = version)) }
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }

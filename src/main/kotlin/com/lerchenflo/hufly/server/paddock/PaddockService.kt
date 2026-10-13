@@ -230,10 +230,6 @@ class PaddockService(
         val rows = assignmentRepository.findVersionPage(requester.stableId, since, watermark, Limit.of(pageSize + 1))
         return versionSync(
             rows, since, pageSize,
-            id = { it.id.toHexString() },
-            version = { it.version },
-            deleted = { it.deleted },
-            visible = { true },
             toResponse = { it.toPaddockAssignmentResponse() },
         )
     }
