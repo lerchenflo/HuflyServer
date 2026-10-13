@@ -54,7 +54,7 @@ class StableDeletionServiceTest {
             users.save(user)
             tokens.save(RefreshToken(userId = user.id, hashedToken = "h${user.id}", expiresAt = 0L, createdAt = 0L))
             settings.save(UserSettings(user.id, mapOf("k" to "v"), 0L))
-            digestItems.save(DigestItem(userId = user.id, title = "t", body = "b", createdAt = 0L))
+            digestItems.save(DigestItem(userId = user.id, stableId = user.stableId, title = "t", body = "b", createdAt = 0L))
             pictures.save(PictureKind.USER, user.id, byteArrayOf(1))
         }
         listOf(horse, otherHorse).forEach { horses.save(it); pictures.save(PictureKind.HORSE, it.id, byteArrayOf(1)) }
@@ -97,6 +97,17 @@ class StableDeletionServiceTest {
         assertEquals(logins.toSet(), users.accounts.accounts.map { it.id }.toSet())
         assertEquals(logins.toSet(), tokens.tokens.map { it.userId }.toSet())
         assertEquals(logins.toSet(), settings.settings.keys)
+    }
+
+    @Test
+    fun `a member's digest items from other stables stay`() {
+        setUp()
+        digestItems.save(DigestItem(userId = admin.id, stableId = otherStableId, title = "elsewhere", body = "b", createdAt = 0L))
+
+        service.deleteStable(stableId, "Hof Lerchenfeld")
+
+        assertEquals(setOf("elsewhere", "t"), digestItems.items.map { it.title }.toSet())
+        assertTrue(digestItems.items.none { it.stableId == stableId })
     }
 
     @Test

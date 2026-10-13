@@ -270,6 +270,16 @@ class TaskReminderServiceTest {
     }
 
     @Test
+    fun `a series that cannot be expanded is skipped, the other tasks still remind`() {
+        task(dueAt = inAnHour - days(1), recurrence = daily.copy(timeZone = "Mars/Olympus"))
+        val fine = task()
+
+        service.sendDue()
+
+        assertEquals(listOf(reminder(fine, inAnHour)), sentTo(ben))
+    }
+
+    @Test
     fun `reminder records go a day after their due time`() {
         task()
         service.sendDue()

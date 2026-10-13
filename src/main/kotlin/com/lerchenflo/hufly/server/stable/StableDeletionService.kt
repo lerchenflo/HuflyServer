@@ -54,7 +54,7 @@ class StableDeletionService(
 
         val members = userRepository.findByStableId(stableId)
         val userIds = members.map { it.id }
-        digestItemRepository.deleteByUserIdIn(members.map { it.accountId })
+        digestItemRepository.deleteByStableId(stableId)
         userIds.forEach { pictureStore.delete(PictureKind.USER, it) }
         joinRequestRepository.deleteByStableId(stableId)
         horseRepository.findByStableId(stableId).forEach { pictureStore.delete(PictureKind.HORSE, it.id) }

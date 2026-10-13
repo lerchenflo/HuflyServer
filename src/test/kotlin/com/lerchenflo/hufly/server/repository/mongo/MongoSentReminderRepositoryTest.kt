@@ -41,6 +41,7 @@ class MongoSentReminderRepositoryTest {
         repository.insert(SentReminder(stableId = STABLE_ID, taskId = taskId, dueAt = 200L, userId = userId))
         repository.insert(SentReminder(stableId = OTHER_STABLE_ID, taskId = ObjectId.get(), dueAt = 300L, userId = userId))
 
+        assertEquals(listOf(300L), repository.findByDueAtGreaterThan(200L).map { it.dueAt })
         assertEquals(1L, repository.deleteByDueAtBefore(200L))
         assertEquals(1L, repository.deleteByStableId(OTHER_STABLE_ID))
         assertEquals(1L, mongoTemplate.getCollection("sentReminders").countDocuments())

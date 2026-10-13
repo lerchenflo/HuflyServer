@@ -215,6 +215,7 @@ class NotificationServiceTest {
         assertTrue(sentTo(ben).isEmpty() && sentTo(clara).isEmpty())
         val item = digestRepository.items.single()
         assertEquals(clara.id, item.userId)
+        assertEquals(STABLE_ID, item.stableId)
         assertEquals("Einladung: Springstunde" to "Fr. 09.10. 16:00 · von anna", item.title to item.body)
     }
 

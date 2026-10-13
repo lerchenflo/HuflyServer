@@ -209,6 +209,7 @@ class UserService(
         }
         absenceService.removeUser(target.id, actorId)
         pictureStore.delete(PictureKind.USER, target.id)
+        digestItemRepository.deleteByUserIdAndStableId(target.accountId, target.stableId)
         restampCreatingMembership(target.accountId, accountRepository, userRepository, now)
     }
 

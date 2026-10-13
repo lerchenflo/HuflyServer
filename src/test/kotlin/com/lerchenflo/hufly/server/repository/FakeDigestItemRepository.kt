@@ -8,6 +8,12 @@ class FakeDigestItemRepository : DigestItemRepository {
 
     override fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long = items.count { it.userId in userIds }.toLong().also { items.removeIf { it.userId in userIds } }
 
+    override fun deleteByStableId(stableId: ObjectId): Long =
+        items.count { it.stableId == stableId }.toLong().also { items.removeIf { it.stableId == stableId } }
+
+    override fun deleteByUserIdAndStableId(userId: ObjectId, stableId: ObjectId): Long =
+        items.count { it.userId == userId && it.stableId == stableId }.toLong().also { items.removeIf { it.userId == userId && it.stableId == stableId } }
+
     override fun save(item: DigestItem): DigestItem {
         items.removeIf { it.id == item.id }
         items += item

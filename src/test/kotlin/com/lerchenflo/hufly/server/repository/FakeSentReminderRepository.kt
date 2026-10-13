@@ -15,6 +15,8 @@ class FakeSentReminderRepository : SentReminderRepository {
         return reminder
     }
 
+    override fun findByDueAtGreaterThan(time: Long): List<SentReminder> = reminders.filter { it.dueAt > time }
+
     override fun deleteByDueAtBefore(time: Long): Long = reminders.count { it.dueAt < time }.toLong().also { reminders.removeIf { it.dueAt < time } }
 
     override fun deleteByStableId(stableId: ObjectId): Long =

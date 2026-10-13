@@ -6,6 +6,8 @@ import org.springframework.data.repository.Repository
 
 interface DigestItemRepository : Repository<DigestItem, ObjectId> {
     fun deleteByUserIdIn(userIds: Collection<ObjectId>): Long
+    fun deleteByStableId(stableId: ObjectId): Long
+    fun deleteByUserIdAndStableId(userId: ObjectId, stableId: ObjectId): Long
     fun save(item: DigestItem): DigestItem
     fun findByCreatedAtBefore(time: Long): List<DigestItem>
     fun deleteByIdIn(ids: Collection<ObjectId>): Long

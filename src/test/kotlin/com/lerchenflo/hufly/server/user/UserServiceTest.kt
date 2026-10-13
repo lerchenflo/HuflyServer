@@ -281,6 +281,20 @@ class UserServiceTest {
     }
 
     @Test
+    fun `leaving drops the digest items of that stable, others stay`() {
+        val elsewhere = alsoElsewhere(rider)
+        fun item(stableId: ObjectId, title: String) = digestItemRepository.save(
+            com.lerchenflo.hufly.server.notification.model.DigestItem(userId = rider.accountId, stableId = stableId, title = title, body = "", createdAt = 0L)
+        )
+        item(STABLE_ID, "here")
+        item(OTHER_STABLE_ID, "there")
+
+        userService.leaveStable(elsewhere)
+
+        assertEquals(listOf("here"), digestItemRepository.items.map { it.title })
+    }
+
+    @Test
     fun `leaving another stable re-stamps the login's row in the stable that created it`() {
         val elsewhere = alsoElsewhere(rider)
 

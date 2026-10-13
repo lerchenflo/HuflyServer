@@ -17,6 +17,7 @@ import com.lerchenflo.hufly.server.user.model.User
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.bson.types.ObjectId
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -40,13 +41,19 @@ class TaskReminderService(
 ) {
     private data class DueDate(val task: StableTask, val title: String, val dueAt: Long, val occurrenceAt: Long?, val assignees: List<ObjectId>)
 
+    private data class ReminderKey(val taskId: ObjectId, val dueAt: Long, val userId: ObjectId)
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
     fun sendDue() {
         val now = clock.millis()
         sentReminders.deleteByDueAtBefore(now - DAY_MILLIS)
         val preferences = mutableMapOf<ObjectId, NotificationPreferences>()
+        val sent = sentReminders.findByDueAtGreaterThan(now).mapTo(mutableSetOf()) { ReminderKey(it.taskId, it.dueAt, it.userId) }
         dueDates(now, now + NotificationPreferences.MAX_TASK_REMINDER_MINUTES * 60_000L).forEach { date ->
             date.assignees.distinct()
+                .filter { ReminderKey(date.task.id, date.dueAt, it) !in sent }
                 .mapNotNull { id -> userRepository.findById(id)?.takeIf { it.stableId == date.task.stableId && !it.deleted } }
                 .forEach { user ->
                     val userPreferences = preferences.getOrPut(user.accountId) {
@@ -64,7 +71,15 @@ class TaskReminderService(
             .filter { !it.deleted && it.recurrence != null && it.dueAt != null }
             .distinctBy { it.id }
         val changes = occurrenceRepository.findByTaskIdInAndDeletedFalse(series.map { it.id }).groupBy { it.taskId }
-        return single + series.flatMap { task -> seriesDates(task, changes[task.id].orEmpty().associateBy { it.occurrenceDueAt }, now, until) }
+        return single + series.flatMap { task ->
+            // One broken series must not stop every other reminder.
+            try {
+                seriesDates(task, changes[task.id].orEmpty().associateBy { it.occurrenceDueAt }, now, until)
+            } catch (e: RuntimeException) {
+                log.warn("Task {}: dates for reminders failed: {}", task.id, e.message)
+                emptyList()
+            }
+        }
     }
 
     private fun seriesDates(task: StableTask, changes: Map<Long, TaskOccurrence>, now: Long, until: Long): List<DueDate> {

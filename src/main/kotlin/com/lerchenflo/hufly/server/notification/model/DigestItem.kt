@@ -11,6 +11,8 @@ data class DigestItem(
     @Id val id: ObjectId = ObjectId.get(),
     /** The recipient's account id. */
     val userId: ObjectId,
+    /** The stable the push is about; null for items collected before 2026-10-13. */
+    @Indexed val stableId: ObjectId? = null,
     val title: String,
     val body: String,
     @Indexed val createdAt: Long,

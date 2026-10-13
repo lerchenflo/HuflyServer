@@ -187,7 +187,7 @@ class NotificationService(
             }
             if (preferences.digest) {
                 log.info("Notification {} for account {}: held for the digest", type, user.accountId)
-                digestRepository.save(DigestItem(userId = user.accountId, title = push.title, body = push.body, createdAt = clock.millis()))
+                digestRepository.save(DigestItem(userId = user.accountId, stableId = user.stableId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
                 pushService.send(user.accountId, push)
                 onPushed(user, preferences)
