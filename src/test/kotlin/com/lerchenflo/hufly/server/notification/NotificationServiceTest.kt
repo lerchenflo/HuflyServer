@@ -217,6 +217,28 @@ class NotificationServiceTest {
     }
 
     @Test
+    fun `a muted push type is dropped, also for digest users, other types still arrive`() {
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationMutedTypes" to "note, event_invitation"), clock.millis()))
+        settingsRepository.save(UserSettings(clara.id, mapOf("notificationMutedTypes" to "event_invitation,unknown", "notificationDigest" to "true"), clock.millis()))
+
+        service.on(EventInvited(STABLE_ID, anna.id, event().id, listOf(ben.id, clara.id), null))
+        service.on(TaskAssigned(STABLE_ID, anna.id, task().id, listOf(ben.id), null))
+
+        assertEquals(listOf("task_assigned"), sentTo(ben).map { it.data["type"] })
+        assertTrue(digestRepository.items.isEmpty())
+    }
+
+    @Test
+    fun `an accepted join request arrives even when join_accepted is listed as muted`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationMutedTypes" to "join_accepted"), clock.millis()))
+
+        service.on(com.lerchenflo.hufly.server.core.notification.JoinAccepted(STABLE_ID, anna.id, ben.id))
+
+        assertEquals(listOf("join_accepted"), sentTo(ben).map { it.data["type"] })
+    }
+
+    @Test
     fun `muted and digest recipients are logged`() {
         val logs = com.lerchenflo.hufly.server.testdata.LogCapture(NotificationService::class.java)
         settingsRepository.save(UserSettings(ben.id, mapOf("notificationsEnabled" to "false"), clock.millis()))

@@ -12,8 +12,15 @@ data class NotificationPreferences(
     val digestTime: LocalTime = LocalTime(7, 0),
     /** For dates in the text and the digest time. */
     val zone: TimeZone = TimeZone.of("Europe/Vienna"),
+    /** Push types (`data.type`) the user never wants, not even in the digest. */
+    val mutedTypes: Set<String> = emptySet(),
 ) {
+    fun mutes(type: String?): Boolean = type != null && type !in UNMUTABLE_TYPES && type in mutedTypes
+
     companion object {
+        /** The applicant waits for this answer. */
+        private val UNMUTABLE_TYPES = setOf("join_accepted")
+
         fun of(values: Map<String, String>?): NotificationPreferences {
             val defaults = NotificationPreferences()
             if (values == null) return defaults
@@ -26,6 +33,7 @@ data class NotificationPreferences(
                 zone = values["notificationTimeZone"]?.let {
                     try { TimeZone.of(it) } catch (e: IllegalTimeZoneException) { null }
                 } ?: defaults.zone,
+                mutedTypes = values["notificationMutedTypes"].orEmpty().split(',').map { it.trim() }.filterTo(mutableSetOf()) { it.isNotEmpty() },
             )
         }
     }

@@ -149,7 +149,7 @@ class NotificationService(
             // The stable lets an app with several stables open the right one on a tap.
             val push = message(preferences.zone).let { it.copy(data = it.data + ("stableId" to user.stableId.toHexString())) }
             val type = push.data["type"]
-            if (!preferences.enabled) {
+            if (!preferences.enabled || preferences.mutes(type)) {
                 log.info("Notification {} for account {}: muted", type, user.accountId)
                 return@forEach
             }
