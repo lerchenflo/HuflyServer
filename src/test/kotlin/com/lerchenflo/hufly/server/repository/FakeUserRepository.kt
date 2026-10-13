@@ -51,6 +51,9 @@ class FakeUserRepository(val accounts: FakeAccountRepository = FakeAccountReposi
     override fun findByAccountIdAndDeletedFalse(accountId: ObjectId): List<User> =
         users.filter { it.accountId == accountId && !it.deleted }
 
+    override fun findByAccountIdInAndDeletedFalse(accountIds: Collection<ObjectId>): List<User> =
+        users.filter { it.accountId in accountIds && !it.deleted }
+
     override fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<User> =
         users.filter { it.stableId == stableId && !it.deleted }
 }

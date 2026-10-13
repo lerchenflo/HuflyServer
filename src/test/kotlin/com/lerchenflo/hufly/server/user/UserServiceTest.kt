@@ -241,6 +241,96 @@ class UserServiceTest {
         assertTrue(!stored(admin.id).deleted)
     }
 
+    // A login the stable created that joined another stable belongs to the person
+
+    private fun alsoElsewhere(member: com.lerchenflo.hufly.server.user.model.User) =
+        userRepository.save(testUser(email = member.email, stableId = OTHER_STABLE_ID).copy(accountId = member.accountId))
+
+    @Test
+    fun `the admin cannot reset the password of a stable-created login that is also in another stable`() {
+        alsoElsewhere(rider)
+
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.resetPassword(admin, rider.id) }
+
+        assertEquals(HttpStatus.FORBIDDEN, e.statusCode)
+        assertEquals("SELF_REGISTERED", e.code)
+        assertTrue(hashEncoder.matches("OldSecret1", login(rider.accountId).hashedPassword))
+    }
+
+    @Test
+    fun `the admin cannot change the login email of a stable-created login that is also in another stable`() {
+        alsoElsewhere(rider)
+
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> {
+            userService.updateUser(admin, rider.id, "taken-over@hufly.test", "Rider", null, emptyList())
+        }
+
+        assertEquals("SELF_REGISTERED", e.code)
+        assertEquals("rider@hufly.test", login(rider.accountId).email)
+    }
+
+    @Test
+    fun `removing a stable-created member who is also in another stable keeps their login`() {
+        val elsewhere = alsoElsewhere(rider)
+
+        userService.deleteUser(admin, rider.id)
+
+        assertTrue(stored(rider.id).deleted)
+        assertTrue(!login(rider.accountId).deleted)
+        assertEquals(elsewhere, accessService.requester(rider.accountId))
+    }
+
+    // Leaving a stable
+
+    @Test
+    fun `a member leaves the stable and keeps the login, sessions and other stables`() {
+        val elsewhere = userRepository.save(testUser(email = "rider@hufly.test", stableId = OTHER_STABLE_ID).copy(accountId = rider.accountId))
+        horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse().copy(coRiderUserIds = listOf(rider.id)))
+        session(rider.accountId)
+
+        userService.leaveStable(rider)
+
+        val left = stored(rider.id)
+        assertTrue(left.deleted)
+        assertEquals(DELETED_USER_NAME, left.displayName)
+        assertEquals(rider.id, left.updatedBy)
+        assertTrue(horseRepository.horses.all { it.coRiderUserIds.isEmpty() })
+        assertTrue(!login(rider.accountId).deleted)
+        assertEquals(1, refreshTokenRepository.tokens.size)
+        assertEquals(elsewhere, accessService.requester(rider.accountId))
+    }
+
+    @Test
+    fun `a member whose login the stable created keeps that login when leaving`() {
+        val created = userService.createUser(admin, "kid@hufly.test", "Kind", null, emptyList()).user
+
+        userService.leaveStable(created)
+
+        assertTrue(stored(created.id).deleted)
+        assertTrue(!login(created.accountId).deleted)
+        assertEquals("kid@hufly.test", login(created.accountId).email)
+    }
+
+    @Test
+    fun `the admin cannot leave a stable with other members`() {
+        val e = assertFailsWith<com.lerchenflo.hufly.server.core.CodedException> { userService.leaveStable(admin) }
+        assertEquals(HttpStatus.CONFLICT, e.statusCode)
+        assertEquals("STABLE_ADMIN", e.code)
+        assertTrue(!stored(admin.id).deleted)
+    }
+
+    @Test
+    fun `an admin alone leaves and the stable goes with all its data, the login stays`() {
+        userRepository.save(rider.copy(deleted = true))
+        horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse())
+
+        userService.leaveStable(admin)
+
+        assertEquals(null, stableRepository.findById(STABLE_ID))
+        assertTrue(horseRepository.horses.none { it.stableId == STABLE_ID })
+        assertTrue(!login(admin.accountId).deleted)
+    }
+
     // Self-registered members own their login
 
     private fun selfRegistered(): com.lerchenflo.hufly.server.user.model.User {

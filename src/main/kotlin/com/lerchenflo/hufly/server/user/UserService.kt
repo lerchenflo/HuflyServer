@@ -133,8 +133,8 @@ class UserService(
         val target = stableMember(requester, userId)
         eraseMembership(target, requester.id)
         val account = accountRepository.findById(target.accountId)
-        // A login the stable created goes with the member; a self-registered person keeps it and can join elsewhere.
-        if (account != null && account.createdByStableId == requester.stableId) eraseAccount(account)
+        // A login the stable manages goes with the member; anyone else keeps it and can join elsewhere.
+        if (account != null && stableManagesLogin(requester.stableId, account, accessService.memberships(account.id))) eraseAccount(account)
     }
 
     /**
@@ -155,6 +155,18 @@ class UserService(
         }
         memberOf.forEach { eraseMembership(it, it.id) }
         eraseAccount(account)
+    }
+
+    /** The member leaves the requested stable; the login and other stables stay. An admin alone takes the stable along. */
+    fun leaveStable(requester: User) {
+        if (accessService.isAdmin(requester)) {
+            if (userRepository.findByStableIdAndDeletedFalse(requester.stableId).any { it.id != requester.id }) {
+                throw CodedException(HttpStatus.CONFLICT, "STABLE_ADMIN", "The stable admin cannot leave while others are members")
+            }
+            stableRepository.findById(requester.stableId)?.let { stableDeletionService.deleteStable(it.id, it.name) }
+            return
+        }
+        eraseMembership(requester, requester.id)
     }
 
     /** The login is gone for good and its email free again; sessions, settings and pushes go with it. */
@@ -287,10 +299,10 @@ class UserService(
         return normalized
     }
 
-    /** The admin may change only logins their stable created; self-registered members own their login. */
+    /** The admin may change only logins their stable manages; everyone else owns their login. */
     private fun managedAccount(requester: User, target: User): Account {
         val account = accessService.requireAccount(target.accountId)
-        if (account.createdByStableId != requester.stableId) {
+        if (!stableManagesLogin(requester.stableId, account, accessService.memberships(account.id))) {
             throw CodedException(HttpStatus.FORBIDDEN, "SELF_REGISTERED", "The member manages this login")
         }
         return account

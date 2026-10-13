@@ -133,6 +133,22 @@ class UserAdminControllerTest {
     }
 
     @Test
+    fun `leaving the stable answers 204, then the account has no stable, the admin gets 409`() {
+        call(HttpMethod.DELETE, "/users/me/membership", userId = admin.id).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("STABLE_ADMIN") }
+        }
+
+        call(HttpMethod.DELETE, "/users/me/membership", userId = rider.id).andExpect { status { isNoContent() } }
+
+        assertTrue(userRepository.findById(rider.id)!!.deleted)
+        call(HttpMethod.GET, "/users/me", userId = rider.id).andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("NO_STABLE") }
+        }
+    }
+
+    @Test
     fun `own account deletion without a token answers 401`() {
         mockMvc.delete("/users/me") {
             contentType = MediaType.APPLICATION_JSON

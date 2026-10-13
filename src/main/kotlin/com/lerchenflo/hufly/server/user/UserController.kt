@@ -140,6 +140,12 @@ class UserController(
         userService.deleteOwnAccount(accessService.requireAccount(requireAuth()), request.password)
     }
 
+    @DeleteMapping("/me/membership")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun leaveStable() {
+        userService.leaveStable(accessService.requester(requireAuth()))
+    }
+
     @PostMapping
     fun createUser(@Valid @RequestBody request: CreateUserRequest): CreatedUserResponse {
         val requester = accessService.requester(requireAuth())

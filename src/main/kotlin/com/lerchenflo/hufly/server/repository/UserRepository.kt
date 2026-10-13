@@ -12,5 +12,6 @@ interface UserRepository : Repository<User, ObjectId> {
     /** Fails with a duplicate key error if the account has a live membership in that stable already. */
     fun insert(user: User): User
     fun findByAccountIdAndDeletedFalse(accountId: ObjectId): List<User>
+    fun findByAccountIdInAndDeletedFalse(accountIds: Collection<ObjectId>): List<User>
     fun findByStableIdAndDeletedFalse(stableId: ObjectId): List<User>
 }
