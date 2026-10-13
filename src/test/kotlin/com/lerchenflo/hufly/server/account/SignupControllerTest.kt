@@ -11,6 +11,7 @@ import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testAccount
+import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.testStable
 import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
@@ -200,6 +201,26 @@ class SignupControllerTest {
 
         call(HttpMethod.DELETE, "/accounts/me/joinrequest", as_ = login).andExpect { status { isNoContent() } }
         call(HttpMethod.GET, "/accounts/me", as_ = login).andExpect { jsonPath("$.joinRequest") { value(null) } }
+    }
+
+    // A login the stable created belongs to the person once it joins another stable (loginManagedByStable flips)
+
+    @Test
+    fun `joining another stable re-stamps the login's row in the stable that created it`() {
+        val foreignAdmin = userRepository.save(testUser(email = "chef@sonnenhof.test", stableId = OTHER_STABLE_ID))
+        stableRepository.save(testStable(id = OTHER_STABLE_ID, adminUserId = foreignAdmin.id, name = "Sonnenhof").copy(inviteCode = "WXYZ6789"))
+        val requestId = json(call(HttpMethod.PUT, "/accounts/me/joinrequest", """{"code":"WXYZ6789"}""", as_ = rider.id))["id"].asString()
+
+        call(HttpMethod.POST, "/stables/me/joinrequests/$requestId/accept", as_ = foreignAdmin.id).andExpect { status { isOk() } }
+
+        assertTrue(userRepository.findById(rider.id)!!.updatedAt > 0L)
+    }
+
+    @Test
+    fun `creating an own stable re-stamps the login's row in the stable that created it`() {
+        call(HttpMethod.POST, "/accounts/me/stable", """{"name":"Eigener Hof"}""", as_ = rider.id).andExpect { status { isCreated() } }
+
+        assertTrue(userRepository.findById(rider.id)!!.updatedAt > 0L)
     }
 
     // Admin answers

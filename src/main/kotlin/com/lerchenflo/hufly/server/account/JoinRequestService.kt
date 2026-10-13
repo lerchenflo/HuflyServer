@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.account
 
+import com.lerchenflo.hufly.server.user.restampCreatingMembership
 import com.lerchenflo.hufly.server.account.model.JoinRequest
 import com.lerchenflo.hufly.server.account.model.JoinRequestResponse
 import com.lerchenflo.hufly.server.account.model.JoinRequestStatus
@@ -83,6 +84,7 @@ class JoinRequestService(
             resolve(request, JoinRequestStatus.WITHDRAWN)
             throw StableOnboardingService.alreadyMember()
         }
+        restampCreatingMembership(account.id, accountRepository, userRepository, now)
         events.publishEvent(JoinAccepted(requester.stableId, requester.id, member.id))
         return member
     }

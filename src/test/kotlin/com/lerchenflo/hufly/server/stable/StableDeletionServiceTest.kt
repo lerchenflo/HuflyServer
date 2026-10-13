@@ -30,12 +30,13 @@ class StableDeletionServiceTest {
     private val tags = FakeTagRepository()
     private val pictures = FakePictureStore()
     private val sentReminders = com.lerchenflo.hufly.server.repository.FakeSentReminderRepository()
+    private val clock = com.lerchenflo.hufly.server.core.security.MutableClock(1_000L)
 
     private val service = StableDeletionService(
         stables, users, joinRequests, digestItems, horses, tags, FakeFoodPlanRepository(), FakeHorseLogRepository(),
         FakePaddockRepository(), FakeHorseGroupRepository(), FakeHorseConflictRepository(), FakePaddockAssignmentRepository(),
         FakeEventRepository(), FakeEventInvitationRepository(), FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, pictures,
+        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, pictures, users.accounts, clock,
     )
 
     private val stableId = ObjectId.get()
@@ -96,6 +97,17 @@ class StableDeletionServiceTest {
         assertEquals(logins.toSet(), users.accounts.accounts.map { it.id }.toSet())
         assertEquals(logins.toSet(), tokens.tokens.map { it.userId }.toSet())
         assertEquals(logins.toSet(), settings.settings.keys)
+    }
+
+    @Test
+    fun `members whose login another stable created get their row there re-stamped`() {
+        setUp()
+        val home = users.save(testUser(stableId = otherStableId))
+        users.save(testUser(stableId = stableId).copy(accountId = home.accountId))
+
+        service.deleteStable(stableId, "Hof Lerchenfeld")
+
+        assertEquals(1_000L, users.findById(home.id)!!.updatedAt)
     }
 
     @Test

@@ -209,6 +209,7 @@ class UserService(
         }
         absenceService.removeUser(target.id, actorId)
         pictureStore.delete(PictureKind.USER, target.id)
+        restampCreatingMembership(target.accountId, accountRepository, userRepository, now)
     }
 
     /** USR-6: everyone sets the own profile picture, the admin also those of members (e.g. kids without phones). */

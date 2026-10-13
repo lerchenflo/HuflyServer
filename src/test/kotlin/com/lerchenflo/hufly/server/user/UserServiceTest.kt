@@ -52,7 +52,7 @@ class UserServiceTest {
         com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository(), com.lerchenflo.hufly.server.repository.FakeHorseLogRepository(), com.lerchenflo.hufly.server.repository.FakePaddockRepository(), com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository(),
         com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository(), com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository(), com.lerchenflo.hufly.server.repository.FakeEventRepository(),
         com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository(),
-        com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, com.lerchenflo.hufly.server.repository.FakeSentReminderRepository(), pictureStore,
+        com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, com.lerchenflo.hufly.server.repository.FakeSentReminderRepository(), pictureStore, userRepository.accounts, clock,
     )
     private val userService = UserService(
         userRepository, userRepository.accounts, joinRequestRepository, stableRepository, stableDeletionService, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
@@ -278,6 +278,15 @@ class UserServiceTest {
         assertTrue(stored(rider.id).deleted)
         assertTrue(!login(rider.accountId).deleted)
         assertEquals(elsewhere, accessService.requester(rider.accountId))
+    }
+
+    @Test
+    fun `leaving another stable re-stamps the login's row in the stable that created it`() {
+        val elsewhere = alsoElsewhere(rider)
+
+        userService.leaveStable(elsewhere)
+
+        assertEquals(clock.millis(), stored(rider.id).updatedAt)
     }
 
     // Leaving a stable

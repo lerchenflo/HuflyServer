@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.stable
 
+import com.lerchenflo.hufly.server.user.restampCreatingMembership
 import com.lerchenflo.hufly.server.account.model.Account
 import com.lerchenflo.hufly.server.authentication.AuthService
 import com.lerchenflo.hufly.server.authentication.normalizeEmail
@@ -67,6 +68,7 @@ class StableOnboardingService(
     fun createStableForAccount(account: Account, stableName: String, place: String?): CreatedStable {
         requireRoomForStable(account.id)
         return create(ObjectId.get(), stableName, place, account)
+            .also { restampCreatingMembership(account.id, accountRepository, userRepository, clock.millis()) }
     }
 
     /** 409 `STABLE_LIMIT` once the account is in [MAX_STABLES_PER_ACCOUNT] stables. Parallel joins may pass it by one or two. */

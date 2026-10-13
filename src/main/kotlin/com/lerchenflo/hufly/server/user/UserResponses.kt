@@ -33,3 +33,13 @@ class UserResponses(private val accountRepository: AccountRepository, private va
  */
 fun stableManagesLogin(stableId: ObjectId, account: Account?, liveMemberships: List<User>): Boolean =
     account?.createdByStableId == stableId && liveMemberships.all { it.stableId == stableId }
+
+/**
+ * Call after the account's memberships changed: its row in the stable that created the login gets a new `updatedAt`,
+ * so that stable's delta sync sends the possibly flipped `loginManagedByStable` again.
+ */
+fun restampCreatingMembership(accountId: ObjectId, accountRepository: AccountRepository, userRepository: UserRepository, now: Long) {
+    val stableId = accountRepository.findById(accountId)?.createdByStableId ?: return
+    val row = userRepository.findByAccountIdAndDeletedFalse(accountId).firstOrNull { it.stableId == stableId } ?: return
+    userRepository.save(row.copy(updatedAt = now))
+}

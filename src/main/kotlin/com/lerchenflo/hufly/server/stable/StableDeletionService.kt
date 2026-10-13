@@ -1,7 +1,9 @@
 package com.lerchenflo.hufly.server.stable
 
+import com.lerchenflo.hufly.server.user.restampCreatingMembership
 import com.lerchenflo.hufly.server.core.picture.PictureKind
 import com.lerchenflo.hufly.server.core.picture.PictureStore
+import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.repository.*
 import org.bson.types.ObjectId
 import org.slf4j.LoggerFactory
@@ -40,6 +42,8 @@ class StableDeletionService(
     private val absenceRepository: AbsenceRepository,
     private val sentReminderRepository: SentReminderRepository,
     private val pictureStore: PictureStore,
+    private val accountRepository: AccountRepository,
+    private val clock: Clock,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -64,6 +68,7 @@ class StableDeletionService(
             eventOccurrenceAnswerRepository::deleteByStableId, taskRepository::deleteByStableId,
             taskOccurrenceRepository::deleteByStableId, noteRepository::deleteByStableId, absenceRepository::deleteByStableId, sentReminderRepository::deleteByStableId,
         ).forEach { it(stableId) }
+        members.map { it.accountId }.distinct().forEach { restampCreatingMembership(it, accountRepository, userRepository, clock.millis()) }
         stableRepository.deleteById(stableId)
         log.info("Stable {} \"{}\" deleted with {} users", stableId, stable.name, userIds.size)
     }
