@@ -35,6 +35,7 @@ class TaskReminderService(
     private val absenceRepository: AbsenceRepository,
     private val sentReminders: SentReminderRepository,
     private val pushService: PushService,
+    private val pushTitles: PushTitles,
     private val clock: Clock,
 ) {
     private data class DueDate(val task: StableTask, val title: String, val dueAt: Long, val occurrenceAt: Long?, val assignees: List<ObjectId>)
@@ -92,7 +93,7 @@ class TaskReminderService(
             if (date.occurrenceAt != null) put("occurrenceAt", date.occurrenceAt.toString())
             put("stableId", user.stableId.toHexString())
         }
-        pushService.send(user.accountId, PushMessage("Erinnerung: ${date.title}", "Fällig ${formatPushTime(date.dueAt, preferences.zone)}", data))
+        pushService.send(user.accountId, PushMessage(pushTitles.of(user, "Erinnerung: ${date.title}"), "Fällig ${formatPushTime(date.dueAt, preferences.zone)}", data))
     }
 
     private fun isAbsent(user: User, dueAt: Long, zone: TimeZone): Boolean {

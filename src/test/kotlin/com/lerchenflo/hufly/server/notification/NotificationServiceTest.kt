@@ -52,7 +52,7 @@ class NotificationServiceTest {
     private val android = FakePushSender(PushPlatform.ANDROID)
     private val pushService = PushService(sessions, listOf(android), Executor { it.run() }, clock)
     private val service = NotificationService(
-        userRepository, userRepository.accounts, stableRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, sentReminders, clock,
+        userRepository, userRepository.accounts, stableRepository, settingsRepository, noteRepository, eventRepository, taskRepository, pushService, digestRepository, sentReminders, PushTitles(userRepository, stableRepository), clock,
     )
 
     private val anna = testUser(email = "anna@hufly.test")
@@ -267,6 +267,43 @@ class NotificationServiceTest {
 
         assertEquals(1, sentTo(ben).size)
         assertTrue(sentReminders.reminders.isEmpty())
+    }
+
+    // Accounts with several stables
+
+    private fun alsoInAnotherStable(user: User) =
+        userRepository.save(testUser(email = user.email, stableId = OTHER_STABLE_ID).copy(accountId = user.accountId))
+
+    @Test
+    fun `titles name the stable for accounts with several stables, others stay unchanged`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        alsoInAnotherStable(ben)
+
+        service.on(NotePosted(STABLE_ID, anna.id, note().id))
+
+        assertEquals(listOf("Hof Lerchenfeld: Neuer Aushang"), sentTo(ben).map { it.title })
+        assertEquals(listOf("Neuer Aushang"), sentTo(clara).map { it.title })
+    }
+
+    @Test
+    fun `digest lines carry the stable prefix under the same rule`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        alsoInAnotherStable(ben)
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationDigest" to "true"), clock.millis()))
+
+        service.on(NotePosted(STABLE_ID, anna.id, note().id))
+
+        assertEquals(listOf("Hof Lerchenfeld: Neuer Aushang"), digestRepository.items.map { it.title })
+    }
+
+    @Test
+    fun `the welcome push keeps its title, it names the stable already`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        alsoInAnotherStable(ben)
+
+        service.on(com.lerchenflo.hufly.server.core.notification.JoinAccepted(STABLE_ID, anna.id, ben.id))
+
+        assertEquals(listOf("Willkommen im Stall"), sentTo(ben).map { it.title })
     }
 
     @Test

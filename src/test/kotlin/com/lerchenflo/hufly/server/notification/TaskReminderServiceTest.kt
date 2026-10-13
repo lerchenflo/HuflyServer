@@ -47,8 +47,10 @@ class TaskReminderServiceTest {
     private val sentReminders = FakeSentReminderRepository()
     private val android = FakePushSender(PushPlatform.ANDROID)
     private val pushService = PushService(sessions, listOf(android), Executor { it.run() }, clock)
+    private val stableRepository = com.lerchenflo.hufly.server.repository.FakeStableRepository()
     private val service = TaskReminderService(
-        taskRepository, occurrenceRepository, userRepository, settingsRepository, absenceRepository, sentReminders, pushService, clock,
+        taskRepository, occurrenceRepository, userRepository, settingsRepository, absenceRepository, sentReminders, pushService,
+        PushTitles(userRepository, stableRepository), clock,
     )
 
     private val anna = testUser(email = "anna@hufly.test")
@@ -253,6 +255,18 @@ class TaskReminderServiceTest {
         service.sendDue()
 
         assertEquals(listOf(reminder(movedHere, inAnHour, occurrenceAt = tomorrow)), sentTo(ben))
+    }
+
+    @Test
+    fun `the title names the stable for an assignee with several stables`() {
+        stableRepository.save(com.lerchenflo.hufly.server.testdata.testStable(adminUserId = anna.id))
+        userRepository.save(testUser(email = ben.email, stableId = OTHER_STABLE_ID).copy(accountId = ben.accountId))
+        task(assignees = listOf(ben, clara))
+
+        service.sendDue()
+
+        assertEquals(listOf("Hof Lerchenfeld: Erinnerung: Misten"), sentTo(ben).map { it.title })
+        assertEquals(listOf("Erinnerung: Misten"), sentTo(clara).map { it.title })
     }
 
     @Test

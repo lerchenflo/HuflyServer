@@ -51,6 +51,7 @@ class NotificationService(
     private val pushService: PushService,
     private val digestRepository: DigestItemRepository,
     private val sentReminders: SentReminderRepository,
+    private val pushTitles: PushTitles,
     private val clock: Clock,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -172,7 +173,13 @@ class NotificationService(
         recipients.forEach { user ->
             val preferences = NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
             // The stable lets an app with several stables open the right one on a tap.
-            val push = message(preferences.zone).let { it.copy(data = it.data + ("stableId" to user.stableId.toHexString())) }
+            val push = message(preferences.zone).let { message ->
+                val type = message.data["type"]
+                message.copy(
+                    title = if (type == "join_accepted") message.title else pushTitles.of(user, message.title),
+                    data = message.data + ("stableId" to user.stableId.toHexString()),
+                )
+            }
             val type = push.data["type"]
             if (!preferences.enabled || preferences.mutes(type)) {
                 log.info("Notification {} for account {}: muted", type, user.accountId)
