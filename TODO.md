@@ -4,6 +4,7 @@ Open work only; finished items live in git history. Client-side product TODOs li
 
 ## Push notifications
 - [ ] Anyone who knows another install's push token could register it on their own session (the token moves). Tokens are not public, so accepted for now.
+- [ ] Event changes push nothing yet (invites and answers do). Decide which of these push the invitees (and how they are muted): time/title change (`updateEvent`), event deleted, invitation removed, a series date moved or the user taken off it (`EventOccurrenceService`), reminder before the start (like `TaskReminderService`, e.g. a per-user lead time). Update the client contract (`data.type` values, muting list) in `../hufly/TODO.md` with it.
 
 ## Open decisions
 - [ ] Payment model (BIZ-6): the app is free for now (decided 2026-10-09); in-app purchases may come later. The subscription fields stay unused (TRIAL); then add prices to the website.
