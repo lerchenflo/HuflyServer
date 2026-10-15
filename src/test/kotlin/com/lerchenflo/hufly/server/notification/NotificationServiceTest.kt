@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.core.notification.EventChange
+import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
 import com.lerchenflo.hufly.server.core.notification.NotePosted
@@ -165,6 +167,77 @@ class NotificationServiceTest {
                 mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toString(), "stableId" to STABLE_ID.toHexString())),
             sentTo(ben).single(),
         )
+    }
+
+    private fun eventUpdate(event: Event, change: String, occurrenceAt: Long? = null) = buildMap {
+        put("type", "event_update")
+        put("eventId", event.id.toHexString())
+        if (occurrenceAt != null) put("occurrenceAt", occurrenceAt.toString())
+        put("change", change)
+        put("stableId", STABLE_ID.toHexString())
+    }
+
+    @Test
+    fun `a moved event tells the given users its new time and who moved it`() {
+        val event = event()
+
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id, anna.id, foreigner.id), EventChange.MOVED))
+
+        assertEquals(listOf(PushMessage("Verschoben: Springstunde", "Neu: Fr. 09.10. 17:00 · von anna", eventUpdate(event, "moved"))), sentTo(ben))
+        assertTrue(sentTo(anna).isEmpty() && sentTo(foreigner).isEmpty() && sentTo(clara).isEmpty())
+    }
+
+    @Test
+    fun `a moved series names its new first date`() {
+        val event = event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna"))
+
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id), EventChange.MOVED))
+
+        assertEquals("Neu: wiederkehrend ab Fr. 09.10. 17:00 · von anna", sentTo(ben).single().body)
+    }
+
+    @Test
+    fun `a deleted event or series is called off, although the event is gone`() {
+        val single = eventRepository.save(event().copy(deleted = true))
+        val series = eventRepository.save(event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna")).copy(deleted = true))
+
+        service.on(EventChanged(STABLE_ID, anna.id, single.id, listOf(ben.id), EventChange.DELETED))
+        service.on(EventChanged(STABLE_ID, anna.id, series.id, listOf(ben.id), EventChange.DELETED))
+
+        assertEquals(
+            listOf(
+                PushMessage("Abgesagt: Springstunde", "Fr. 09.10. 17:00 · von anna", eventUpdate(single, "deleted")),
+                PushMessage("Abgesagt: Springstunde", "Alle Termine · von anna", eventUpdate(series, "deleted")),
+            ),
+            sentTo(ben),
+        )
+    }
+
+    @Test
+    fun `a removed invitation tells its user, naming the date of a date invitation`() {
+        val event = event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna"))
+        val nextWeek = lesson + days(7)
+
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id), EventChange.UNINVITED))
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id), EventChange.UNINVITED, occurrenceStartAt = nextWeek))
+
+        assertEquals(
+            listOf(
+                PushMessage("Ausgeladen: Springstunde", "Alle Termine · von anna", eventUpdate(event, "uninvited")),
+                PushMessage("Ausgeladen: Springstunde", "Fr. 16.10. 17:00 · von anna", eventUpdate(event, "uninvited", nextWeek)),
+            ),
+            sentTo(ben),
+        )
+    }
+
+    @Test
+    fun `only a deletion speaks about a deleted event`() {
+        val event = eventRepository.save(event().copy(deleted = true))
+
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id), EventChange.MOVED))
+        service.on(EventChanged(STABLE_ID, anna.id, event.id, listOf(ben.id), EventChange.UNINVITED))
+
+        assertTrue(android.sent.isEmpty())
     }
 
     @Test

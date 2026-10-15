@@ -151,4 +151,22 @@ class MongoOccurrenceRepositoryTest {
         assertEquals(listOf(series), taskOccurrenceRepository.findByTaskIdInAndDeletedFalse(listOf(series)).map { it.taskId })
         assertEquals(listOf(other), taskOccurrenceRepository.findMovedDue(5_000_000L, 5_000_100L).map { it.taskId })
     }
+
+    @Test
+    fun `event dates and answers load by their series, dates also by a start they were moved to`() {
+        val series = ObjectId.get()
+        val other = ObjectId.get()
+        occurrenceRepository.save(occurrence(1, series, OTHER_STABLE_ID))
+        occurrenceRepository.save(occurrence(2, series, OTHER_STABLE_ID, at = key + 1).copy(deleted = true))
+        occurrenceRepository.save(occurrence(3, other, OTHER_STABLE_ID).copy(startAt = 5_000_050L, endAt = 5_000_060L))
+        occurrenceRepository.save(occurrence(4, stableId = OTHER_STABLE_ID).copy(startAt = 5_000_000L, endAt = 5_000_060L))
+        occurrenceRepository.save(occurrence(5, stableId = OTHER_STABLE_ID).copy(startAt = 5_000_050L, endAt = 5_000_060L, deleted = true))
+        answerRepository.save(answer(6, eventId = series).copy(stableId = OTHER_STABLE_ID))
+        answerRepository.save(answer(7, eventId = series).copy(stableId = OTHER_STABLE_ID, deleted = true))
+        answerRepository.save(answer(8).copy(stableId = OTHER_STABLE_ID))
+
+        assertEquals(listOf(1L), occurrenceRepository.findByEventIdInAndDeletedFalse(listOf(series)).map { it.version })
+        assertEquals(listOf(other), occurrenceRepository.findMovedStarting(5_000_000L, 5_000_100L).map { it.eventId })
+        assertEquals(listOf(6L), answerRepository.findByEventIdInAndDeletedFalse(listOf(series)).map { it.version })
+    }
 }

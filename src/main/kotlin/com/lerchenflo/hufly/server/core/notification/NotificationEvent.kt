@@ -33,6 +33,21 @@ data class InvitationAnswered(
     val occurrenceStartAt: Long?,
 ) : NotificationEvent
 
+enum class EventChange { MOVED, DELETED, UNINVITED }
+
+/**
+ * [change] happened to an event [userIds] had accepted a date of that is not over yet. UNINVITED: their invitation was
+ * removed, to the date [occurrenceStartAt] for a date invitation.
+ */
+data class EventChanged(
+    override val stableId: ObjectId,
+    override val actorUserId: ObjectId,
+    val eventId: ObjectId,
+    val userIds: List<ObjectId>,
+    val change: EventChange,
+    val occurrenceStartAt: Long? = null,
+) : NotificationEvent
+
 /** [userIds] newly have the task, or only its date [occurrenceDueAt] as stand-ins. */
 data class TaskAssigned(
     override val stableId: ObjectId,

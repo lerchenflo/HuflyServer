@@ -2,26 +2,19 @@ package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.notification.model.NotificationPreferences
-import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.SentReminder
-import com.lerchenflo.hufly.server.repository.AbsenceRepository
 import com.lerchenflo.hufly.server.repository.SentReminderRepository
 import com.lerchenflo.hufly.server.repository.TaskOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.TaskRepository
-import com.lerchenflo.hufly.server.repository.UserRepository
-import com.lerchenflo.hufly.server.repository.UserSettingsRepository
 import com.lerchenflo.hufly.server.task.model.StableTask
 import com.lerchenflo.hufly.server.task.model.TaskOccurrence
 import com.lerchenflo.hufly.server.task.model.rotationAssignee
 import com.lerchenflo.hufly.server.user.model.User
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.bson.types.ObjectId
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import kotlin.time.Instant
 
 /**
  * Reminds the effective assignees of open tasks and series dates `taskReminderMinutes` before they are due, at once
@@ -31,12 +24,8 @@ import kotlin.time.Instant
 class TaskReminderService(
     private val taskRepository: TaskRepository,
     private val occurrenceRepository: TaskOccurrenceRepository,
-    private val userRepository: UserRepository,
-    private val settingsRepository: UserSettingsRepository,
-    private val absenceRepository: AbsenceRepository,
     private val sentReminders: SentReminderRepository,
-    private val pushService: PushService,
-    private val pushTitles: PushTitles,
+    private val reminders: Reminders,
     private val clock: Clock,
 ) {
     private data class DueDate(val task: StableTask, val title: String, val dueAt: Long, val occurrenceAt: Long?, val assignees: List<ObjectId>)
@@ -48,19 +37,12 @@ class TaskReminderService(
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
     fun sendDue() {
         val now = clock.millis()
-        sentReminders.deleteByDueAtBefore(now - DAY_MILLIS)
-        val preferences = mutableMapOf<ObjectId, NotificationPreferences>()
+        sentReminders.deleteByDueAtBefore(now - Reminders.KEEP_SENT_MILLIS)
         val sent = sentReminders.findByDueAtGreaterThan(now).mapTo(mutableSetOf()) { ReminderKey(it.taskId, it.dueAt, it.userId) }
-        dueDates(now, now + NotificationPreferences.MAX_TASK_REMINDER_MINUTES * 60_000L).forEach { date ->
-            date.assignees.distinct()
-                .filter { ReminderKey(date.task.id, date.dueAt, it) !in sent }
-                .mapNotNull { id -> userRepository.findById(id)?.takeIf { it.stableId == date.task.stableId && !it.deleted } }
-                .forEach { user ->
-                    val userPreferences = preferences.getOrPut(user.accountId) {
-                        NotificationPreferences.of(settingsRepository.findById(user.accountId)?.values)
-                    }
-                    remind(user, date, userPreferences, now)
-                }
+        val run = reminders.run()
+        dueDates(now, now + Reminders.WINDOW_MILLIS).forEach { date ->
+            val userIds = date.assignees.filter { ReminderKey(date.task.id, date.dueAt, it) !in sent }
+            reminders.recipients(run, userIds, date.task.stableId, TYPE).forEach { (user, preferences) -> remind(user, date, preferences, now) }
         }
     }
 
@@ -94,30 +76,21 @@ class TaskReminderService(
     }
 
     private fun remind(user: User, date: DueDate, preferences: NotificationPreferences, now: Long) {
-        if (!preferences.enabled || preferences.mutes(TYPE)) return
         val remindAt = preferences.taskReminderAt(date.dueAt) ?: return
-        if (now < remindAt || isAbsent(user, date.dueAt, preferences.zone)) return
+        if (now < remindAt || reminders.isAbsent(user, date.dueAt, preferences.zone)) return
         try {
             sentReminders.insert(SentReminder(stableId = date.task.stableId, taskId = date.task.id, dueAt = date.dueAt, userId = user.id))
         } catch (e: DuplicateKeyException) {
             return
         }
         val data = buildMap {
-            put("type", TYPE)
             put("taskId", date.task.id.toHexString())
             if (date.occurrenceAt != null) put("occurrenceAt", date.occurrenceAt.toString())
-            put("stableId", user.stableId.toHexString())
         }
-        pushService.send(user.accountId, PushMessage(pushTitles.of(user, "Erinnerung: ${date.title}"), "Fällig ${formatPushTime(date.dueAt, preferences.zone)}", data))
-    }
-
-    private fun isAbsent(user: User, dueAt: Long, zone: TimeZone): Boolean {
-        val day = Instant.fromEpochMilliseconds(dueAt).toLocalDateTime(zone).date.toEpochDays()
-        return absenceRepository.findByUserIdAndDeletedFalse(user.id).any { day in it.from..it.until }
+        reminders.send(user, TYPE, "Erinnerung: ${date.title}", "Fällig ${formatPushTime(date.dueAt, preferences.zone)}", data)
     }
 
     companion object {
         const val TYPE = "task_reminder"
-        private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
     }
 }

@@ -80,6 +80,9 @@ class FakeRepositoryConfig {
     fun fakeSentReminderRepository() = FakeSentReminderRepository()
 
     @Bean @Primary
+    fun fakeSentEventReminderRepository() = FakeSentEventReminderRepository()
+
+    @Bean @Primary
     fun fakeVersionCounterStore() = com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()
 
     @Bean @Primary

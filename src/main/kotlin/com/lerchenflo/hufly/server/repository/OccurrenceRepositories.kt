@@ -13,6 +13,11 @@ interface EventOccurrenceRepository : Repository<EventOccurrence, ObjectId> {
     fun save(occurrence: EventOccurrence): EventOccurrence
     fun findByEventIdAndOccurrenceStartAt(eventId: ObjectId, occurrenceStartAt: Long): EventOccurrence?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrence>
+    fun findByEventIdInAndDeletedFalse(eventIds: Collection<ObjectId>): List<EventOccurrence>
+
+    /** Live dates of every stable moved to a start in (from, to]. */
+    @Query("{ 'deleted': false, 'startAt': { '\$gt': ?0, '\$lte': ?1 } }")
+    fun findMovedStarting(from: Long, to: Long): List<EventOccurrence>
 
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")
     fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<EventOccurrence>
@@ -24,6 +29,7 @@ interface EventOccurrenceAnswerRepository : Repository<EventOccurrenceAnswer, Ob
     fun findByInvitationIdAndOccurrenceStartAt(invitationId: ObjectId, occurrenceStartAt: Long): EventOccurrenceAnswer?
     fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrenceAnswer>
     fun findByInvitationIdAndDeletedFalse(invitationId: ObjectId): List<EventOccurrenceAnswer>
+    fun findByEventIdInAndDeletedFalse(eventIds: Collection<ObjectId>): List<EventOccurrenceAnswer>
 
     @Query(value = "{ 'stableId': ?0, 'version': { '\$gt': ?1, '\$lte': ?2 } }", sort = "{ 'version': 1 }")
     fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<EventOccurrenceAnswer>

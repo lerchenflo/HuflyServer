@@ -1,5 +1,7 @@
 package com.lerchenflo.hufly.server.repository.mongo
 
+import com.lerchenflo.hufly.server.core.recurrence.Recurrence
+import com.lerchenflo.hufly.server.core.recurrence.RecurrenceFrequency
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
@@ -77,5 +79,36 @@ class MongoEventRepositoryTest {
 
         assertEquals(listOf(2L, 3L), invitationRepository.findVersionPage(STABLE_ID, 1, 4, Limit.of(2)).map { it.version })
         assertEquals(5, invitationRepository.findByUserIdAndDeletedFalse(anna).size)
+    }
+
+    @Test
+    fun `reminder queries find single events starting in the window and series started by its end`() {
+        val window = 1_000_000L
+        val weekly = Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "UTC")
+        fun save(title: String, startAt: Long, recurrence: Recurrence? = null, deleted: Boolean = false) =
+            eventRepository.save(event(0, OTHER_STABLE_ID).copy(creatorUserId = ObjectId.get(), title = title, startAt = startAt, endAt = startAt, recurrence = recurrence, deleted = deleted))
+        save("at start", window)
+        val inside = save("inside", window + 50)
+        save("at end", window + 100)
+        save("after", window + 101)
+        save("deleted", window + 50, deleted = true)
+        save("series", window + 50, weekly)
+        save("old series", 0, weekly)
+        save("later series", window + 101, weekly)
+        save("deleted series", 0, weekly, deleted = true)
+
+        assertEquals(setOf("inside", "at end"), eventRepository.findSingleStarting(window, window + 100).map { it.title }.toSet())
+        assertEquals(setOf("series", "old series"), eventRepository.findSeriesStartingBy(window + 100).map { it.title }.toSet())
+        assertEquals(listOf("inside"), eventRepository.findByIdIn(listOf(inside.id)).map { it.title })
+    }
+
+    @Test
+    fun `invitations load by their events`() {
+        val event = ObjectId.get()
+        invitationRepository.save(invitation(1, ObjectId.get(), OTHER_STABLE_ID).copy(eventId = event))
+        invitationRepository.save(invitation(2, ObjectId.get(), OTHER_STABLE_ID).copy(eventId = event, deleted = true))
+        invitationRepository.save(invitation(3, ObjectId.get(), OTHER_STABLE_ID))
+
+        assertEquals(listOf(1L), invitationRepository.findByEventIdInAndDeletedFalse(listOf(event)).map { it.version })
     }
 }

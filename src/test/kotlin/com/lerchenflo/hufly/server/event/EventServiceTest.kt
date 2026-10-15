@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.notification.EventChange
+import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
@@ -366,5 +368,64 @@ class EventServiceTest {
             ),
             announced(),
         )
+    }
+
+    /** User ids sorted, since their order does not matter. */
+    private fun changed(change: EventChange, event: Event, vararg users: User, by: User = teacher, occurrenceStartAt: Long? = null) =
+        EventChanged(STABLE_ID, by.id, event.id, users.map { it.id }.sorted(), change, occurrenceStartAt)
+
+    private fun announcedChanges() = announced().map { it as EventChanged }.map { it.copy(userIds = it.userIds.sorted()) }
+
+    /** Anna accepted, Ben declined, Clara has not answered; the organiser takes part. */
+    private fun answeredLesson(): Event {
+        val event = lesson(invitees = listOf(anna.id, ben.id, clara.id))
+        service.invite(teacher, event.id, listOf(teacher.id))
+        service.respond(anna, invitationOf(event, anna).id, accepted = true)
+        service.respond(ben, invitationOf(event, ben).id, accepted = false)
+        published.clear()
+        return event
+    }
+
+    @Test
+    fun `moving an event tells the invitees who accepted, other edits tell nobody`() {
+        val event = answeredLesson()
+
+        service.updateEvent(teacher, event.id, "Dressur", "Platz", start, end, listOf(blitz.id))
+        assertEquals(emptyList(), announced())
+
+        service.updateEvent(teacher, event.id, "Dressur", "Platz", start, end.plusSeconds(1800), listOf(blitz.id))
+        service.updateEvent(admin, event.id, "Dressur", "Platz", start.plusSeconds(3600), end.plusSeconds(3600), listOf(blitz.id))
+
+        assertEquals(listOf(changed(EventChange.MOVED, event, anna), changed(EventChange.MOVED, event, anna, teacher, by = admin)), announcedChanges())
+    }
+
+    @Test
+    fun `deleting an event tells the invitees who accepted`() {
+        val event = answeredLesson()
+
+        service.deleteEvent(teacher, event.id)
+
+        assertEquals(listOf(changed(EventChange.DELETED, event, anna)), announced())
+    }
+
+    @Test
+    fun `removing an accepted invitation tells its user, other removals nobody`() {
+        val event = answeredLesson()
+
+        listOf(anna, ben, clara, teacher).forEach { service.removeInvitation(teacher, invitationOf(event, it).id) }
+
+        assertEquals(listOf(changed(EventChange.UNINVITED, event, anna)), announced())
+    }
+
+    @Test
+    fun `changes to an event that is over tell nobody`() {
+        val event = answeredLesson()
+        clock.advance(end - clock.millis())
+
+        service.updateEvent(teacher, event.id, "Reitstunde", "Halle", start.plusSeconds(60), end, listOf(blitz.id))
+        service.removeInvitation(teacher, invitationOf(event, anna).id)
+        service.deleteEvent(teacher, event.id)
+
+        assertEquals(emptyList(), announced())
     }
 }

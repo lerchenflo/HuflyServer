@@ -27,6 +27,12 @@ class FakeEventOccurrenceRepository : EventOccurrenceRepository {
     override fun findByEventIdAndDeletedFalse(eventId: ObjectId): List<EventOccurrence> =
         occurrences.filter { it.eventId == eventId && !it.deleted }
 
+    override fun findByEventIdInAndDeletedFalse(eventIds: Collection<ObjectId>): List<EventOccurrence> =
+        occurrences.filter { it.eventId in eventIds && !it.deleted }
+
+    override fun findMovedStarting(from: Long, to: Long): List<EventOccurrence> =
+        occurrences.filter { !it.deleted && it.startAt != null && it.startAt > from && it.startAt <= to }
+
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<EventOccurrence> =
         occurrences.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }
@@ -55,6 +61,9 @@ class FakeEventOccurrenceAnswerRepository : EventOccurrenceAnswerRepository {
 
     override fun findByInvitationIdAndDeletedFalse(invitationId: ObjectId): List<EventOccurrenceAnswer> =
         answers.filter { it.invitationId == invitationId && !it.deleted }
+
+    override fun findByEventIdInAndDeletedFalse(eventIds: Collection<ObjectId>): List<EventOccurrenceAnswer> =
+        answers.filter { it.eventId in eventIds && !it.deleted }
 
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<EventOccurrenceAnswer> =
         answers.filter { it.stableId == stableId && it.version > since && it.version <= watermark }

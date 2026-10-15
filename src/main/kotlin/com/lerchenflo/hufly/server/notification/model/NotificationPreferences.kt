@@ -16,16 +16,25 @@ data class NotificationPreferences(
     val mutedTypes: Set<String> = emptySet(),
     /** Lead time of task due reminders; 0 turns them off. */
     val taskReminderMinutes: Int = 60,
+    /** Lead time of event start reminders; 0 turns them off. */
+    val eventReminderMinutes: Int = 60,
 ) {
     /** When to remind of a task due at [dueAt], null when reminders are off. */
-    fun taskReminderAt(dueAt: Long): Long? = if (taskReminderMinutes == 0) null else dueAt - taskReminderMinutes * 60_000L
+    fun taskReminderAt(dueAt: Long): Long? = reminderAt(dueAt, taskReminderMinutes)
+
+    /** When to remind of an event starting at [startAt], null when reminders are off. */
+    fun eventReminderAt(startAt: Long): Long? = reminderAt(startAt, eventReminderMinutes)
+
+    private fun reminderAt(at: Long, minutes: Int): Long? = if (minutes == 0) null else at - minutes * 60_000L
 
     fun mutes(type: String?): Boolean = type != null && type !in UNMUTABLE_TYPES && type in mutedTypes
 
     companion object {
         /** The applicant waits for this answer. */
         private val UNMUTABLE_TYPES = setOf("join_accepted")
-        const val MAX_TASK_REMINDER_MINUTES = 1440
+        const val MAX_REMINDER_MINUTES = 1440
+
+        private fun minutes(value: String?) = value?.toIntOrNull()?.takeIf { it in 0..MAX_REMINDER_MINUTES }
 
         fun of(values: Map<String, String>?): NotificationPreferences {
             val defaults = NotificationPreferences()
@@ -40,8 +49,8 @@ data class NotificationPreferences(
                     try { TimeZone.of(it) } catch (e: IllegalTimeZoneException) { null }
                 } ?: defaults.zone,
                 mutedTypes = values["notificationMutedTypes"].orEmpty().split(',').map { it.trim() }.filterTo(mutableSetOf()) { it.isNotEmpty() },
-                taskReminderMinutes = values["taskReminderMinutes"]?.toIntOrNull()?.takeIf { it in 0..MAX_TASK_REMINDER_MINUTES }
-                    ?: defaults.taskReminderMinutes,
+                taskReminderMinutes = minutes(values["taskReminderMinutes"]) ?: defaults.taskReminderMinutes,
+                eventReminderMinutes = minutes(values["eventReminderMinutes"]) ?: defaults.eventReminderMinutes,
             )
         }
     }

@@ -49,8 +49,8 @@ class TaskReminderServiceTest {
     private val pushService = PushService(sessions, listOf(android), Executor { it.run() }, clock)
     private val stableRepository = com.lerchenflo.hufly.server.repository.FakeStableRepository()
     private val service = TaskReminderService(
-        taskRepository, occurrenceRepository, userRepository, settingsRepository, absenceRepository, sentReminders, pushService,
-        PushTitles(userRepository, stableRepository), clock,
+        taskRepository, occurrenceRepository, sentReminders,
+        Reminders(userRepository, settingsRepository, absenceRepository, pushService, PushTitles(userRepository, stableRepository)), clock,
     )
 
     private val anna = testUser(email = "anna@hufly.test")

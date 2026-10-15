@@ -4,6 +4,8 @@ import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
+import com.lerchenflo.hufly.server.core.notification.EventChange
+import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
 import com.lerchenflo.hufly.server.core.notification.NotificationEvent
@@ -115,6 +117,7 @@ class EventService(
     ): Event {
         val event = managedEvent(requester, eventId)
         validate(requester, startAt, endAt, horseIds)
+        val told = if (startAt != event.startAt || endAt != event.endAt) acceptedUpcoming(requester, event) else emptyList()
         return saveEvent(
             event.copy(
                 title = title,
@@ -126,11 +129,12 @@ class EventService(
                 updatedAt = clock.millis(),
                 updatedBy = requester.id,
             )
-        )
+        ).also { announceChange(requester, it, told, EventChange.MOVED) }
     }
 
     fun deleteEvent(requester: User, eventId: ObjectId) {
         val event = managedEvent(requester, eventId)
+        val told = acceptedUpcoming(requester, event)
         val now = clock.millis()
         invitationRepository.findByEventIdAndDeletedFalse(event.id).forEach {
             saveInvitation(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
@@ -142,6 +146,7 @@ class EventService(
             saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         }
         saveEvent(event.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+        announceChange(requester, event, told, EventChange.DELETED)
     }
 
     /**
@@ -170,11 +175,13 @@ class EventService(
         val invitation = liveInvitation(requester, invitationId)
         val event = managedEvent(requester, invitation.eventId)
         val now = clock.millis()
+        val told = invitation.userId.takeIf { invitation.userId != requester.id && participation(event).acceptsUpcoming(invitation, now) }
         saveInvitation(invitation.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         answerRepository.findByInvitationIdAndDeletedFalse(invitation.id).forEach {
             saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
         }
         restamp(event)
+        announceChange(requester, event, listOfNotNull(told), EventChange.UNINVITED, invitation.occurrenceStartAt)
     }
 
     fun respond(requester: User, invitationId: ObjectId, accepted: Boolean): EventInvitation {
@@ -194,6 +201,20 @@ class EventService(
 
     /** Hands the change to the push notifications, see [NotificationEvent]. */
     internal fun announce(event: NotificationEvent) = events.publishEvent(event)
+
+    private fun announceChange(requester: User, event: Event, userIds: List<ObjectId>, change: EventChange, occurrenceStartAt: Long? = null) {
+        if (userIds.isNotEmpty()) announce(EventChanged(event.stableId, requester.id, event.id, userIds, change, occurrenceStartAt))
+    }
+
+    /** Who hears about a change of [event]: everyone but [requester] who accepted a date that is not over yet. */
+    private fun acceptedUpcoming(requester: User, event: Event) = participation(event).acceptedUpcoming(clock.millis()) - requester.id
+
+    private fun participation(event: Event) = EventParticipation(
+        event,
+        invitationRepository.findByEventIdAndDeletedFalse(event.id),
+        occurrenceRepository.findByEventIdAndDeletedFalse(event.id),
+        answerRepository.findByEventIdAndDeletedFalse(event.id),
+    )
 
     fun syncEvents(requester: User, since: Long, pageSize: Int): VersionSyncResponse<EventResponse> {
         val seesAll = seesAll(requester)

@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.notification.EventChange
+import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
 import com.lerchenflo.hufly.server.core.notification.JoinAccepted
@@ -63,6 +65,7 @@ class NotificationService(
                 is NotePosted -> notePosted(event)
                 is EventInvited -> eventInvited(event)
                 is InvitationAnswered -> invitationAnswered(event)
+                is EventChanged -> eventChanged(event)
                 is TaskAssigned -> taskAssigned(event)
                 is JoinRequested -> joinRequested(event)
                 is JoinAccepted -> joinAccepted(event)
@@ -101,6 +104,31 @@ class NotificationService(
                 "$who hat ${if (event.accepted) "zugesagt" else "abgesagt"}",
                 "${calendarEvent.title}, ${format(at, zone)}",
                 data("invitation_answer", "eventId" to calendarEvent.id, event.occurrenceStartAt),
+            )
+        }
+    }
+
+    /** A deleted event is still read for its deletion; the row stays as a soft delete. */
+    private fun eventChanged(event: EventChanged) {
+        val calendarEvent = eventRepository.findById(event.eventId)
+            ?.takeIf { it.stableId == event.stableId && (!it.deleted || event.change == EventChange.DELETED) } ?: return
+        val from = userRepository.findById(event.actorUserId)?.displayName ?: return
+        deliver(members(event, event.userIds)) { zone ->
+            val dates = when {
+                event.occurrenceStartAt != null -> format(event.occurrenceStartAt, zone)
+                calendarEvent.recurrence == null -> format(calendarEvent.startAt, zone)
+                event.change == EventChange.MOVED -> "wiederkehrend ab ${format(calendarEvent.startAt, zone)}"
+                else -> "Alle Termine"
+            }
+            val (title, body) = when (event.change) {
+                EventChange.MOVED -> "Verschoben: ${calendarEvent.title}" to "Neu: $dates"
+                EventChange.DELETED -> "Abgesagt: ${calendarEvent.title}" to dates
+                EventChange.UNINVITED -> "Ausgeladen: ${calendarEvent.title}" to dates
+            }
+            PushMessage(
+                title,
+                "$body · von $from",
+                data("event_update", "eventId" to calendarEvent.id, event.occurrenceStartAt) + ("change" to event.change.name.lowercase()),
             )
         }
     }

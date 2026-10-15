@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.notification.EventChange
+import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.recurrence.RecurrenceFrequency
 import com.lerchenflo.hufly.server.core.security.MutableClock
@@ -80,6 +82,7 @@ class EventSeriesServiceTest {
     // Tuesdays 16:00 UTC, four dates.
     private val first = millis("2026-10-13T16:00:00Z")
     private val second = first + days(7)
+    private val third = second + days(7)
     private val weekly = Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, 4, "UTC")
 
     @BeforeTest
@@ -437,9 +440,69 @@ class EventSeriesServiceTest {
         assertEquals(emptyList(), announced())
     }
 
+    // Pushes about changes go to who accepted a date that is not over yet
+
+    private val fourth = first + days(21)
+
+    private fun changed(change: EventChange, event: Event, users: List<User>, by: User = teacher, occurrenceStartAt: Long? = null) =
+        EventChanged(STABLE_ID, by.id, event.id, users.map { it.id }, change, occurrenceStartAt)
+
+    @Test
+    fun `moving a series tells who accepted a date that is not over, cancelled or taken off`() {
+        val event = series(invitees = listOf(anna.id, ben.id, clara.id))
+        eventService.invite(teacher, event.id, listOf(teacher.id))
+        eventService.invite(teacher, event.id, listOf(otherTeacher.id), occurrenceStartAt = third)
+        eventService.respond(otherTeacher, invitationOf(event, otherTeacher).id, accepted = true)
+        service.answer(anna, invitationOf(event, anna).id, second, accepted = true)
+        service.answer(ben, invitationOf(event, ben).id, first, accepted = true)
+        service.answer(ben, invitationOf(event, ben).id, fourth, accepted = true)
+        service.putOccurrence(teacher, event.id, fourth, change(cancelled = true))
+        service.answer(clara, invitationOf(event, clara).id, third, accepted = true)
+        service.putOccurrence(teacher, event.id, third, change(removedUserIds = listOf(clara.id)))
+        clock.advance(first + hours(1) - clock.millis())
+        published.clear()
+
+        eventService.updateEvent(admin, event.id, "Springstunde", "", first + hours(1), first + hours(2), listOf(blitz.id), weekly)
+
+        val announced = announced().single() as EventChanged
+        assertEquals(changed(EventChange.MOVED, event, emptyList(), by = admin), announced.copy(userIds = emptyList()))
+        assertEquals(setOf(teacher.id, anna.id, otherTeacher.id), announced.userIds.toSet())
+    }
+
+    @Test
+    fun `removing an accepted date invitation names the date, deleting the series tells who accepted`() {
+        val event = series(invitees = listOf(anna.id))
+        eventService.invite(teacher, event.id, listOf(otherTeacher.id), occurrenceStartAt = third)
+        eventService.respond(otherTeacher, invitationOf(event, otherTeacher).id, accepted = true)
+        service.answer(anna, invitationOf(event, anna).id, second, accepted = true)
+        published.clear()
+
+        eventService.removeInvitation(teacher, invitationOf(event, otherTeacher).id)
+        eventService.deleteEvent(teacher, event.id)
+
+        assertEquals(
+            listOf(
+                changed(EventChange.UNINVITED, event, listOf(otherTeacher), occurrenceStartAt = third),
+                changed(EventChange.DELETED, event, listOf(anna)),
+            ),
+            announced(),
+        )
+    }
+
+    @Test
+    fun `answers to dates the rule no longer has do not count`() {
+        val event = series(invitees = listOf(anna.id))
+        service.answer(anna, invitationOf(event, anna).id, second, accepted = true)
+        eventService.updateEvent(teacher, event.id, "Springstunde", "", first + hours(1), first + hours(2), listOf(blitz.id), weekly)
+        published.clear()
+
+        eventService.deleteEvent(teacher, event.id)
+
+        assertEquals(emptyList(), announced())
+    }
+
     // "Diesen und alle folgenden": a split series takes over invitees' answers
 
-    private val third = second + days(7)
 
     private fun splitOff(by: User = teacher, from: Event, at: Long = second, invitees: List<ObjectId> = emptyList()) =
         eventService.createEvent(

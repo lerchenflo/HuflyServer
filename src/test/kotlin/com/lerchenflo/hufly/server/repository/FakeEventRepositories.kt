@@ -25,6 +25,14 @@ class FakeEventRepository : EventRepository {
     override fun findByCreatorUserIdAndDeletedFalse(creatorUserId: ObjectId): List<Event> =
         events.filter { it.creatorUserId == creatorUserId && !it.deleted }
 
+    override fun findByIdIn(ids: Collection<ObjectId>): List<Event> = events.filter { it.id in ids }
+
+    override fun findSingleStarting(from: Long, to: Long): List<Event> =
+        events.filter { !it.deleted && it.recurrence == null && it.startAt > from && it.startAt <= to }
+
+    override fun findSeriesStartingBy(to: Long): List<Event> =
+        events.filter { !it.deleted && it.recurrence != null && it.startAt <= to }
+
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<Event> =
         events.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
             .sortedBy { it.version }
@@ -49,6 +57,9 @@ class FakeEventInvitationRepository : EventInvitationRepository {
 
     override fun findByUserIdAndDeletedFalse(userId: ObjectId): List<EventInvitation> =
         invitations.filter { it.userId == userId && !it.deleted }
+
+    override fun findByEventIdInAndDeletedFalse(eventIds: Collection<ObjectId>): List<EventInvitation> =
+        invitations.filter { it.eventId in eventIds && !it.deleted }
 
     override fun findVersionPage(stableId: ObjectId, since: Long, watermark: Long, limit: Limit): List<EventInvitation> =
         invitations.filter { it.stableId == stableId && it.version > since && it.version <= watermark }
