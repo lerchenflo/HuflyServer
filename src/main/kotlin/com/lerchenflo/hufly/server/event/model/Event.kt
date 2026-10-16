@@ -33,7 +33,26 @@ data class Event(
     /** Set when the client split this series off [splitFromEventId] ("Diesen und alle folgenden"), see [EventSplit]. */
     val splitFromEventId: ObjectId? = null,
     val splitFromOccurrenceStartAt: Long? = null,
+    /** The Terminart (an EVENT_TYPE tag) the client copied the lesson fields from; editing the tag changes nothing here. */
+    val eventTypeId: ObjectId? = null,
+    /** Set makes the event a lesson with places and a waiting list, see [com.lerchenflo.hufly.server.event.LessonPlacement]. */
+    val maxParticipants: Int? = null,
+    /** Accepted participants cannot leave from this many hours before a date's start on; null or 0: never locked. */
+    val leaveLockHours: Int? = null,
+    /** How long someone moved up from the waiting list has to accept; null: no limit. */
+    val answerHours: Int? = null,
+    /** Who gets places first; may name users without an invitation, invitees missing from it come last. */
+    val participantOrder: List<ObjectId> = emptyList(),
 ) : VersionSynced
+
+/** The lesson fields of an [Event], all empty for a plain event. */
+data class LessonFields(
+    val eventTypeId: ObjectId? = null,
+    val maxParticipants: Int? = null,
+    val leaveLockHours: Int? = null,
+    val answerHours: Int? = null,
+    val participantOrder: List<ObjectId> = emptyList(),
+)
 
 /** Invitees of the old series take their answers from [occurrenceStartAt] on over to the new one. */
 data class EventSplit(val eventId: ObjectId, val occurrenceStartAt: Long)

@@ -16,7 +16,9 @@ import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.event.model.LessonFields
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.OTHER_STABLE_ID
 import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.days
@@ -55,7 +57,7 @@ class EventServiceTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val service = EventService(
         eventRepository, invitationRepository, FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        userRepository, horseRepository, accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
+        userRepository, horseRepository, tagRepository, accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
     )
 
     private val admin = testUser()
@@ -427,5 +429,52 @@ class EventServiceTest {
         service.deleteEvent(teacher, event.id)
 
         assertEquals(emptyList(), announced())
+    }
+
+    // Lesson fields (client schema 37; supersede EVT-7)
+
+    private fun typedLesson(fields: LessonFields) =
+        service.createEvent(teacher, "Springstunde", "", start, end, listOf(blitz.id), listOf(anna.id), lesson = fields)
+
+    @Test
+    fun `a lesson takes only a live EVENT_TYPE tag of the own stable`() {
+        val type = tagRepository.save(testTag(type = TagType.EVENT_TYPE))
+        assertEquals(type.id, typedLesson(LessonFields(eventTypeId = type.id, maxParticipants = 4)).eventTypeId)
+
+        listOf(
+            testTag(type = TagType.FOOD),
+            testTag(type = TagType.EVENT_TYPE, stableId = OTHER_STABLE_ID),
+            testTag(type = TagType.EVENT_TYPE, deleted = true),
+        ).forEach { tag ->
+            tagRepository.save(tag)
+            assertStatus(HttpStatus.BAD_REQUEST) { typedLesson(LessonFields(eventTypeId = tag.id)) }
+        }
+        assertStatus(HttpStatus.BAD_REQUEST) { typedLesson(LessonFields(eventTypeId = ObjectId.get())) }
+    }
+
+    @Test
+    fun `an edit keeps an event type deleted since, but cannot pick a deleted one`() {
+        val type = tagRepository.save(testTag(type = TagType.EVENT_TYPE))
+        val gone = tagRepository.save(testTag(type = TagType.EVENT_TYPE, deleted = true))
+        val event = typedLesson(LessonFields(eventTypeId = type.id))
+        tagRepository.save(type.copy(deleted = true))
+
+        service.updateEvent(teacher, event.id, "Springstunde", "", start, end, listOf(blitz.id), lesson = LessonFields(eventTypeId = type.id))
+
+        assertEquals(type.id, eventRepository.findById(event.id)!!.eventTypeId)
+        assertStatus(HttpStatus.BAD_REQUEST) {
+            service.updateEvent(teacher, event.id, "Springstunde", "", start, end, listOf(blitz.id), lesson = LessonFields(eventTypeId = gone.id))
+        }
+    }
+
+    @Test
+    fun `the participant order takes users of the own stable, also uninvited or removed ones, without duplicates`() {
+        val left = testUser(deleted = true).also { userRepository.save(it) }
+
+        val event = typedLesson(LessonFields(maxParticipants = 2, participantOrder = listOf(ben.id, anna.id, left.id, ben.id)))
+
+        assertEquals(listOf(ben.id, anna.id, left.id), eventRepository.findById(event.id)!!.participantOrder)
+        assertStatus(HttpStatus.BAD_REQUEST) { typedLesson(LessonFields(participantOrder = listOf(foreigner.id))) }
+        assertStatus(HttpStatus.BAD_REQUEST) { typedLesson(LessonFields(participantOrder = listOf(ObjectId.get()))) }
     }
 }

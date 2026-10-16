@@ -15,6 +15,7 @@ import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswerResponse
 import com.lerchenflo.hufly.server.event.model.EventOccurrenceResponse
 import com.lerchenflo.hufly.server.event.model.EventResponse
 import com.lerchenflo.hufly.server.event.model.EventSplit
+import com.lerchenflo.hufly.server.event.model.LessonFields
 import com.lerchenflo.hufly.server.event.model.toEventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.toEventOccurrenceAnswerResponse
 import com.lerchenflo.hufly.server.event.model.toEventOccurrenceResponse
@@ -56,7 +57,21 @@ class EventController(
         /** Only read on create, both or none: the series this one was split off and its first date taken over. */
         val splitFromEventId: String? = null,
         @field:Min(0) @field:Max(MAX_EPOCH_MILLIS) val splitFromOccurrenceStartAt: Long? = null,
+        /** The lesson fields; a missing one is cleared on update, like [recurrence]. */
+        val eventTypeId: String? = null,
+        @field:Min(1) @field:Max(99) val maxParticipants: Int? = null,
+        @field:Min(0) @field:Max(MAX_LESSON_HOURS) val leaveLockHours: Int? = null,
+        @field:Min(0) @field:Max(MAX_LESSON_HOURS) val answerHours: Int? = null,
+        @field:Size(max = 500) val participantOrder: List<String>? = null,
     ) {
+        fun lesson() = LessonFields(
+            eventTypeId = eventTypeId?.let(::parseObjectId),
+            maxParticipants = maxParticipants,
+            leaveLockHours = leaveLockHours,
+            answerHours = answerHours,
+            participantOrder = participantOrder.orEmpty().map(::parseObjectId),
+        )
+
         fun split(): EventSplit? {
             if ((splitFromEventId == null) != (splitFromOccurrenceStartAt == null)) {
                 throw badRequest("splitFromEventId and splitFromOccurrenceStartAt go together")
@@ -94,6 +109,7 @@ class EventController(
             request.horseIds.map(::parseObjectId), request.inviteeUserIds.map(::parseObjectId), request.clientId,
             request.recurrence?.toRecurrence(request.startAt),
             request.split(),
+            request.lesson(),
         ).toEventResponse()
     }
 
@@ -104,6 +120,7 @@ class EventController(
             requester, parseObjectId(eventId), request.title, request.description, request.startAt,
             request.endAt, request.horseIds.map(::parseObjectId),
             request.recurrence?.toRecurrence(request.startAt),
+            request.lesson(),
         ).toEventResponse()
     }
 
@@ -204,3 +221,5 @@ class EventController(
         return occurrenceService.syncAnswers(requester, since, pageSize)
     }
 }
+
+private const val MAX_LESSON_HOURS = 336L

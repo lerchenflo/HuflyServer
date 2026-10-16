@@ -8,8 +8,10 @@ import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.testdata.testHorse
 import com.lerchenflo.hufly.server.testdata.testStable
+import com.lerchenflo.hufly.server.testdata.testTag
 import com.lerchenflo.hufly.server.testdata.testUser
 import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,6 +25,8 @@ import org.springframework.test.web.servlet.request
 import tools.jackson.databind.ObjectMapper
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** EVT-1..EVT-8: HTTP mapping, validation and version sync. Business rules live in EventServiceTest. */
 @SpringBootTest
@@ -158,5 +162,80 @@ class EventControllerTest {
             jsonPath("$.length()") { value(2) }
             jsonPath("$[0].eventId") { value(eventId) }
         }
+    }
+
+    // Lessons (client schema 37; supersede EVT-7)
+
+    private fun lessonJson(lesson: String) =
+        """{"title":"Springstunde","startAt":1790000000000,"endAt":1790003600000,"horseIds":["${blitz.id.toHexString()}"],$lesson}"""
+
+    private fun eventType() = tagRepository.save(testTag(type = TagType.EVENT_TYPE))
+
+    @Test
+    fun `a lesson stores its type, places, lock, answer time and order and answers them`() {
+        val type = eventType()
+        val lesson = """"eventTypeId":"${type.id.toHexString()}","maxParticipants":4,"leaveLockHours":24,"answerHours":12,""" +
+            """"participantOrder":["${ben.id.toHexString()}","${anna.id.toHexString()}"]"""
+
+        call(HttpMethod.POST, "/events", lessonJson(lesson)).andExpect {
+            status { isOk() }
+            jsonPath("$.eventTypeId") { value(type.id.toHexString()) }
+            jsonPath("$.maxParticipants") { value(4) }
+            jsonPath("$.leaveLockHours") { value(24) }
+            jsonPath("$.answerHours") { value(12) }
+            jsonPath("$.participantOrder[0]") { value(ben.id.toHexString()) }
+            jsonPath("$.participantOrder[1]") { value(anna.id.toHexString()) }
+        }
+        val stored = eventRepository.events.single()
+        assertEquals(listOf(ben.id, anna.id), stored.participantOrder)
+        assertEquals(type.id, stored.eventTypeId)
+    }
+
+    @Test
+    fun `a plain event answers null lesson fields and an empty order`() {
+        call(HttpMethod.POST, "/events", eventJson()).andExpect {
+            status { isOk() }
+            jsonPath("$.eventTypeId") { value(null) }
+            jsonPath("$.maxParticipants") { value(null) }
+            jsonPath("$.leaveLockHours") { value(null) }
+            jsonPath("$.answerHours") { value(null) }
+            jsonPath("$.participantOrder") { isEmpty() }
+        }
+    }
+
+    @Test
+    fun `an edit without the lesson fields clears them`() {
+        val created = call(HttpMethod.POST, "/events", lessonJson(""""maxParticipants":4,"leaveLockHours":24,"answerHours":12,"participantOrder":["${anna.id.toHexString()}"]"""))
+        val eventId = objectMapper.readTree(created.andReturn().response.contentAsString)["id"].asString()
+
+        call(HttpMethod.PUT, "/events/$eventId", eventJson()).andExpect {
+            status { isOk() }
+            jsonPath("$.maxParticipants") { value(null) }
+            jsonPath("$.leaveLockHours") { value(null) }
+            jsonPath("$.answerHours") { value(null) }
+            jsonPath("$.participantOrder") { isEmpty() }
+        }
+        val stored = eventRepository.events.single()
+        assertEquals(listOf(null, null, null), listOf(stored.maxParticipants, stored.leaveLockHours, stored.answerHours))
+        assertTrue(stored.participantOrder.isEmpty())
+    }
+
+    @Test
+    fun `lesson fields out of range answer 400`() {
+        val eventId = createEvent()
+        val outOfRange = listOf(
+            "maxParticipants" to "0", "maxParticipants" to "100",
+            "leaveLockHours" to "-1", "leaveLockHours" to "337",
+            "answerHours" to "-1", "answerHours" to "337",
+            "participantOrder" to (1..501).joinToString(",", "[", "]") { "\"${anna.id.toHexString()}\"" },
+            "participantOrder" to "[\"nope\"]",
+            "eventTypeId" to "\"nope\"",
+        )
+        outOfRange.forEach { (field, value) ->
+            call(HttpMethod.POST, "/events", lessonJson(""""$field":$value""")).andExpect { status { isBadRequest() } }
+            call(HttpMethod.PUT, "/events/$eventId", lessonJson(""""$field":$value""")).andExpect { status { isBadRequest() } }
+        }
+        call(HttpMethod.POST, "/events", lessonJson(""""maxParticipants":99,"leaveLockHours":336,"answerHours":0""")).andExpect { status { isOk() } }
+        call(HttpMethod.PUT, "/events/$eventId", lessonJson(""""maxParticipants":1,"leaveLockHours":0,"answerHours":336""")).andExpect { status { isOk() } }
     }
 }

@@ -20,6 +20,11 @@ data class EventResponse(
     val version: Long,
     val splitFromEventId: String?,
     val splitFromOccurrenceStartAt: Long?,
+    val eventTypeId: String?,
+    val maxParticipants: Int?,
+    val leaveLockHours: Int?,
+    val answerHours: Int?,
+    val participantOrder: List<String>,
 )
 
 data class EventInvitationResponse(
@@ -52,6 +57,11 @@ fun Event.toEventResponse() = EventResponse(
     version = version,
     splitFromEventId = splitFromEventId?.toHexString(),
     splitFromOccurrenceStartAt = splitFromOccurrenceStartAt,
+    eventTypeId = eventTypeId?.toHexString(),
+    maxParticipants = maxParticipants,
+    leaveLockHours = leaveLockHours,
+    answerHours = answerHours,
+    participantOrder = participantOrder.map { it.toHexString() },
 )
 
 fun EventInvitation.toEventInvitationResponse() = EventInvitationResponse(

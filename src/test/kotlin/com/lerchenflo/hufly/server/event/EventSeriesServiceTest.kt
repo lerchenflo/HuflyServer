@@ -61,7 +61,7 @@ class EventSeriesServiceTest {
     private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val eventService = EventService(
-        eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository,
+        eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository, tagRepository,
         accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
     )
     private val service = EventOccurrenceService(

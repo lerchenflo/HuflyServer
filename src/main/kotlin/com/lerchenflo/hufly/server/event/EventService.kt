@@ -23,6 +23,7 @@ import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.event.model.EventResponse
 import com.lerchenflo.hufly.server.event.model.EventSplit
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
+import com.lerchenflo.hufly.server.event.model.LessonFields
 import com.lerchenflo.hufly.server.event.model.toEventInvitationResponse
 import com.lerchenflo.hufly.server.event.model.toEventResponse
 import com.lerchenflo.hufly.server.repository.EventInvitationRepository
@@ -30,8 +31,10 @@ import com.lerchenflo.hufly.server.repository.EventOccurrenceAnswerRepository
 import com.lerchenflo.hufly.server.repository.EventOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.EventRepository
 import com.lerchenflo.hufly.server.repository.HorseRepository
+import com.lerchenflo.hufly.server.repository.TagRepository
 import com.lerchenflo.hufly.server.repository.UserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.tag.model.TagType
 import com.lerchenflo.hufly.server.user.model.User
 import org.bson.types.ObjectId
 import org.springframework.context.ApplicationEventPublisher
@@ -55,6 +58,7 @@ class EventService(
     private val answerRepository: EventOccurrenceAnswerRepository,
     private val userRepository: UserRepository,
     private val horseRepository: HorseRepository,
+    private val tagRepository: TagRepository,
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
@@ -71,11 +75,13 @@ class EventService(
         clientId: String? = null,
         recurrence: Recurrence? = null,
         splitFrom: EventSplit? = null,
+        lesson: LessonFields = LessonFields(),
     ): Event {
         accessService.requirePermission(requester, Permission.EVENT_EDIT)
         return idempotentCreate(clientId, { eventRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             val invitees = inviteeUserIds.distinct() - requester.id
             validate(requester, startAt, endAt, horseIds)
+            val lessonFields = validLesson(requester, lesson, keptTypeId = null)
             requireOwnUsers(requester, invitees)
             requireInvitationCap(invitees.size)
             requireSplitSource(requester, splitFrom)
@@ -96,7 +102,7 @@ class EventService(
                     clientId = clientId,
                     splitFromEventId = splitFrom?.eventId,
                     splitFromOccurrenceStartAt = splitFrom?.occurrenceStartAt,
-                )
+                ).withLesson(lessonFields)
             )
             invitees.forEach { addInvitation(requester, event, it, null) }
             val fresh = invitees - invitedBeforeSplit(event)
@@ -114,9 +120,11 @@ class EventService(
         endAt: Long,
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
+        lesson: LessonFields = LessonFields(),
     ): Event {
         val event = managedEvent(requester, eventId)
         validate(requester, startAt, endAt, horseIds)
+        val lessonFields = validLesson(requester, lesson, keptTypeId = event.eventTypeId)
         val told = if (startAt != event.startAt || endAt != event.endAt) acceptedUpcoming(requester, event) else emptyList()
         return saveEvent(
             event.copy(
@@ -128,7 +136,7 @@ class EventService(
                 recurrence = recurrence,
                 updatedAt = clock.millis(),
                 updatedBy = requester.id,
-            )
+            ).withLesson(lessonFields)
         ).also { announceChange(requester, it, told, EventChange.MOVED) }
     }
 
@@ -351,6 +359,25 @@ class EventService(
             horseIds.all { id -> horseRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }
         if (!horsesOk) throw badRequest("An event needs at least one horse of the stable (EVT-5)")
     }
+
+    /** An event keeps its Terminart when the tag was deleted since; a newly picked one must be live. */
+    private fun validLesson(requester: User, lesson: LessonFields, keptTypeId: ObjectId?): LessonFields {
+        lesson.eventTypeId?.takeIf { it != keptTypeId }?.let { typeId ->
+            val valid = tagRepository.findById(typeId)?.let { it.stableId == requester.stableId && !it.deleted && it.type == TagType.EVENT_TYPE } == true
+            if (!valid) throw badRequest("Unknown event type")
+        }
+        val order = lesson.participantOrder.distinct()
+        if (!order.all { id -> userRepository.findById(id)?.stableId == requester.stableId }) throw badRequest("Unknown user in participantOrder")
+        return lesson.copy(participantOrder = order)
+    }
+
+    private fun Event.withLesson(lesson: LessonFields) = copy(
+        eventTypeId = lesson.eventTypeId,
+        maxParticipants = lesson.maxParticipants,
+        leaveLockHours = lesson.leaveLockHours,
+        answerHours = lesson.answerHours,
+        participantOrder = lesson.participantOrder,
+    )
 
     private fun requireOwnUsers(requester: User, userIds: List<ObjectId>) {
         val valid = userIds.all { id -> userRepository.findById(id)?.let { it.stableId == requester.stableId && !it.deleted } == true }
