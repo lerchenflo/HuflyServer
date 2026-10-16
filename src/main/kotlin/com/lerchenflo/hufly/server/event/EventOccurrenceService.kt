@@ -65,25 +65,27 @@ class EventOccurrenceService(
         validate(requester, change)
         val removedUserIds = change.removedUserIds?.distinct()?.takeIf { it.isNotEmpty() }
         removedUserIds?.let { requireSeriesInvitees(event, it) }
-        return retryOnDuplicate {
-            val existing = occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)
-            eventService.saveOccurrence(
-                EventOccurrence(
-                    id = existing?.id ?: ObjectId.get(),
-                    stableId = event.stableId,
-                    eventId = event.id,
-                    occurrenceStartAt = occurrenceStartAt,
-                    cancelled = change.cancelled,
-                    title = change.title,
-                    description = change.description,
-                    startAt = change.startAt,
-                    endAt = change.endAt,
-                    horseIds = change.horseIds?.distinct(),
-                    removedUserIds = removedUserIds,
-                    updatedAt = clock.millis(),
-                    updatedBy = requester.id,
+        return lessons.movingUp(requester.id, event, listOf(occurrenceStartAt)) {
+            retryOnDuplicate {
+                val existing = occurrenceRepository.findByEventIdAndOccurrenceStartAt(event.id, occurrenceStartAt)
+                eventService.saveOccurrence(
+                    EventOccurrence(
+                        id = existing?.id ?: ObjectId.get(),
+                        stableId = event.stableId,
+                        eventId = event.id,
+                        occurrenceStartAt = occurrenceStartAt,
+                        cancelled = change.cancelled,
+                        title = change.title,
+                        description = change.description,
+                        startAt = change.startAt,
+                        endAt = change.endAt,
+                        horseIds = change.horseIds?.distinct(),
+                        removedUserIds = removedUserIds,
+                        updatedAt = clock.millis(),
+                        updatedBy = requester.id,
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -100,23 +102,8 @@ class EventOccurrenceService(
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
         val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
         if (before != status) lessons.requireAnswerAllowed(event, invitation, occurrenceStartAt, accepted)
-        val saved = retryOnDuplicate {
-            val existing = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)
-            val now = clock.millis()
-            eventService.saveAnswer(
-                EventOccurrenceAnswer(
-                    id = existing?.id ?: ObjectId.get(),
-                    stableId = invitation.stableId,
-                    eventId = invitation.eventId,
-                    invitationId = invitation.id,
-                    userId = invitation.userId,
-                    occurrenceStartAt = occurrenceStartAt,
-                    status = status,
-                    respondedAt = now,
-                    updatedAt = now,
-                    updatedBy = requester.id,
-                )
-            )
+        val saved = lessons.movingUp(requester.id, event, listOf(occurrenceStartAt)) {
+            eventService.upsertAnswer(invitation, occurrenceStartAt, status, requester.id)
         }
         if (before != status && invitation.userId != event.creatorUserId) eventService.announce(InvitationAnswered(invitation.stableId, requester.id, event.id, accepted, occurrenceStartAt))
         return saved

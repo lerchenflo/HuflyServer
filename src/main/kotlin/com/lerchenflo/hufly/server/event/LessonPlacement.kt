@@ -55,6 +55,18 @@ class LessonPlacement(
     /** The start of the date [key], moved or not. */
     fun startOf(key: Long?): Long = key?.let { changes[it]?.startAt ?: it } ?: event.startAt
 
+    /** Whether [key] names a live date of the event: null for a single event, else a date of the series not cancelled. */
+    fun isDate(key: Long?): Boolean {
+        val recurrence = event.recurrence ?: return key == null
+        return key != null && changes[key]?.cancelled != true && recurrence.isOccurrence(event.startAt, key)
+    }
+
+    /** The next [limit] dates that have not started at [now]. */
+    fun upcomingDates(now: Long, limit: Int): List<Long?> {
+        val recurrence = event.recurrence ?: return if (event.startAt > now) listOf(null) else emptyList()
+        return recurrence.starts(event.startAt).filter { changes[it]?.cancelled != true && startOf(it) > now }.take(limit).toList()
+    }
+
     private fun participants(key: Long?): List<Pair<EventInvitation, InvitationStatus>> {
         val inOrder = invitations.sortedWith(compareBy({ it.invitedAt }, { it.id }))
         if (event.recurrence == null || key == null) return inOrder.filter { it.occurrenceStartAt == null }.map { it to it.status }

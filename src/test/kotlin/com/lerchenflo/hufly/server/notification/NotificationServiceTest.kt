@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.core.notification.EventChange
 import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
+import com.lerchenflo.hufly.server.core.notification.LessonPlaceOffered
 import com.lerchenflo.hufly.server.core.notification.NotePosted
 import com.lerchenflo.hufly.server.core.notification.TaskAssigned
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
@@ -167,6 +168,53 @@ class NotificationServiceTest {
                 mapOf("type" to "event_invitation", "eventId" to event.id.toHexString(), "occurrenceAt" to nextWeek.toString(), "stableId" to STABLE_ID.toHexString())),
             sentTo(ben).single(),
         )
+    }
+
+    // Lessons (client schema 37)
+
+    private fun offerData(event: Event, occurrenceAt: Long? = null) = buildMap {
+        put("type", "event_invitation")
+        put("eventId", event.id.toHexString())
+        if (occurrenceAt != null) put("occurrenceAt", occurrenceAt.toString())
+        put("stableId", STABLE_ID.toHexString())
+    }
+
+    @Test
+    fun `a place offered from the waiting list names the date and the answer time`() {
+        val event = eventRepository.save(event().copy(maxParticipants = 2, answerHours = 12))
+
+        service.on(LessonPlaceOffered(STABLE_ID, anna.id, event.id, listOf(ben.id), occurrenceStartAt = null))
+
+        assertEquals(listOf(PushMessage("Platz frei: Springstunde", "Fr. 09.10. 17:00 · zusagen bis Mo. 05.10. 22:00", offerData(event))), sentTo(ben))
+    }
+
+    @Test
+    fun `an offer without an answer time, or one ending after the start, asks to accept now`() {
+        val event = eventRepository.save(event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna")).copy(maxParticipants = 2))
+        val late = eventRepository.save(event().copy(maxParticipants = 2, answerHours = 200))
+
+        service.on(LessonPlaceOffered(STABLE_ID, anna.id, event.id, listOf(ben.id), occurrenceStartAt = lesson + days(7)))
+        service.on(LessonPlaceOffered(STABLE_ID, anna.id, late.id, listOf(ben.id), occurrenceStartAt = null))
+
+        assertEquals(
+            listOf(
+                PushMessage("Platz frei: Springstunde", "Fr. 16.10. 17:00 · jetzt zusagen", offerData(event, lesson + days(7))),
+                PushMessage("Platz frei: Springstunde", "Fr. 09.10. 17:00 · jetzt zusagen", offerData(late)),
+            ),
+            sentTo(ben),
+        )
+    }
+
+    @Test
+    fun `an offer reaches digest users at once, muted invitations mute it`() {
+        settingsRepository.save(UserSettings(ben.id, mapOf("notificationDigest" to "true"), clock.millis()))
+        settingsRepository.save(UserSettings(clara.id, mapOf("notificationMutedTypes" to "event_invitation"), clock.millis()))
+        val event = eventRepository.save(event().copy(maxParticipants = 2))
+
+        service.on(LessonPlaceOffered(STABLE_ID, anna.id, event.id, listOf(ben.id, clara.id), occurrenceStartAt = null))
+
+        assertEquals(1, sentTo(ben).size)
+        assertTrue(sentTo(clara).isEmpty() && digestRepository.items.isEmpty())
     }
 
     private fun eventUpdate(event: Event, change: String, occurrenceAt: Long? = null) = buildMap {

@@ -31,13 +31,14 @@ class StableDeletionServiceTest {
     private val pictures = FakePictureStore()
     private val sentReminders = com.lerchenflo.hufly.server.repository.FakeSentReminderRepository()
     private val sentEventReminders = com.lerchenflo.hufly.server.repository.FakeSentEventReminderRepository()
+    private val lessonOffers = com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository()
     private val clock = com.lerchenflo.hufly.server.core.security.MutableClock(1_000L)
 
     private val service = StableDeletionService(
         stables, users, joinRequests, digestItems, horses, tags, FakeFoodPlanRepository(), FakeHorseLogRepository(),
         FakePaddockRepository(), FakeHorseGroupRepository(), FakeHorseConflictRepository(), FakePaddockAssignmentRepository(),
         FakeEventRepository(), FakeEventInvitationRepository(), FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, sentEventReminders, pictures, users.accounts, clock,
+        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, sentEventReminders, lessonOffers, pictures, users.accounts, clock,
     )
 
     private val stableId = ObjectId.get()
@@ -64,6 +65,11 @@ class StableDeletionServiceTest {
         listOf(stableId, otherStableId).forEach {
             sentReminders.insert(com.lerchenflo.hufly.server.notification.model.SentReminder(stableId = it, taskId = ObjectId.get(), dueAt = 0L, userId = ObjectId.get()))
             sentEventReminders.insert(com.lerchenflo.hufly.server.notification.model.SentEventReminder(stableId = it, eventId = ObjectId.get(), startAt = 0L, userId = ObjectId.get()))
+            lessonOffers.save(
+                com.lerchenflo.hufly.server.event.model.LessonOffer(
+                    stableId = it, eventId = ObjectId.get(), invitationId = ObjectId.get(), userId = ObjectId.get(), occurrenceStartAt = null, offeredAt = 0L,
+                )
+            )
         }
     }
 
@@ -88,6 +94,7 @@ class StableDeletionServiceTest {
         assertEquals(setOf(PictureKind.USER to otherUser.id, PictureKind.HORSE to otherHorse.id), pictures.pictures.keys)
         assertEquals(listOf(otherStableId), sentReminders.reminders.map { it.stableId })
         assertEquals(listOf(otherStableId), sentEventReminders.reminders.map { it.stableId })
+        assertEquals(listOf(otherStableId), lessonOffers.offers.map { it.stableId })
     }
 
     @Test

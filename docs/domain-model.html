@@ -299,6 +299,10 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "permissions: Set\u003cPermission>",
     "defaultIntervalDays: Int?",
     "icon: String?",
+    "maxParticipants: Int?",
+    "leaveLockHours: Int?",
+    "answerHours: Int?",
+    "durationMinutes: Int?",
     "updatedAt: Long (epoch ms)",
     "updatedBy: ObjectId",
     "deleted: Boolean"
@@ -306,7 +310,7 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "id": "tag",
    "kind": "class",
    "name": "Tag",
-   "note": "Created and assigned by the admin only. One collection for every kind of tag; permissions is only used when type = USER_ROLE; defaultIntervalDays (1..3650) only when type = ACTIVITY, where it suggests the next due date of a horse log entry. icon is an opaque client icon key ([a-z_]{1,40}, null = default). A user's rights = union of the permissions of all their USER_ROLE tags. The admin ignores tags and can do everything.",
+   "note": "Created and assigned by the admin only. One collection for every kind of tag; permissions is only used when type = USER_ROLE; defaultIntervalDays (1..3650) only when type = ACTIVITY, where it suggests the next due date of a horse log entry. icon is an opaque client icon key ([a-z_]{1,40}, null = default). A user's rights = union of the permissions of all their USER_ROLE tags. The admin ignores tags and can do everything. EVENT_TYPE (Terminart) only: maxParticipants (1..99), leaveLockHours and answerHours (0..336) and durationMinutes (5..1440) are a template the client copies into an event; changing or deleting the tag never changes events.",
    "pkg": "tag",
    "x": 29,
    "y": 542
@@ -316,12 +320,13 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "USER_ROLE",
     "FOOD",
     "ACTIVITY",
-    "TASK_CATEGORY"
+    "TASK_CATEGORY",
+    "EVENT_TYPE"
    ],
    "id": "tagtype",
    "kind": "enum",
    "name": "TagType",
-   "note": "USER_ROLE: role of a user (e.g. Reitlehrer), carries permissions. FOOD: food item (e.g. Heu, Hafer), used in food plans. ACTIVITY: something done with a horse (e.g. Springen, Impfung, Hufschmied), used in the horse log. TASK_CATEGORY: groups tasks (e.g. Füttern) so users can hide them in their calendar (client setting). Only USER_ROLE uses permissions.",
+   "note": "USER_ROLE: role of a user (e.g. Reitlehrer), carries permissions. FOOD: food item (e.g. Heu, Hafer), used in food plans. ACTIVITY: something done with a horse (e.g. Springen, Impfung, Hufschmied), used in the horse log. TASK_CATEGORY: groups tasks (e.g. Füttern) so users can hide them in their calendar (client setting). Only USER_ROLE uses permissions. EVENT_TYPE: a Terminart (e.g. Springstunde) whose lesson fields prefill events.",
    "pkg": "tag",
    "x": 42,
    "y": 856
@@ -550,12 +555,17 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "deleted: Boolean",
     "version: Long",
     "splitFromEventId: ObjectId?",
-    "splitFromOccurrenceStartAt: Long? (epoch ms)"
+    "splitFromOccurrenceStartAt: Long? (epoch ms)",
+    "eventTypeId: ObjectId?",
+    "maxParticipants: Int?",
+    "leaveLockHours: Int?",
+    "answerHours: Int?",
+    "participantOrder: List\u003cObjectId>"
    ],
    "id": "event",
    "kind": "class",
    "name": "Event",
-   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing, no participant limit. With recurrence it is a series (EVT-10): startAt/endAt are the first date, each date lasts endAt - startAt, dates are keyed by their original start (occurrenceStartAt). Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. Split series (\"Diesen und alle folgenden\"): splitFromEventId/splitFromOccurrenceStartAt name the old series and the first date taken over; invitations to the new series copy the user's old answers from that date on, without a fresh push for users of the old series.",
+   "note": "Mainly riding lessons, shown in the calendar. Creating and inviting needs EVENT_EDIT, seeing needs EVENT_VIEW. Horses are only attached; no rider-horse pairing. With recurrence it is a series (EVT-10): startAt/endAt are the first date, each date lasts endAt - startAt, dates are keyed by their original start (occurrenceStartAt). Version sync: every write, soft delete included, stamps the next per-collection version; clients sync with `since`. Split series (\"Diesen und alle folgenden\"): splitFromEventId/splitFromOccurrenceStartAt name the old series and the first date taken over; invitations to the new series copy the user's old answers from that date on, without a fresh push for users of the old series. Lessons (client schema 37, supersede EVT-7): maxParticipants set gives every date that many places. Per date, invitees are sorted by participantOrder (missing ones last, by invitedAt), the organiser takes no place, ACCEPTED keep theirs, PENDING ones fill the free places in order, the other PENDING ones wait. The placement is computed, never stored. Waiting people and decliners without a free place cannot accept (409), accepted ones cannot leave from leaveLockHours before the date's start (409). eventTypeId names the Terminart the fields were copied from.",
    "pkg": "event",
    "x": 395,
    "y": 520
@@ -846,6 +856,24 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "pkg": "account",
    "x": 760,
    "y": 1300
+  },
+  {
+   "fields": [
+    "id: ObjectId",
+    "stableId: ObjectId",
+    "eventId: ObjectId",
+    "invitationId: ObjectId",
+    "userId: ObjectId",
+    "occurrenceStartAt: Long? (epoch ms)",
+    "offeredAt: Long (epoch ms)"
+   ],
+   "id": "lessonoffer",
+   "kind": "class",
+   "name": "LessonOffer",
+   "note": "Server-internal, never synced. A place offered to someone who moved up from a lesson's waiting list on one date (occurrenceStartAt null = single event), with an event_invitation push. Unique per invitation and date. Unanswered answerHours after offeredAt (or at the date's start) the job declines it for them and the next one waiting is offered the place; without answerHours it ends at the start.",
+   "pkg": "event",
+   "x": 700,
+   "y": 820
   }
  ],
  "packages": [
@@ -1364,6 +1392,24 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "label": "to join",
    "to": "stable",
    "toCard": "1"
+  },
+  {
+   "from": "lessonoffer",
+   "fromCard": "*",
+   "id": "r_lessonoffer_inv",
+   "kind": "assoc",
+   "label": "offers a place to",
+   "to": "inv",
+   "toCard": "1"
+  },
+  {
+   "from": "event",
+   "fromCard": "*",
+   "id": "r_event_type",
+   "kind": "assoc",
+   "label": "Terminart",
+   "to": "tag",
+   "toCard": "0..1"
   }
  ]
 }

@@ -106,7 +106,7 @@ class EventService(
                 ).withLesson(lessonFields)
             )
             invitees.forEach { addInvitation(requester, event, it, null) }
-            val fresh = invitees - invitedBeforeSplit(event)
+            val fresh = lessons.withPlace(event, invitees - invitedBeforeSplit(event), lessons.datesOf(event, null))
             if (fresh.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, fresh, null))
             event
         }
@@ -127,18 +127,20 @@ class EventService(
         validate(requester, startAt, endAt, horseIds)
         val lessonFields = validLesson(requester, lesson, keptTypeId = event.eventTypeId)
         val told = if (startAt != event.startAt || endAt != event.endAt) acceptedUpcoming(requester, event) else emptyList()
-        return saveEvent(
-            event.copy(
-                title = title,
-                description = description,
-                startAt = startAt,
-                endAt = endAt,
-                horseIds = horseIds.distinct(),
-                recurrence = recurrence,
-                updatedAt = clock.millis(),
-                updatedBy = requester.id,
-            ).withLesson(lessonFields)
-        ).also { announceChange(requester, it, told, EventChange.MOVED) }
+        return lessons.movingUp(requester.id, event, lessons.datesOf(event, null)) {
+            saveEvent(
+                event.copy(
+                    title = title,
+                    description = description,
+                    startAt = startAt,
+                    endAt = endAt,
+                    horseIds = horseIds.distinct(),
+                    recurrence = recurrence,
+                    updatedAt = clock.millis(),
+                    updatedBy = requester.id,
+                ).withLesson(lessonFields)
+            )
+        }.also { announceChange(requester, it, told, EventChange.MOVED) }
     }
 
     fun deleteEvent(requester: User, eventId: ObjectId) {
@@ -172,9 +174,12 @@ class EventService(
         val newUserIds = userIds.distinct().filter { it !in skipped && (it != event.creatorUserId || occurrenceStartAt == null) }
         if (newUserIds.isNotEmpty()) {
             requireInvitationCap(live.size + newUserIds.size)
-            newUserIds.forEach { addInvitation(requester, event, it, occurrenceStartAt) }
-            restamp(event)
-            val invitees = newUserIds - event.creatorUserId - invitedBeforeSplit(event)
+            val dates = lessons.datesOf(event, occurrenceStartAt)
+            lessons.movingUp(requester.id, event, dates) {
+                newUserIds.forEach { addInvitation(requester, event, it, occurrenceStartAt) }
+                restamp(event)
+            }
+            val invitees = lessons.withPlace(event, newUserIds - event.creatorUserId - invitedBeforeSplit(event), dates)
             if (invitees.isNotEmpty()) announce(EventInvited(event.stableId, requester.id, event.id, invitees, occurrenceStartAt))
         }
         return invitationRepository.findByEventIdAndDeletedFalse(event.id)
@@ -185,29 +190,69 @@ class EventService(
         val event = managedEvent(requester, invitation.eventId)
         val now = clock.millis()
         val told = invitation.userId.takeIf { invitation.userId != requester.id && participation(event).acceptsUpcoming(invitation, now) }
-        saveInvitation(invitation.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
-        answerRepository.findByInvitationIdAndDeletedFalse(invitation.id).forEach {
-            saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+        lessons.movingUp(requester.id, event, lessons.datesOf(event, invitation.occurrenceStartAt)) {
+            saveInvitation(invitation.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+            answerRepository.findByInvitationIdAndDeletedFalse(invitation.id).forEach {
+                saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+            }
+            restamp(event)
         }
-        restamp(event)
         announceChange(requester, event, listOfNotNull(told), EventChange.UNINVITED, invitation.occurrenceStartAt)
     }
 
     fun respond(requester: User, invitationId: ObjectId, accepted: Boolean): EventInvitation {
         val invitation = liveInvitation(requester, invitationId)
         if (invitation.userId != requester.id) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not your invitation")
-        val event = eventRepository.findById(invitation.eventId)
-        if (invitation.occurrenceStartAt == null && event?.recurrence != null) {
+        val event = eventRepository.findById(invitation.eventId)?.takeUnless { it.deleted }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found")
+        if (invitation.occurrenceStartAt == null && event.recurrence != null) {
             throw badRequest("Answer the dates of a series one by one")
         }
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
-        if (event != null && status != invitation.status) lessons.requireAnswerAllowed(event, invitation, invitation.occurrenceStartAt, accepted)
+        if (status != invitation.status) lessons.requireAnswerAllowed(event, invitation, invitation.occurrenceStartAt, accepted)
         val now = clock.millis()
-        val saved = saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
+        val saved = lessons.movingUp(requester.id, event, listOf(invitation.occurrenceStartAt)) {
+            saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
+        }
         if (invitation.status != status) {
             announce(InvitationAnswered(invitation.stableId, requester.id, invitation.eventId, accepted, invitation.occurrenceStartAt))
         }
         return saved
+    }
+
+    /**
+     * Ends an offer from the waiting list nobody answered in time: [invitation] declines the date [key] (null: a single
+     * event) as if its user had, and the place goes to the next one waiting.
+     */
+    internal fun declineUnanswered(event: Event, invitation: EventInvitation, key: Long?) {
+        lessons.movingUp(invitation.userId, event, listOf(key)) {
+            if (key != null && invitation.occurrenceStartAt == null) {
+                upsertAnswer(invitation, key, InvitationStatus.DECLINED, invitation.userId)
+            } else {
+                val now = clock.millis()
+                saveInvitation(invitation.copy(status = InvitationStatus.DECLINED, respondedAt = now, updatedAt = now, updatedBy = invitation.userId))
+            }
+        }
+    }
+
+    /** The answer of a series invitation for the date [key]; an upsert, so retries and races keep one row. */
+    internal fun upsertAnswer(invitation: EventInvitation, key: Long, status: InvitationStatus, by: ObjectId): EventOccurrenceAnswer = retryOnDuplicate {
+        val existing = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, key)
+        val now = clock.millis()
+        saveAnswer(
+            EventOccurrenceAnswer(
+                id = existing?.id ?: ObjectId.get(),
+                stableId = invitation.stableId,
+                eventId = invitation.eventId,
+                invitationId = invitation.id,
+                userId = invitation.userId,
+                occurrenceStartAt = key,
+                status = status,
+                respondedAt = now,
+                updatedAt = now,
+                updatedBy = by,
+            )
+        )
     }
 
     /** Hands the change to the push notifications, see [NotificationEvent]. */

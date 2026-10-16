@@ -1,10 +1,12 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.MILLIS_PER_HOUR
 import com.lerchenflo.hufly.server.core.notification.EventChange
 import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
 import com.lerchenflo.hufly.server.core.notification.InvitationAnswered
+import com.lerchenflo.hufly.server.core.notification.LessonPlaceOffered
 import com.lerchenflo.hufly.server.core.notification.JoinAccepted
 import com.lerchenflo.hufly.server.core.notification.JoinRequested
 import com.lerchenflo.hufly.server.core.notification.NotePosted
@@ -65,6 +67,7 @@ class NotificationService(
                 is NotePosted -> notePosted(event)
                 is EventInvited -> eventInvited(event)
                 is InvitationAnswered -> invitationAnswered(event)
+                is LessonPlaceOffered -> placeOffered(event)
                 is EventChanged -> eventChanged(event)
                 is TaskAssigned -> taskAssigned(event)
                 is JoinRequested -> joinRequested(event)
@@ -90,6 +93,20 @@ class NotificationService(
             PushMessage(
                 "Einladung: ${calendarEvent.title}",
                 "${format(at, zone)} · von $from",
+                data("event_invitation", "eventId" to calendarEvent.id, event.occurrenceStartAt),
+            )
+        }
+    }
+
+    /** Has an answer time, so it goes out at once, also to digest users; it is an invitation for whoever mutes those. */
+    private fun placeOffered(event: LessonPlaceOffered) {
+        val calendarEvent = eventRepository.findById(event.eventId)?.takeIf { it.stableId == event.stableId && !it.deleted } ?: return
+        val at = event.occurrenceStartAt ?: calendarEvent.startAt
+        val answerBy = calendarEvent.answerHours?.let { clock.millis() + it * MILLIS_PER_HOUR }?.takeIf { it < at }
+        deliver(members(event, event.userIds), atOnce = true) { zone ->
+            PushMessage(
+                "Platz frei: ${calendarEvent.title}",
+                "${format(at, zone)} · " + (answerBy?.let { "zusagen bis ${format(it, zone)}" } ?: "jetzt zusagen"),
                 data("event_invitation", "eventId" to calendarEvent.id, event.occurrenceStartAt),
             )
         }
@@ -196,6 +213,7 @@ class NotificationService(
     private fun deliver(
         recipients: List<User>,
         onPushed: (User, NotificationPreferences) -> Unit = { _, _ -> },
+        atOnce: Boolean = false,
         message: (TimeZone) -> PushMessage,
     ) {
         recipients.forEach { user ->
@@ -213,7 +231,7 @@ class NotificationService(
                 log.info("Notification {} for account {}: muted", type, user.accountId)
                 return@forEach
             }
-            if (preferences.digest) {
+            if (preferences.digest && !atOnce) {
                 log.info("Notification {} for account {}: held for the digest", type, user.accountId)
                 digestRepository.save(DigestItem(userId = user.accountId, stableId = user.stableId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {

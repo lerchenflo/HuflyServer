@@ -24,6 +24,15 @@ data class EventInvited(
     val occurrenceStartAt: Long?,
 ) : NotificationEvent
 
+/** [userIds] moved up from a lesson's waiting list and are offered a place on the date [occurrenceStartAt] (null: a single event). */
+data class LessonPlaceOffered(
+    override val stableId: ObjectId,
+    override val actorUserId: ObjectId,
+    val eventId: ObjectId,
+    val userIds: List<ObjectId>,
+    val occurrenceStartAt: Long?,
+) : NotificationEvent
+
 /** The invitee [actorUserId] changed their answer, for one date of a series when [occurrenceStartAt] is set. */
 data class InvitationAnswered(
     override val stableId: ObjectId,

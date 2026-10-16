@@ -5,6 +5,10 @@ Open work only; finished items live in git history. Client-side product TODOs li
 ## Push notifications
 - [ ] Anyone who knows another install's push token could register it on their own session (the token moves). Tokens are not public, so accepted for now.
 
+## Lessons
+- [ ] LOW: answers to a lesson are checked, then saved, without a lock. Two decliners who accept the last free place at the same moment, or a user who answers while the timeout job declines for them, can end one over `maxParticipants`. Lock per event (or an atomic place counter) if that shows up.
+- [ ] Removing a member leaves their event invitations, so in a lesson their PENDING or ACCEPTED invitation keeps a place. Remove (and move people up) when a membership ends.
+
 ## Open decisions
 - [ ] Payment model (BIZ-6): the app is free for now (decided 2026-10-09); in-app purchases may come later. The subscription fields stay unused (TRIAL); then add prices to the website.
 

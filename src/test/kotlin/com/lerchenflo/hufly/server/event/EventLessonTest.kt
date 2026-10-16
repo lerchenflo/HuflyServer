@@ -1,6 +1,8 @@
 package com.lerchenflo.hufly.server.event
 
 import com.lerchenflo.hufly.server.core.access.AccessService
+import com.lerchenflo.hufly.server.core.notification.EventInvited
+import com.lerchenflo.hufly.server.core.notification.LessonPlaceOffered
 import com.lerchenflo.hufly.server.core.recurrence.Recurrence
 import com.lerchenflo.hufly.server.core.recurrence.RecurrenceFrequency
 import com.lerchenflo.hufly.server.core.security.MutableClock
@@ -15,10 +17,12 @@ import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepositor
 import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.FakeEventRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
+import com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
 import com.lerchenflo.hufly.server.tag.model.Permission
+import com.lerchenflo.hufly.server.testdata.STABLE_ID
 import com.lerchenflo.hufly.server.testdata.days
 import com.lerchenflo.hufly.server.testdata.hours
 import com.lerchenflo.hufly.server.testdata.millis
@@ -51,11 +55,14 @@ class EventLessonTest {
     private val answerRepository = FakeEventOccurrenceAnswerRepository()
     private val accessService = AccessService(userRepository, userRepository.accounts, stableRepository, tagRepository)
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
-    private val lessons = LessonService(invitationRepository, occurrenceRepository, answerRepository, clock)
+    private val offerRepository = FakeLessonOfferRepository()
+    private val publisher = ApplicationEventPublisher { published += it }
+    private val lessons = LessonService(eventRepository, invitationRepository, occurrenceRepository, answerRepository, offerRepository, clock, publisher)
     private val eventService = EventService(
         eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository, tagRepository,
-        accessService, versionCounterService, clock, ApplicationEventPublisher { published += it }, lessons,
+        accessService, versionCounterService, clock, publisher, lessons,
     )
+    private val timeouts = LessonOfferTimeouts(offerRepository, eventRepository, lessons, eventService, clock)
     private val occurrenceService = EventOccurrenceService(
         eventService, eventRepository, invitationRepository, occurrenceRepository, answerRepository, horseRepository,
         accessService, versionCounterService, clock, lessons,
@@ -67,16 +74,19 @@ class EventLessonTest {
     private val anna = testUser()
     private val ben = testUser()
     private val clara = testUser()
+    private val dora = testUser()
     private val blitz = testHorse()
 
     // Clock: 2026-10-03T10:00Z. Single lessons and the first date of a series start on 2026-10-13 16:00Z.
     private val start = millis("2026-10-13T16:00:00Z")
     private val second = start + days(7)
+    private val third = second + days(7)
+    private val fourth = third + days(7)
     private val weekly = Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, 4, "UTC")
 
     @BeforeTest
     fun setUp() {
-        listOf(admin, teacher, anna, ben, clara).forEach { userRepository.save(it) }
+        listOf(admin, teacher, anna, ben, clara, dora).forEach { userRepository.save(it) }
         tagRepository.save(teacherTag)
         horseRepository.save(blitz)
         stableRepository.save(testStable(adminUserId = admin.id))
@@ -88,10 +98,23 @@ class EventLessonTest {
         leaveLockHours: Int? = null,
         recurrence: Recurrence? = null,
         invitees: List<User> = listOf(anna, ben, clara),
+        answerHours: Int? = null,
     ) = eventService.createEvent(
         teacher, "Springstunde", "", start, start + hours(1), listOf(blitz.id), invitees.map { it.id }, recurrence = recurrence,
-        lesson = LessonFields(maxParticipants = maxParticipants, leaveLockHours = leaveLockHours, participantOrder = invitees.map { it.id }),
+        lesson = fields(maxParticipants, leaveLockHours, answerHours, invitees),
     )
+
+    private fun fields(maxParticipants: Int, leaveLockHours: Int? = null, answerHours: Int? = null, order: List<User> = listOf(anna, ben, clara, dora)) =
+        LessonFields(maxParticipants = maxParticipants, leaveLockHours = leaveLockHours, answerHours = answerHours, participantOrder = order.map { it.id })
+
+    private fun update(event: Event, lesson: LessonFields) =
+        eventService.updateEvent(teacher, event.id, event.title, event.description, event.startAt, event.endAt, event.horseIds, event.recurrence, lesson)
+
+    private fun offered() = published.filterIsInstance<LessonPlaceOffered>()
+
+    private fun offer(event: Event, by: User, user: User, key: Long? = null) = LessonPlaceOffered(STABLE_ID, by.id, event.id, listOf(user.id), key)
+
+    private fun offers() = offerRepository.offers.map { it.userId to it.occurrenceStartAt }
 
     private fun invitationOf(event: Event, user: User): EventInvitation =
         invitationRepository.findByEventIdAndDeletedFalse(event.id).single { it.userId == user.id }
@@ -189,5 +212,208 @@ class EventLessonTest {
         assertRefused("Lesson: no free place") { eventService.respond(ben, benOnSecond.id, accepted = true) }
         answerDate(event, anna, second, accepted = false)
         assertEquals(InvitationStatus.ACCEPTED, eventService.respond(ben, benOnSecond.id, accepted = true).status)
+    }
+
+    // Moving up
+
+    @Test
+    fun `a decline offers the place to the first one waiting`() {
+        val event = lesson(invitees = listOf(anna, ben, clara, dora))
+        published.clear()
+
+        respond(event, anna, accepted = false)
+
+        assertEquals(listOf(offer(event, anna, clara)), offered())
+        assertEquals(listOf(clara.id to clock.millis()), offerRepository.offers.map { it.userId to it.offeredAt })
+        assertEquals(InvitationStatus.ACCEPTED, respond(event, clara, accepted = true).status)
+    }
+
+    @Test
+    fun `inviting pushes only invitees with a place and offers nothing`() {
+        val event = lesson()
+        eventService.invite(teacher, event.id, listOf(dora.id))
+
+        assertEquals(listOf(listOf(anna.id, ben.id)), published.filterIsInstance<EventInvited>().map { it.userIds })
+        assertEquals(emptyList(), offers())
+    }
+
+    @Test
+    fun `removing an invitation offers its place`() {
+        val event = lesson()
+        published.clear()
+
+        eventService.removeInvitation(teacher, invitationOf(event, anna).id)
+
+        assertEquals(listOf(offer(event, teacher, clara)), offered())
+    }
+
+    @Test
+    fun `more places offer them to the ones waiting, in order`() {
+        val event = lesson(invitees = listOf(anna, ben, clara, dora))
+        published.clear()
+
+        update(event, fields(maxParticipants = 3))
+
+        assertEquals(listOf(offer(event, teacher, clara)), offered())
+    }
+
+    @Test
+    fun `a new order offers places to who moves ahead, who falls back just waits`() {
+        val event = lesson()
+        published.clear()
+
+        update(event, fields(maxParticipants = 2, order = listOf(clara, anna, ben)))
+
+        assertEquals(listOf(offer(event, teacher, clara)), offered())
+        assertRefused("Lesson: no free place") { respond(event, ben, accepted = true) }
+    }
+
+    @Test
+    fun `a decline on one date of a series offers the place on that date only`() {
+        val event = lesson(recurrence = weekly)
+        published.clear()
+
+        answerDate(event, anna, second, accepted = false)
+
+        assertEquals(listOf(offer(event, anna, clara, second)), offered())
+        assertEquals(listOf(clara.id to second), offers())
+    }
+
+    @Test
+    fun `taking someone off a date offers their place on that date`() {
+        val event = lesson(recurrence = weekly)
+        published.clear()
+
+        occurrenceService.putOccurrence(teacher, event.id, third, EventOccurrenceChange(false, null, null, null, null, null, removedUserIds = listOf(anna.id)))
+
+        assertEquals(listOf(offer(event, teacher, clara, third)), offered())
+    }
+
+    @Test
+    fun `more places on a series offer every upcoming date but push once, for the earliest`() {
+        val event = lesson(recurrence = weekly)
+        clock.advance(start - clock.millis())
+        published.clear()
+
+        update(event, fields(maxParticipants = 3))
+
+        assertEquals(listOf(offer(event, teacher, clara, second)), offered())
+        assertEquals(listOf(clara.id to second, clara.id to third, clara.id to fourth), offers())
+    }
+
+    @Test
+    fun `a date that started is left alone`() {
+        val event = lesson()
+        clock.advance(start - clock.millis())
+        published.clear()
+
+        respond(event, anna, accepted = false)
+
+        assertEquals(emptyList(), offered())
+        assertEquals(emptyList(), offers())
+    }
+
+    // Answer time
+
+    @Test
+    fun `an offer left open for answerHours is declined and offered to the next one`() {
+        val event = lesson(invitees = listOf(anna, ben, clara, dora), answerHours = 12)
+        respond(event, anna, accepted = false)
+        published.clear()
+
+        clock.advance(hours(12) - 1)
+        timeouts.expireOffers()
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
+
+        clock.advance(1)
+        timeouts.expireOffers()
+
+        val clarasInvitation = invitationOf(event, clara)
+        assertEquals(listOf(InvitationStatus.DECLINED, clock.millis(), clara.id), listOf(clarasInvitation.status, clarasInvitation.respondedAt, clarasInvitation.updatedBy))
+        assertEquals(listOf(offer(event, clara, dora)), offered())
+        assertEquals(listOf(dora.id to null), offers())
+    }
+
+    @Test
+    fun `an open offer on a series date is declined for that date`() {
+        val event = lesson(recurrence = weekly, invitees = listOf(anna, ben, clara, dora), answerHours = 12)
+        answerDate(event, anna, second, accepted = false)
+        published.clear()
+
+        clock.advance(hours(12))
+        timeouts.expireOffers()
+
+        val answer = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitationOf(event, clara).id, second)!!
+        assertEquals(listOf(InvitationStatus.DECLINED, clock.millis(), clara.id), listOf(answer.status, answer.respondedAt, answer.updatedBy))
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
+        assertEquals(listOf(offer(event, clara, dora, second)), offered())
+    }
+
+    @Test
+    fun `an answered offer is dropped`() {
+        val event = lesson(answerHours = 12)
+        respond(event, anna, accepted = false)
+        respond(event, clara, accepted = true)
+
+        clock.advance(hours(12))
+        timeouts.expireOffers()
+
+        assertEquals(InvitationStatus.ACCEPTED, invitationOf(event, clara).status)
+        assertEquals(emptyList(), offers())
+    }
+
+    @Test
+    fun `without answerHours an offer stays open until the start and then ends without an answer`() {
+        val event = lesson()
+        respond(event, anna, accepted = false)
+
+        clock.advance(start - 1 - clock.millis())
+        timeouts.expireOffers()
+        assertEquals(listOf(clara.id to null), offers())
+
+        clock.advance(1)
+        timeouts.expireOffers()
+        assertEquals(emptyList(), offers())
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
+    }
+
+    @Test
+    fun `with answerHours the start ends an open offer as declined`() {
+        val event = lesson(answerHours = 336)
+        respond(event, anna, accepted = false)
+
+        clock.advance(start - clock.millis())
+        timeouts.expireOffers()
+
+        assertEquals(InvitationStatus.DECLINED, invitationOf(event, clara).status)
+        assertEquals(emptyList(), offers())
+    }
+
+    @Test
+    fun `an offer ends without an answer when its invitation or event is gone`() {
+        val removed = lesson(answerHours = 1)
+        respond(removed, anna, accepted = false)
+        eventService.removeInvitation(teacher, invitationOf(removed, clara).id)
+        val deleted = lesson(answerHours = 1)
+        respond(deleted, anna, accepted = false)
+        eventService.deleteEvent(teacher, deleted.id)
+
+        clock.advance(hours(1))
+        timeouts.expireOffers()
+
+        assertEquals(emptyList(), offers())
+    }
+
+    @Test
+    fun `an offer ends without an answer when its user falls back to waiting`() {
+        val event = lesson(answerHours = 1)
+        respond(event, anna, accepted = false)
+        update(event, fields(maxParticipants = 1, answerHours = 1))
+
+        clock.advance(hours(1))
+        timeouts.expireOffers()
+
+        assertEquals(emptyList(), offers())
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
     }
 }

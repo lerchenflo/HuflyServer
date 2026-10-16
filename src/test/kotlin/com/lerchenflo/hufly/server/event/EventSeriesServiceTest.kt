@@ -63,11 +63,11 @@ class EventSeriesServiceTest {
     private val eventService = EventService(
         eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository, tagRepository,
         accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
-        LessonService(invitationRepository, occurrenceRepository, answerRepository, clock),
+        LessonService(eventRepository, invitationRepository, occurrenceRepository, answerRepository, com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), clock) { published += it },
     )
     private val service = EventOccurrenceService(
         eventService, eventRepository, invitationRepository, occurrenceRepository, answerRepository, horseRepository,
-        accessService, versionCounterService, clock, LessonService(invitationRepository, occurrenceRepository, answerRepository, clock),
+        accessService, versionCounterService, clock, LessonService(eventRepository, invitationRepository, occurrenceRepository, answerRepository, com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), clock) { published += it },
     )
 
     private val admin = testUser()
