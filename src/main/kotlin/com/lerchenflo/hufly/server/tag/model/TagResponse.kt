@@ -9,6 +9,10 @@ data class TagResponse(
     val permissions: Set<Permission>,
     val defaultIntervalDays: Int?,
     val icon: String?,
+    val maxParticipants: Int?,
+    val leaveLockHours: Int?,
+    val answerHours: Int?,
+    val durationMinutes: Int?,
     val updatedAt: Long,
     val updatedBy: String,
 )
@@ -22,6 +26,10 @@ fun Tag.toTagResponse() = TagResponse(
     permissions = permissions,
     defaultIntervalDays = defaultIntervalDays,
     icon = icon,
+    maxParticipants = maxParticipants,
+    leaveLockHours = leaveLockHours,
+    answerHours = answerHours,
+    durationMinutes = durationMinutes,
     updatedAt = updatedAt,
     updatedBy = updatedBy.toHexString(),
 )

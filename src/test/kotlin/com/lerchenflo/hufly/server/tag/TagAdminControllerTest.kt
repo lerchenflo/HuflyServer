@@ -21,6 +21,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** TAG-2: HTTP mapping and validation. Business rules live in TagServiceTest. */
 @SpringBootTest
@@ -186,6 +187,77 @@ class TagAdminControllerTest {
         call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Heu","color":"#8bc34a","permissions":[],"icon":"Hay"}""")
             .andExpect { status { isBadRequest() } }
         call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Heu","color":"#8bc34a","permissions":[],"icon":"riding_hat"}""")
+            .andExpect { status { isOk() } }
+    }
+
+    // Terminarten (lessons, client schema 37; supersedes EVT-7)
+
+    @Test
+    fun `an EVENT_TYPE tag stores its lesson template and answers it`() {
+        val body = """{"name":"Springstunde","type":"EVENT_TYPE","color":"#3f51b5","maxParticipants":4,"leaveLockHours":24,"answerHours":12,"durationMinutes":60}"""
+        call(HttpMethod.POST, "/tags", body).andExpect {
+            status { isOk() }
+            jsonPath("$.type") { value("EVENT_TYPE") }
+            jsonPath("$.maxParticipants") { value(4) }
+            jsonPath("$.leaveLockHours") { value(24) }
+            jsonPath("$.answerHours") { value(12) }
+            jsonPath("$.durationMinutes") { value(60) }
+        }
+        val tag = tagRepository.tags.single()
+        assertEquals(listOf(4, 24, 12, 60), listOf(tag.maxParticipants, tag.leaveLockHours, tag.answerHours, tag.durationMinutes))
+    }
+
+    @Test
+    fun `editing an EVENT_TYPE tag replaces the template and missing fields clear it`() {
+        val tag = tagRepository.save(testTag(type = TagType.EVENT_TYPE).copy(maxParticipants = 4, leaveLockHours = 24, answerHours = 12, durationMinutes = 60))
+
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"Springstunde","color":"#3f51b5","permissions":[],"maxParticipants":6}""").andExpect {
+            status { isOk() }
+            jsonPath("$.maxParticipants") { value(6) }
+            jsonPath("$.leaveLockHours") { value(null) }
+            jsonPath("$.answerHours") { value(null) }
+            jsonPath("$.durationMinutes") { value(null) }
+        }
+        val stored = tagRepository.findById(tag.id)!!
+        assertEquals(listOf(6, null, null, null), listOf(stored.maxParticipants, stored.leaveLockHours, stored.answerHours, stored.durationMinutes))
+    }
+
+    @Test
+    fun `tags other than EVENT_TYPE store no lesson template`() {
+        val food = tagRepository.save(testTag(type = TagType.FOOD))
+        val template = """"maxParticipants":4,"leaveLockHours":24,"answerHours":12,"durationMinutes":60"""
+
+        call(HttpMethod.POST, "/tags", """{"name":"Hafer","type":"FOOD","color":"#8d6e63",$template}""").andExpect {
+            status { isOk() }
+            jsonPath("$.maxParticipants") { value(null) }
+            jsonPath("$.durationMinutes") { value(null) }
+        }
+        call(HttpMethod.PUT, "/tags/${food.id.toHexString()}", """{"name":"Heu","color":"#8d6e63","permissions":[],$template}""").andExpect {
+            status { isOk() }
+            jsonPath("$.leaveLockHours") { value(null) }
+            jsonPath("$.answerHours") { value(null) }
+        }
+        assertTrue(tagRepository.tags.all { it.maxParticipants == null && it.leaveLockHours == null && it.answerHours == null && it.durationMinutes == null })
+    }
+
+    @Test
+    fun `lesson template values out of range answer 400`() {
+        val tag = tagRepository.save(testTag(type = TagType.EVENT_TYPE))
+        val outOfRange = listOf(
+            "maxParticipants" to 0, "maxParticipants" to 100,
+            "leaveLockHours" to -1, "leaveLockHours" to 337,
+            "answerHours" to -1, "answerHours" to 337,
+            "durationMinutes" to 4, "durationMinutes" to 1441,
+        )
+        outOfRange.forEach { (field, value) ->
+            call(HttpMethod.POST, "/tags", """{"name":"X","type":"EVENT_TYPE","color":"#3f51b5","$field":$value}""")
+                .andExpect { status { isBadRequest() } }
+            call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"X","color":"#3f51b5","permissions":[],"$field":$value}""")
+                .andExpect { status { isBadRequest() } }
+        }
+        val bounds = """"maxParticipants":99,"leaveLockHours":0,"answerHours":336,"durationMinutes":5"""
+        call(HttpMethod.POST, "/tags", """{"name":"X","type":"EVENT_TYPE","color":"#3f51b5",$bounds}""").andExpect { status { isOk() } }
+        call(HttpMethod.PUT, "/tags/${tag.id.toHexString()}", """{"name":"X","color":"#3f51b5","permissions":[],"maxParticipants":1,"leaveLockHours":336,"answerHours":0,"durationMinutes":1440}""")
             .andExpect { status { isOk() } }
     }
 }

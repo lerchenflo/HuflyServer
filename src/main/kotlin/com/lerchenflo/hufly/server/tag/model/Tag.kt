@@ -7,7 +7,15 @@ import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 
-enum class TagType { USER_ROLE, FOOD, ACTIVITY, TASK_CATEGORY }
+enum class TagType {
+    USER_ROLE,
+    FOOD,
+    ACTIVITY,
+    TASK_CATEGORY,
+
+    /** Terminart: its lesson fields are a template the client copies into an event; editing it never changes events. */
+    EVENT_TYPE,
+}
 
 /**
  * Grantable through USER_ROLE tags. An EDIT permission includes its VIEW permission ([impliedView]).
@@ -44,9 +52,23 @@ data class Tag(
     val defaultIntervalDays: Int? = null,
     /** Icon key the client draws; never interpreted here, null means the client's default. */
     val icon: String? = null,
+    /** Only for [TagType.EVENT_TYPE], see [com.lerchenflo.hufly.server.event.model.Event.maxParticipants]. */
+    val maxParticipants: Int? = null,
+    val leaveLockHours: Int? = null,
+    val answerHours: Int? = null,
+    /** Only prefills the client's event editor. */
+    val durationMinutes: Int? = null,
     override val updatedAt: Long,
     val updatedBy: ObjectId,
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
 ) : TimestampSynced
+
+/** The lesson fields of a [TagType.EVENT_TYPE] tag. */
+data class LessonTemplate(
+    val maxParticipants: Int? = null,
+    val leaveLockHours: Int? = null,
+    val answerHours: Int? = null,
+    val durationMinutes: Int? = null,
+)

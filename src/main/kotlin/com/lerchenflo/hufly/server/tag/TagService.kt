@@ -5,6 +5,7 @@ import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.access.AccessService
 import com.lerchenflo.hufly.server.core.idempotentCreate
 import com.lerchenflo.hufly.server.repository.TagRepository
+import com.lerchenflo.hufly.server.tag.model.LessonTemplate
 import com.lerchenflo.hufly.server.tag.model.Permission
 import com.lerchenflo.hufly.server.tag.model.Tag
 import com.lerchenflo.hufly.server.tag.model.TagType
@@ -30,6 +31,7 @@ class TagService(
         clientId: String? = null,
         defaultIntervalDays: Int? = null,
         icon: String? = null,
+        template: LessonTemplate = LessonTemplate(),
     ): Tag {
         accessService.requireAdmin(requester)
         return idempotentCreate(clientId, { tagRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -46,7 +48,7 @@ class TagService(
                     updatedAt = clock.millis(),
                     updatedBy = requester.id,
                     clientId = clientId,
-                )
+                ).withTemplate(template)
             )
         }
     }
@@ -59,6 +61,7 @@ class TagService(
         permissions: Set<Permission>,
         defaultIntervalDays: Int? = null,
         icon: String? = null,
+        template: LessonTemplate = LessonTemplate(),
     ): Tag {
         accessService.requireAdmin(requester)
         val tag = stableTag(requester, tagId)
@@ -72,7 +75,7 @@ class TagService(
                 icon = icon,
                 updatedAt = clock.millis(),
                 updatedBy = requester.id,
-            )
+            ).withTemplate(template)
         )
     }
 
@@ -80,6 +83,16 @@ class TagService(
         accessService.requireAdmin(requester)
         val tag = stableTag(requester, tagId)
         tagRepository.save(tag.copy(deleted = true, updatedAt = clock.millis(), updatedBy = requester.id))
+    }
+
+    private fun Tag.withTemplate(template: LessonTemplate): Tag {
+        val kept = template.takeIf { type == TagType.EVENT_TYPE } ?: LessonTemplate()
+        return copy(
+            maxParticipants = kept.maxParticipants,
+            leaveLockHours = kept.leaveLockHours,
+            answerHours = kept.answerHours,
+            durationMinutes = kept.durationMinutes,
+        )
     }
 
     private fun requirePermissionsFit(type: TagType, permissions: Set<Permission>) {
