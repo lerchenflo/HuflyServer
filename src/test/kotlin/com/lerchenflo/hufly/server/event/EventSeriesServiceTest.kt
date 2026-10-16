@@ -63,10 +63,11 @@ class EventSeriesServiceTest {
     private val eventService = EventService(
         eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository, tagRepository,
         accessService, versionCounterService, clock, ApplicationEventPublisher { published += it },
+        LessonService(invitationRepository, occurrenceRepository, answerRepository, clock),
     )
     private val service = EventOccurrenceService(
         eventService, eventRepository, invitationRepository, occurrenceRepository, answerRepository, horseRepository,
-        accessService, versionCounterService, clock,
+        accessService, versionCounterService, clock, LessonService(invitationRepository, occurrenceRepository, answerRepository, clock),
     )
 
     private val admin = testUser()

@@ -57,6 +57,7 @@ class EventOccurrenceService(
     private val accessService: AccessService,
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
+    private val lessons: LessonService,
 ) {
     fun putOccurrence(requester: User, eventId: ObjectId, occurrenceStartAt: Long, change: EventOccurrenceChange): EventOccurrence {
         val event = eventService.managedEvent(requester, eventId)
@@ -98,6 +99,7 @@ class EventOccurrenceService(
         if (occurrence?.removedUserIds?.contains(invitation.userId) == true) throw badRequest("Not invited to this date")
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
         val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
+        if (before != status) lessons.requireAnswerAllowed(event, invitation, occurrenceStartAt, accepted)
         val saved = retryOnDuplicate {
             val existing = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)
             val now = clock.millis()

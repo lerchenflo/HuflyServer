@@ -63,6 +63,7 @@ class EventService(
     private val versionCounterService: VersionCounterService,
     private val clock: Clock,
     private val events: ApplicationEventPublisher,
+    private val lessons: LessonService,
 ) {
     fun createEvent(
         requester: User,
@@ -195,11 +196,13 @@ class EventService(
     fun respond(requester: User, invitationId: ObjectId, accepted: Boolean): EventInvitation {
         val invitation = liveInvitation(requester, invitationId)
         if (invitation.userId != requester.id) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not your invitation")
-        if (invitation.occurrenceStartAt == null && eventRepository.findById(invitation.eventId)?.recurrence != null) {
+        val event = eventRepository.findById(invitation.eventId)
+        if (invitation.occurrenceStartAt == null && event?.recurrence != null) {
             throw badRequest("Answer the dates of a series one by one")
         }
-        val now = clock.millis()
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
+        if (event != null && status != invitation.status) lessons.requireAnswerAllowed(event, invitation, invitation.occurrenceStartAt, accepted)
+        val now = clock.millis()
         val saved = saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
         if (invitation.status != status) {
             announce(InvitationAnswered(invitation.stableId, requester.id, invitation.eventId, accepted, invitation.occurrenceStartAt))
