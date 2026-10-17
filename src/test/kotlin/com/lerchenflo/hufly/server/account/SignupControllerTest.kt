@@ -328,7 +328,7 @@ class SignupControllerTest {
         }
     }
 
-    // Stable settings and invite code (admin)
+    // Stable settings (admin) and invite code (members read, admin renews)
 
     @Test
     fun `the admin reads and renews the invite code, the old one stops working at once`() {
@@ -345,10 +345,23 @@ class SignupControllerTest {
     }
 
     @Test
-    fun `members never see the invite code`() {
-        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id).andExpect { status { isForbidden() } }
+    fun `members read the invite code to pass it on, only the admin renews it`() {
+        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id).andExpect {
+            status { isOk() }
+            jsonPath("$.code") { value("ABCD2345") }
+        }
         call(HttpMethod.POST, "/stables/me/invitecode", as_ = rider.id).andExpect { status { isForbidden() } }
+        assertEquals("ABCD2345", stableRepository.findById(STABLE_ID)!!.inviteCode)
         call(HttpMethod.GET, "/users/me", as_ = admin.id).andExpect { jsonPath("$.stable.inviteCode") { doesNotExist() } }
+    }
+
+    @Test
+    fun `nobody reads the invite code of a stable they are not a member of`() {
+        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id, stable = ObjectId.get().toHexString()).andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("NO_STABLE") }
+        }
+        call(HttpMethod.GET, "/stables/me/invitecode", as_ = registered()).andExpect { status { isForbidden() } }
     }
 
     @Test
@@ -399,8 +412,8 @@ class SignupControllerTest {
             jsonPath("$.stable.id") { value(own) }
             jsonPath("$.isAdmin") { value(true) }
         }
-        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id, stable = own).andExpect { status { isOk() } }
-        call(HttpMethod.GET, "/stables/me/invitecode", as_ = rider.id, stable = STABLE_ID.toHexString()).andExpect { status { isForbidden() } }
+        call(HttpMethod.POST, "/stables/me/invitecode", as_ = rider.id, stable = own).andExpect { status { isOk() } }
+        call(HttpMethod.POST, "/stables/me/invitecode", as_ = rider.id, stable = STABLE_ID.toHexString()).andExpect { status { isForbidden() } }
     }
 
     @Test

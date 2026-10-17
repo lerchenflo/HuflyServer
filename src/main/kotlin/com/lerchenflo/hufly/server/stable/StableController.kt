@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-/** The own stable's name, place and invite code (admin only). */
+/** The own stable's name, place (admin only) and invite code (members read it, the admin renews it). */
 @RestController
 @RequestMapping("/stables/me")
 class StableController(
@@ -48,10 +48,10 @@ class StableController(
         return stableLookupService.getById(requester.stableId).also(changeListener::publish).toStableResponse()
     }
 
+    /** Every member may read it to pass it on; joining still needs the admin to accept the request. */
     @GetMapping("/invitecode")
     fun inviteCode(): InviteCodeResponse {
         val requester = accessService.requester(requireAuth())
-        accessService.requireAdmin(requester)
         // Every stable gets a code when created (older ones by the migration); this covers anything missed.
         return InviteCodeResponse(stableLookupService.getById(requester.stableId).inviteCode ?: newCode(requester.stableId))
     }
