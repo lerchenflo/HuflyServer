@@ -19,7 +19,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
 /**
  * Logs every failed app request (status 400 and up, except 401 for missing or expired logins) with its method, path,
  * cause, the allowed methods of a 405, the account and the app, so a failure seen in the log can be traced. Never logs
- * bodies, query strings or rejected values; they may hold passwords or names. Runs after [JwtAuthFilter].
+ * bodies, query strings or rejected values; they may hold passwords or names. Runs after [JwtAuthFilter]. Wrong paths,
+ * methods or types without a login go to DEBUG: those are bots probing the public website.
  */
 class FailedRequestLog(private val errorAttributes: ErrorAttributes) : OncePerRequestFilter() {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -35,13 +36,19 @@ class FailedRequestLog(private val errorAttributes: ErrorAttributes) : OncePerRe
 
     private fun logFailure(request: HttpServletRequest, response: HttpServletResponse, status: Int) {
         val cause = cause(errorAttributes.getError(ServletWebRequest(request)))
+        val accountId = (SecurityContextHolder.getContext().authentication?.principal as? String)?.takeIf(ObjectId::isValid)
         val details = listOfNotNull(
             response.getHeader("Allow")?.let { allow -> "allowed " + allow.split(",").map(String::trim).sorted().joinToString(",") },
-            (SecurityContextHolder.getContext().authentication?.principal as? String)?.takeIf(ObjectId::isValid)?.let { "account $it" } ?: "no account",
+            accountId?.let { "account $it" } ?: "no account",
             "agent ${request.getHeader("User-Agent")?.let { clean(it, 100) } ?: "none"}",
         ).joinToString("; ")
         val message = "$status ${request.method} ${clean(request.requestURI, 200)}${cause?.let { ": $it" }.orEmpty()} ($details)"
-        if (status >= 500) log.warn(message) else log.info(message)
+        when {
+            status >= 500 -> log.warn(message)
+            // Without a login only the website and /auth/** are reachable; wrong paths there are bots probing for files.
+            accountId == null && status in BOT_PROBE_STATUSES -> log.debug(message)
+            else -> log.info(message)
+        }
     }
 
     /** Only texts the server wrote itself; validation names the fields, not what was sent. */
@@ -56,4 +63,9 @@ class FailedRequestLog(private val errorAttributes: ErrorAttributes) : OncePerRe
 
     /** Against forged log lines and floods. */
     private fun clean(text: String, max: Int) = text.replace(Regex("\\p{Cntrl}"), "?").take(max)
+
+    private companion object {
+        /** Not found, method not allowed, not acceptable. */
+        val BOT_PROBE_STATUSES = setOf(404, 405, 406)
+    }
 }

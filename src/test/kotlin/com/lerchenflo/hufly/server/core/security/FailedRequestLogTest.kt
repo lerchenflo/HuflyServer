@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.core.security
 
+import ch.qos.logback.classic.Level
 import com.lerchenflo.hufly.server.repository.FakeRepositoryConfig
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeUserRepository
@@ -40,7 +41,7 @@ class FailedRequestLogTest {
         stableRepository.stables.clear()
         listOf(admin, rider).forEach { userRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
-        logs = LogCapture(FailedRequestLog::class.java)
+        logs = LogCapture(FailedRequestLog::class.java, Level.DEBUG)
     }
 
     @AfterTest
@@ -59,13 +60,27 @@ class FailedRequestLogTest {
     @Test
     fun `a method the route does not take is logged with path, cause, allowed methods, account and app`() {
         call(HttpMethod.POST, "/events/sync", as_ = rider.id).andExpect { status { isMethodNotAllowed() } }
-        call(HttpMethod.POST, "/").andExpect { status { isMethodNotAllowed() } }
 
         assertEquals(
             listOf(
                 // Also matches PUT/DELETE /events/{eventId}.
                 "INFO 405 POST /events/sync: Request method 'POST' is not supported (allowed DELETE,GET,PUT; account ${rider.id}; agent Ktor client)",
-                "INFO 405 POST /: Request method 'POST' is not supported (allowed GET,HEAD; no account; agent Ktor client)",
+            ),
+            logs.lines,
+        )
+    }
+
+    @Test
+    fun `wrong paths, methods or types without a login are bots probing the website, logged at DEBUG only`() {
+        call(HttpMethod.POST, "/").andExpect { status { isMethodNotAllowed() } }
+        call(HttpMethod.GET, "/assets/.env").andExpect { status { isNotFound() } }
+        mockMvc.request(HttpMethod.GET, "/") { header("Accept", "application/json") }.andExpect { status { isNotAcceptable() } }
+
+        assertEquals(
+            listOf(
+                "DEBUG 405 POST /: Request method 'POST' is not supported (allowed GET,HEAD; no account; agent Ktor client)",
+                "DEBUG 404 GET /assets/.env: No static resource assets/.env for request '/assets/.env'. (no account; agent Ktor client)",
+                "DEBUG 406 GET / (no account; agent none)",
             ),
             logs.lines,
         )

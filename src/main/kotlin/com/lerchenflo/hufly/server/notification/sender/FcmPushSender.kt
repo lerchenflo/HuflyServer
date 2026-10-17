@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.notification.sender
 
 import com.google.auth.oauth2.GoogleCredentials
+import com.google.auth.oauth2.ServiceAccountCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.AndroidConfig
@@ -30,7 +31,10 @@ class FcmPushSender(@Value("\${push.fcm.credentials-file:}") credentialsFile: St
         log.warn("FCM off: no credentials file (push.fcm.credentials-file)")
         null
     } else try {
-        val options = File(credentialsFile).inputStream().use { FirebaseOptions.builder().setCredentials(GoogleCredentials.fromStream(it)).build() }
+        val credentials = File(credentialsFile).inputStream().use(GoogleCredentials::fromStream)
+        // Firebase reads the project from a service account only when it sends; set it so the log shows it at startup.
+        val projectId = (credentials as? ServiceAccountCredentials)?.projectId
+        val options = FirebaseOptions.builder().setCredentials(credentials).apply { if (projectId != null) setProjectId(projectId) }.build()
         val app = FirebaseApp.getApps().firstOrNull { it.name == APP_NAME } ?: FirebaseApp.initializeApp(options, APP_NAME)
         FirebaseMessaging.getInstance(app).also { log.info("FCM loaded (project {})", options.projectId) }
     } catch (e: Exception) {
