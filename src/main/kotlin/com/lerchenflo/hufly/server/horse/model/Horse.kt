@@ -38,4 +38,7 @@ data class Horse(
     val clientId: String? = null,
     /** Reitbeteiligungen; no extra rights. */
     val coRiderUserIds: List<ObjectId> = emptyList(),
+    /** Written through their own route, see `HorseNotesService`. */
+    val notes: List<HorseNote> = emptyList(),
+    val paddockRules: PaddockRules? = null,
 ) : TimestampSynced

@@ -6,6 +6,7 @@ import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository
+import com.lerchenflo.hufly.server.horse.model.PaddockRules
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
 import com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository
 import com.lerchenflo.hufly.server.repository.FakePaddockRepository
@@ -271,6 +272,23 @@ class PaddockServiceTest {
     }
 
     // Paddock delete cascade
+
+    @Test
+    fun `deleting a paddock takes it out of the horses' paddock rules`() {
+        val paddock = service.createPaddock(admin, "Koppel", "")
+        val other = service.createPaddock(admin, "Andere", "")
+        horseRepository.save(blitz.copy(paddockRules = PaddockRules(listOf(paddock.id, other.id), neverAloneInStable = false, neverAloneOnPaddock = false)))
+        horseRepository.save(donner.copy(paddockRules = PaddockRules(listOf(paddock.id), neverAloneInStable = false, neverAloneOnPaddock = false)))
+        horseRepository.save(wolke.copy(paddockRules = PaddockRules(listOf(paddock.id), neverAloneInStable = true, neverAloneOnPaddock = false)))
+        clock.advance(60_000)
+
+        service.deletePaddock(admin, paddock.id)
+
+        assertEquals(listOf(other.id), horseRepository.findById(blitz.id)!!.paddockRules?.allowedPaddockIds)
+        assertEquals(null, horseRepository.findById(donner.id)!!.paddockRules)
+        assertEquals(PaddockRules(emptyList(), true, false), horseRepository.findById(wolke.id)!!.paddockRules)
+        assertEquals(listOf(clock.millis()), listOf(blitz, donner, wolke).map { horseRepository.findById(it.id)!!.updatedAt }.distinct())
+    }
 
     @Test
     fun `deleting a paddock drops future assignments, ends running ones and keeps the past`() {

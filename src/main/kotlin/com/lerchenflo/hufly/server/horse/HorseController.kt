@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.horse
 
+import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.core.MAX_CLIENT_ID_LENGTH
 import com.lerchenflo.hufly.server.core.MAX_EPOCH_DAYS
 import com.lerchenflo.hufly.server.core.access.AccessService
@@ -12,7 +13,10 @@ import com.lerchenflo.hufly.server.core.sync.deltaSync
 import com.lerchenflo.hufly.server.core.sync.requireValidSyncRequest
 import com.lerchenflo.hufly.server.foodplan.FoodPlanService
 import com.lerchenflo.hufly.server.horse.model.HorseResponse
+import com.lerchenflo.hufly.server.horse.model.HorseNote
+import com.lerchenflo.hufly.server.horse.model.HorseNoteArea
 import com.lerchenflo.hufly.server.horse.model.Medication
+import com.lerchenflo.hufly.server.horse.model.PaddockRules
 import com.lerchenflo.hufly.server.horse.model.toHorseResponse
 import com.lerchenflo.hufly.server.repository.HorseRepository
 import jakarta.validation.Valid
@@ -39,7 +43,22 @@ class HorseController(
     private val horseService: HorseService,
     private val horseRepository: HorseRepository,
     private val foodPlanService: FoodPlanService,
+    private val notesService: HorseNotesService,
 ) {
+    data class NoteRequest(
+        @field:NotBlank @field:Size(max = 64) val id: String,
+        val area: String,
+        val text: String,
+    )
+
+    data class NotesRequest(@field:Valid @field:Size(max = 100) val notes: List<NoteRequest>)
+
+    /** Replaces the stored rules; an empty list and two false clear them. */
+    data class PaddockRulesRequest(
+        @field:Size(max = 50) val allowedPaddockIds: List<String> = emptyList(),
+        val neverAloneInStable: Boolean = false,
+        val neverAloneOnPaddock: Boolean = false,
+    )
 
     data class AssignFoodPlanRequest(val foodPlanId: String?)
 
@@ -105,6 +124,26 @@ class HorseController(
         val requester = accessService.requester(requireAuth())
         return horseService.updateMedications(requester, parseObjectId(horseId), request.medications.toMedications())
             .toHorseResponse(showMedications = true)
+    }
+
+    /** The horse's complete note list; each area a change touches needs its right. */
+    @PutMapping("/{horseId}/notes")
+    fun updateNotes(@PathVariable horseId: String, @Valid @RequestBody request: NotesRequest): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        val notes = request.notes.map { note ->
+            val area = HorseNoteArea.entries.firstOrNull { it.name == note.area } ?: throw badRequest("Unknown note area")
+            HorseNote(note.id, area, note.text)
+        }
+        return notesService.updateNotes(requester, parseObjectId(horseId), notes)
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
+    }
+
+    @PutMapping("/{horseId}/paddockrules")
+    fun updatePaddockRules(@PathVariable horseId: String, @Valid @RequestBody request: PaddockRulesRequest): HorseResponse {
+        val requester = accessService.requester(requireAuth())
+        val rules = PaddockRules(request.allowedPaddockIds.map(::parseObjectId), request.neverAloneInStable, request.neverAloneOnPaddock)
+        return notesService.updatePaddockRules(requester, parseObjectId(horseId), rules)
+            .let { it.toHorseResponse(horseService.medicationVisibility(requester)(it)) }
     }
 
     /** Needs FOODPLAN_EDIT (or HORSE_EDIT_OWN on an own horse), not HORSE_EDIT (FOD-3). Null removes the plan. */

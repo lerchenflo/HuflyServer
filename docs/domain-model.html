@@ -264,12 +264,14 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
     "updatedAt: Long (epoch ms)",
     "updatedBy: ObjectId",
     "deleted: Boolean",
-    "coRiderUserIds: List\u003cObjectId>"
+    "coRiderUserIds: List\u003cObjectId>",
+    "notes: List\u003cHorseNote>",
+    "paddockRules: PaddockRules?"
    ],
    "id": "horse",
    "kind": "class",
    "name": "Horse",
-   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung'). Medications are only visible with HORSE_MEDICATION_VIEW and edited separately with HORSE_MEDICATION_EDIT. coRiderUserIds: co-riders (Reitbeteiligungen), set with the horse edit, no extra rights; a deleted user is removed from them.",
+   "note": "Admin adds and removes horses (HOR-3). foodPlanId points at a shared FoodPlan. Vaccinations are horse log entries (ACTIVITY tag 'Impfung'). Medications are only visible with HORSE_MEDICATION_VIEW and edited separately with HORSE_MEDICATION_EDIT. coRiderUserIds: co-riders (Reitbeteiligungen), set with the horse edit, no extra rights; a deleted user is removed from them. Notes (client schema 38) are written per area through PUT /horses/{id}/notes: each changed area needs its right (GENERAL/RIDING HORSE_EDIT, FEEDING FOODPLAN_EDIT, PADDOCK PADDOCK_PLAN; HORSE_EDIT_OWN on own horses). Paddock rules (PADDOCK_PLAN) are only warnings in the app; deleting a paddock removes it from them.",
    "pkg": "horse",
    "x": 813,
    "y": 22
@@ -874,6 +876,49 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "pkg": "event",
    "x": 700,
    "y": 820
+  },
+  {
+   "fields": [
+    "id: String (client UUID)",
+    "area: HorseNoteArea",
+    "text: String"
+   ],
+   "id": "horsenote",
+   "kind": "class",
+   "name": "HorseNote",
+   "note": "Embedded in Horse, at most 50, text 1..1000.",
+   "pkg": "horse",
+   "x": 1133,
+   "y": 22
+  },
+  {
+   "fields": [
+    "GENERAL",
+    "FEEDING",
+    "PADDOCK",
+    "RIDING"
+   ],
+   "id": "horsenotearea",
+   "kind": "enum",
+   "name": "HorseNoteArea",
+   "note": "Decides the right needed to write a note.",
+   "pkg": "horse",
+   "x": 1133,
+   "y": 182
+  },
+  {
+   "fields": [
+    "allowedPaddockIds: List\u003cObjectId>",
+    "neverAloneInStable: Boolean",
+    "neverAloneOnPaddock: Boolean"
+   ],
+   "id": "paddockrules",
+   "kind": "class",
+   "name": "PaddockRules",
+   "note": "Embedded in Horse, null when empty; empty allowedPaddockIds allows every paddock. Checked by the app only.",
+   "pkg": "horse",
+   "x": 1133,
+   "y": 302
   }
  ],
  "packages": [
@@ -1409,6 +1454,24 @@ ol.qs li.done input[type=text] { text-decoration: line-through; color: var(--mut
    "kind": "assoc",
    "label": "Terminart",
    "to": "tag",
+   "toCard": "0..1"
+  },
+  {
+   "from": "horse",
+   "fromCard": "1",
+   "id": "r_horse_notes",
+   "kind": "comp",
+   "label": "notes",
+   "to": "horsenote",
+   "toCard": "0..50"
+  },
+  {
+   "from": "horse",
+   "fromCard": "1",
+   "id": "r_horse_paddockrules",
+   "kind": "comp",
+   "label": "paddock rules",
+   "to": "paddockrules",
    "toCard": "0..1"
   }
  ]

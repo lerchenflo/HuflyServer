@@ -272,4 +272,53 @@ class HorseControllerTest {
             jsonPath("$.coRiderUserIds.length()") { value(0) }
         }
     }
+
+    // Notes and paddock rules (client schema 38)
+
+    @Autowired lateinit var paddockRepository: com.lerchenflo.hufly.server.repository.FakePaddockRepository
+
+    @Test
+    fun `notes and paddock rules are answered and replaced through their own routes`() {
+        val horse = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse())
+        val paddock = paddockRepository.save(
+            com.lerchenflo.hufly.server.paddock.model.Paddock(stableId = horse.stableId, name = "Koppel", description = "", updatedAt = 0, updatedBy = admin.id)
+        )
+        val id = horse.id.toHexString()
+
+        call(HttpMethod.PUT, "/horses/$id/notes", """{"notes":[{"id":"6b1f-uuid","area":"FEEDING","text":"Heu nur nass"}]}""").andExpect {
+            status { isOk() }
+            jsonPath("$.notes[0].id") { value("6b1f-uuid") }
+            jsonPath("$.notes[0].area") { value("FEEDING") }
+            jsonPath("$.notes[0].text") { value("Heu nur nass") }
+            jsonPath("$.paddockRules") { value(null) }
+        }
+        call(HttpMethod.PUT, "/horses/$id/paddockrules", """{"allowedPaddockIds":["${paddock.id.toHexString()}"],"neverAloneInStable":true,"neverAloneOnPaddock":false}""").andExpect {
+            status { isOk() }
+            jsonPath("$.paddockRules.allowedPaddockIds[0]") { value(paddock.id.toHexString()) }
+            jsonPath("$.paddockRules.neverAloneInStable") { value(true) }
+            jsonPath("$.paddockRules.neverAloneOnPaddock") { value(false) }
+            jsonPath("$.notes.length()") { value(1) }
+        }
+    }
+
+    @Test
+    fun `a horse without notes answers an empty list`() {
+        call(HttpMethod.POST, "/horses", """{"name":"Blitz"}""").andExpect {
+            status { isOk() }
+            jsonPath("$.notes.length()") { value(0) }
+            jsonPath("$.paddockRules") { value(null) }
+        }
+    }
+
+    @Test
+    fun `an unknown area, a malformed paddock id or too many paddocks answer 400`() {
+        val id = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse()).id.toHexString()
+
+        call(HttpMethod.PUT, "/horses/$id/notes", """{"notes":[{"id":"a","area":"STALL","text":"x"}]}""").andExpect { status { isBadRequest() } }
+        call(HttpMethod.PUT, "/horses/$id/paddockrules", """{"allowedPaddockIds":["nope"],"neverAloneInStable":false,"neverAloneOnPaddock":false}""")
+            .andExpect { status { isBadRequest() } }
+        val many = (1..51).joinToString(",") { "\"${ObjectId.get().toHexString()}\"" }
+        call(HttpMethod.PUT, "/horses/$id/paddockrules", """{"allowedPaddockIds":[$many],"neverAloneInStable":false,"neverAloneOnPaddock":false}""")
+            .andExpect { status { isBadRequest() } }
+    }
 }

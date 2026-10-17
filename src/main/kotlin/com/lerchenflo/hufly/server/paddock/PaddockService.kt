@@ -71,6 +71,11 @@ class PaddockService(
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
         val now = clock.millis()
         paddockRepository.save(paddock.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
+        horseRepository.findByStableIdAndDeletedFalse(requester.stableId).forEach { horse ->
+            val rules = horse.paddockRules?.takeIf { paddock.id in it.allowedPaddockIds } ?: return@forEach
+            val left = rules.copy(allowedPaddockIds = rules.allowedPaddockIds - paddock.id).orNullWhenEmpty()
+            horseRepository.save(horse.copy(paddockRules = left, updatedAt = now, updatedBy = requester.id))
+        }
         assignmentRepository.findByPaddockIdAndDeletedFalse(paddock.id).forEach {
             when {
                 it.startAt > now -> saveAssignment(it.copy(deleted = true, updatedAt = now, updatedBy = requester.id))
