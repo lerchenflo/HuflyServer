@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.webmvc.error.ErrorAttributes
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
@@ -82,7 +83,7 @@ class SecurityConfig(
 
     @Bean
     @Order(2)
-    fun filterChain(http: HttpSecurity): SecurityFilterChain = http
+    fun filterChain(http: HttpSecurity, errorAttributes: ErrorAttributes): SecurityFilterChain = http
         .csrf { it.disable() }
         .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         .authorizeHttpRequests { auth ->
@@ -95,6 +96,7 @@ class SecurityConfig(
         }
         .exceptionHandling { it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)) }
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
+        .addFilterAfter(FailedRequestLog(errorAttributes), JwtAuthFilter::class.java)
         .build()
 }
 
