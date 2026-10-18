@@ -200,6 +200,31 @@ class EventService(
         announceChange(requester, event, listOfNotNull(told), EventChange.UNINVITED, invitation.occurrenceStartAt)
     }
 
+    /**
+     * A membership ended ([actorId] removed it, or the member left): their invitations and answers go without a push,
+     * and in lessons the next ones waiting move up. Their own events stay.
+     */
+    fun removeMember(userId: ObjectId, actorId: ObjectId) {
+        val now = clock.millis()
+        invitationRepository.findByUserIdAndDeletedFalse(userId).forEach { invitation ->
+            val event = eventRepository.findById(invitation.eventId)?.takeUnless { it.deleted }
+            val remove = {
+                saveInvitation(invitation.copy(deleted = true, updatedAt = now, updatedBy = actorId))
+                answerRepository.findByInvitationIdAndDeletedFalse(invitation.id).forEach {
+                    saveAnswer(it.copy(deleted = true, updatedAt = now, updatedBy = actorId))
+                }
+            }
+            if (event == null) {
+                remove()
+            } else {
+                lessons.movingUp(actorId, event, lessons.datesOf(event, invitation.occurrenceStartAt)) {
+                    remove()
+                    restamp(event)
+                }
+            }
+        }
+    }
+
     fun respond(requester: User, invitationId: ObjectId, accepted: Boolean): EventInvitation {
         val invitation = liveInvitation(requester, invitationId)
         if (invitation.userId != requester.id) throw ResponseStatusException(HttpStatus.FORBIDDEN, "Not your invitation")

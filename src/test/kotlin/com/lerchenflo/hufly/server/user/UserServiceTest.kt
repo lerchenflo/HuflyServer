@@ -54,10 +54,22 @@ class UserServiceTest {
         com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository(),
         com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, com.lerchenflo.hufly.server.repository.FakeSentReminderRepository(), com.lerchenflo.hufly.server.repository.FakeSentEventReminderRepository(), com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), pictureStore, userRepository.accounts, clock,
     )
+    private val eventRepository = com.lerchenflo.hufly.server.repository.FakeEventRepository()
+    private val invitationRepository = com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository()
+    private val eventService = run {
+        val occurrences = com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository()
+        val answers = com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository()
+        val publisher = org.springframework.context.ApplicationEventPublisher { }
+        com.lerchenflo.hufly.server.event.EventService(
+            eventRepository, invitationRepository, occurrences, answers, userRepository, horseRepository, tagRepository, accessService,
+            com.lerchenflo.hufly.server.core.sync.VersionCounterService(com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()), clock, publisher,
+            com.lerchenflo.hufly.server.event.LessonService(eventRepository, invitationRepository, occurrences, answers, com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), clock, publisher),
+        )
+    }
     private val userService = UserService(
         userRepository, userRepository.accounts, joinRequestRepository, stableRepository, stableDeletionService, tagRepository, refreshTokenRepository, horseRepository, userSettingsRepository, digestItemRepository,
         absenceService, pictureStore, accessService, hashEncoder, clock,
-        com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter(4, clock),
+        com.lerchenflo.hufly.server.core.picture.PictureUploadLimiter(4, clock), eventService,
     )
 
     private val admin = testUser(email = "admin@hufly.test")
@@ -301,6 +313,18 @@ class UserServiceTest {
         userService.leaveStable(elsewhere)
 
         assertEquals(clock.millis(), stored(rider.id).updatedAt)
+    }
+
+    @Test
+    fun `a removed or leaving member's event invitations go`() {
+        val horse = horseRepository.save(com.lerchenflo.hufly.server.testdata.testHorse())
+        val other = userRepository.save(testUser(email = "other@hufly.test"))
+        val event = eventService.createEvent(admin, "Reitstunde", "", 1_800_000_000_000, 1_800_003_600_000, listOf(horse.id), listOf(rider.id, other.id))
+
+        userService.deleteUser(admin, rider.id)
+        userService.leaveStable(other)
+
+        assertEquals(emptyList(), invitationRepository.findByEventIdAndDeletedFalse(event.id))
     }
 
     // Leaving a stable

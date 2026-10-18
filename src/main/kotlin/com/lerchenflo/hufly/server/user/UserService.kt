@@ -1,5 +1,6 @@
 package com.lerchenflo.hufly.server.user
 
+import com.lerchenflo.hufly.server.event.EventService
 import com.lerchenflo.hufly.server.core.badRequest
 import com.lerchenflo.hufly.server.absence.AbsenceService
 import com.lerchenflo.hufly.server.account.model.Account
@@ -56,6 +57,7 @@ class UserService(
     private val hashEncoder: HashEncoder,
     private val clock: Clock,
     private val pictureUploadLimiter: PictureUploadLimiter,
+    private val eventService: EventService,
 ) {
     data class CreatedUser(val user: User, val generatedPassword: String)
 
@@ -209,6 +211,7 @@ class UserService(
             horseRepository.save(it.copy(coRiderUserIds = it.coRiderUserIds - target.id, updatedAt = now, updatedBy = actorId))
         }
         absenceService.removeUser(target.id, actorId)
+        eventService.removeMember(target.id, actorId)
         pictureStore.delete(PictureKind.USER, target.id)
         digestItemRepository.deleteByUserIdAndStableId(target.accountId, target.stableId)
         restampCreatingMembership(target.accountId, accountRepository, userRepository, now)

@@ -416,4 +416,23 @@ class EventLessonTest {
         assertEquals(emptyList(), offers())
         assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
     }
+
+    // Members who leave
+
+    @Test
+    fun `a member who leaves loses every invitation and answer, and the next one waiting moves up`() {
+        val single = lesson()
+        respond(single, anna, accepted = true)
+        val series = lesson(recurrence = weekly)
+        answerDate(series, anna, second, accepted = true)
+        published.clear()
+
+        eventService.removeMember(anna.id, admin.id)
+
+        assertEquals(emptyList(), invitationRepository.invitations.filter { it.userId == anna.id && !it.deleted })
+        assertEquals(emptyList(), answerRepository.answers.filter { it.userId == anna.id && !it.deleted })
+        assertEquals(listOf(single.id, series.id), offered().map { it.eventId })
+        assertEquals(setOf(clara.id), offered().flatMap { it.userIds }.toSet())
+        assertEquals(emptyList(), published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.EventChanged>())
+    }
 }
