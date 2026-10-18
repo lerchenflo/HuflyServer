@@ -21,7 +21,8 @@ import org.springframework.web.server.ResponseStatusException
 /**
  * The rules of lessons ([Event.maxParticipants] set): places, the waiting list and the leave lock, see [LessonPlacement].
  * Every change that can free or add a place runs through [movingUp]: whoever waited on a date that has not started and
- * has a place afterwards is offered it ([LessonOffer]) and pushed once, for their earliest such date.
+ * has a place afterwards is offered it ([LessonOffer]) and pushed once, for their earliest such date. It runs under
+ * the lesson's lock ([LessonLocks]), so checks inside the change see every other change of that lesson.
  */
 @Service
 class LessonService(
@@ -30,6 +31,7 @@ class LessonService(
     private val occurrenceRepository: EventOccurrenceRepository,
     private val answerRepository: EventOccurrenceAnswerRepository,
     private val offerRepository: LessonOfferRepository,
+    private val locks: LessonLocks,
     private val clock: Clock,
     private val events: ApplicationEventPublisher,
 ) {
@@ -42,7 +44,8 @@ class LessonService(
 
     /**
      * 409 unless [invitation] may answer so for the date [key] (null: a single event): waiting people and decliners
-     * without a free place cannot accept, accepted ones cannot leave once the leave lock has started.
+     * without a free place cannot accept, accepted ones cannot leave once the leave lock has started. Call it inside
+     * [movingUp] together with the answer's save.
      */
     fun requireAnswerAllowed(event: Event, invitation: EventInvitation, key: Long?, accepted: Boolean) {
         if (event.maxParticipants == null) return
@@ -68,10 +71,13 @@ class LessonService(
         else -> placement(event).upcomingDates(clock.millis(), MOVE_UP_DATES)
     }
 
-    /** Runs [change] on [event] and offers places to whoever moves up on [dates] by it. */
+    /** Runs [change] on [event] and offers places to whoever moves up on [dates] by it; one change of a lesson at a time. */
     fun <T> movingUp(actorUserId: ObjectId, event: Event, dates: List<Long?>, change: () -> T): T {
-        val before = waiting(event, dates)
-        return change().also { offerMovedUp(actorUserId, event.id, before) }
+        if (event.maxParticipants == null) return change()
+        return locks.holding(event.id, event.stableId) {
+            val before = waiting(event, dates)
+            change().also { offerMovedUp(actorUserId, event.id, before) }
+        }
     }
 
     /** Who of [userIds] has a place on [dates]; an invitation push goes only to them, waiting people are not asked yet. */

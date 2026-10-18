@@ -44,6 +44,7 @@ class StableDeletionService(
     private val sentReminderRepository: SentReminderRepository,
     private val sentEventReminderRepository: SentEventReminderRepository,
     private val lessonOfferRepository: LessonOfferRepository,
+    private val lessonLockRepository: LessonLockRepository,
     private val pictureStore: PictureStore,
     private val accountRepository: AccountRepository,
     private val clock: Clock,
@@ -71,6 +72,7 @@ class StableDeletionService(
             eventOccurrenceAnswerRepository::deleteByStableId, taskRepository::deleteByStableId,
             taskOccurrenceRepository::deleteByStableId, noteRepository::deleteByStableId, absenceRepository::deleteByStableId,
             sentReminderRepository::deleteByStableId, sentEventReminderRepository::deleteByStableId, lessonOfferRepository::deleteByStableId,
+            lessonLockRepository::deleteByStableId,
         ).forEach { it(stableId) }
         members.map { it.accountId }.distinct().forEach { restampCreatingMembership(it, accountRepository, userRepository, clock.millis()) }
         stableRepository.deleteById(stableId)

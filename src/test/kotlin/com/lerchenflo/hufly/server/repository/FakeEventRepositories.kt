@@ -42,9 +42,13 @@ class FakeEventRepository : EventRepository {
 class FakeEventInvitationRepository : EventInvitationRepository {
     val invitations = mutableListOf<EventInvitation>()
 
+    /** Runs at the start of every save, so a test can hold a request there. */
+    var beforeSave: () -> Unit = {}
+
     override fun deleteByStableId(stableId: ObjectId): Long = invitations.count { it.stableId == stableId }.toLong().also { invitations.removeIf { it.stableId == stableId } }
 
     override fun save(invitation: EventInvitation): EventInvitation {
+        beforeSave()
         invitations.removeIf { it.id == invitation.id }
         invitations += invitation
         return invitation

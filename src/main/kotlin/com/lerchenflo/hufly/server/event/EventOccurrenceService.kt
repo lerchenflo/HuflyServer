@@ -101,8 +101,8 @@ class EventOccurrenceService(
         if (occurrence?.removedUserIds?.contains(invitation.userId) == true) throw badRequest("Not invited to this date")
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
         val before = answerRepository.findByInvitationIdAndOccurrenceStartAt(invitation.id, occurrenceStartAt)?.takeUnless { it.deleted }?.status
-        if (before != status) lessons.requireAnswerAllowed(event, invitation, occurrenceStartAt, accepted)
         val saved = lessons.movingUp(requester.id, event, listOf(occurrenceStartAt)) {
+            if (before != status) lessons.requireAnswerAllowed(event, invitation, occurrenceStartAt, accepted)
             eventService.upsertAnswer(invitation, occurrenceStartAt, status, requester.id)
         }
         if (before != status && invitation.userId != event.creatorUserId) eventService.announce(InvitationAnswered(invitation.stableId, requester.id, event.id, accepted, occurrenceStartAt))

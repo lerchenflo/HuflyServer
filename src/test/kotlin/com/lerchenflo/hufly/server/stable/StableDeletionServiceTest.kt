@@ -32,13 +32,14 @@ class StableDeletionServiceTest {
     private val sentReminders = com.lerchenflo.hufly.server.repository.FakeSentReminderRepository()
     private val sentEventReminders = com.lerchenflo.hufly.server.repository.FakeSentEventReminderRepository()
     private val lessonOffers = com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository()
+    private val lessonLocks = com.lerchenflo.hufly.server.repository.FakeLessonLockRepository()
     private val clock = com.lerchenflo.hufly.server.core.security.MutableClock(1_000L)
 
     private val service = StableDeletionService(
         stables, users, joinRequests, digestItems, horses, tags, FakeFoodPlanRepository(), FakeHorseLogRepository(),
         FakePaddockRepository(), FakeHorseGroupRepository(), FakeHorseConflictRepository(), FakePaddockAssignmentRepository(),
         FakeEventRepository(), FakeEventInvitationRepository(), FakeEventOccurrenceRepository(), FakeEventOccurrenceAnswerRepository(),
-        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, sentEventReminders, lessonOffers, pictures, users.accounts, clock,
+        FakeTaskRepository(), FakeTaskOccurrenceRepository(), FakeNoteRepository(), FakeAbsenceRepository(), sentReminders, sentEventReminders, lessonOffers, lessonLocks, pictures, users.accounts, clock,
     )
 
     private val stableId = ObjectId.get()
@@ -70,6 +71,7 @@ class StableDeletionServiceTest {
                     stableId = it, eventId = ObjectId.get(), invitationId = ObjectId.get(), userId = ObjectId.get(), occurrenceStartAt = null, offeredAt = 0L,
                 )
             )
+            lessonLocks.insert(com.lerchenflo.hufly.server.event.model.LessonLock(ObjectId.get(), it, ObjectId.get(), until = 0L))
         }
     }
 
@@ -95,6 +97,7 @@ class StableDeletionServiceTest {
         assertEquals(listOf(otherStableId), sentReminders.reminders.map { it.stableId })
         assertEquals(listOf(otherStableId), sentEventReminders.reminders.map { it.stableId })
         assertEquals(listOf(otherStableId), lessonOffers.offers.map { it.stableId })
+        assertEquals(listOf(otherStableId), lessonLocks.locks.values.map { it.stableId })
     }
 
     @Test

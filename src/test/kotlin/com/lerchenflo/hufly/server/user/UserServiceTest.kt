@@ -52,7 +52,7 @@ class UserServiceTest {
         com.lerchenflo.hufly.server.repository.FakeFoodPlanRepository(), com.lerchenflo.hufly.server.repository.FakeHorseLogRepository(), com.lerchenflo.hufly.server.repository.FakePaddockRepository(), com.lerchenflo.hufly.server.repository.FakeHorseGroupRepository(),
         com.lerchenflo.hufly.server.repository.FakeHorseConflictRepository(), com.lerchenflo.hufly.server.repository.FakePaddockAssignmentRepository(), com.lerchenflo.hufly.server.repository.FakeEventRepository(),
         com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepository(),
-        com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, com.lerchenflo.hufly.server.repository.FakeSentReminderRepository(), com.lerchenflo.hufly.server.repository.FakeSentEventReminderRepository(), com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), pictureStore, userRepository.accounts, clock,
+        com.lerchenflo.hufly.server.repository.FakeTaskRepository(), com.lerchenflo.hufly.server.repository.FakeTaskOccurrenceRepository(), com.lerchenflo.hufly.server.repository.FakeNoteRepository(), absenceRepository, com.lerchenflo.hufly.server.repository.FakeSentReminderRepository(), com.lerchenflo.hufly.server.repository.FakeSentEventReminderRepository(), com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), com.lerchenflo.hufly.server.repository.FakeLessonLockRepository(), pictureStore, userRepository.accounts, clock,
     )
     private val eventRepository = com.lerchenflo.hufly.server.repository.FakeEventRepository()
     private val invitationRepository = com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository()
@@ -63,7 +63,7 @@ class UserServiceTest {
         com.lerchenflo.hufly.server.event.EventService(
             eventRepository, invitationRepository, occurrences, answers, userRepository, horseRepository, tagRepository, accessService,
             com.lerchenflo.hufly.server.core.sync.VersionCounterService(com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore()), clock, publisher,
-            com.lerchenflo.hufly.server.event.LessonService(eventRepository, invitationRepository, occurrences, answers, com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), clock, publisher),
+            com.lerchenflo.hufly.server.event.LessonService(eventRepository, invitationRepository, occurrences, answers, com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository(), com.lerchenflo.hufly.server.event.LessonLocks(com.lerchenflo.hufly.server.repository.FakeLessonLockRepository(), clock), clock, publisher),
         )
     }
     private val userService = UserService(

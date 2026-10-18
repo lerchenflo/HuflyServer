@@ -234,9 +234,9 @@ class EventService(
             throw badRequest("Answer the dates of a series one by one")
         }
         val status = if (accepted) InvitationStatus.ACCEPTED else InvitationStatus.DECLINED
-        if (status != invitation.status) lessons.requireAnswerAllowed(event, invitation, invitation.occurrenceStartAt, accepted)
         val now = clock.millis()
         val saved = lessons.movingUp(requester.id, event, listOf(invitation.occurrenceStartAt)) {
+            if (status != invitation.status) lessons.requireAnswerAllowed(event, invitation, invitation.occurrenceStartAt, accepted)
             saveInvitation(invitation.copy(status = status, respondedAt = now, updatedAt = now, updatedBy = requester.id))
         }
         if (invitation.status != status) {
@@ -247,15 +247,18 @@ class EventService(
 
     /**
      * Ends an offer from the waiting list nobody answered in time: [invitation] declines the date [key] (null: a single
-     * event) as if its user had, and the place goes to the next one waiting.
+     * event) as if its user had, and the place goes to the next one waiting. Nothing happens once it is answered.
      */
     internal fun declineUnanswered(event: Event, invitation: EventInvitation, key: Long?) {
         lessons.movingUp(invitation.userId, event, listOf(key)) {
+            val current = eventRepository.findById(event.id)?.takeUnless { it.deleted } ?: return@movingUp
+            val seat = lessons.placement(current).seatsOn(key)?.firstOrNull { it.invitation.id == invitation.id }
+            if (seat == null || seat.status != InvitationStatus.PENDING || seat.isWaiting) return@movingUp
             if (key != null && invitation.occurrenceStartAt == null) {
-                upsertAnswer(invitation, key, InvitationStatus.DECLINED, invitation.userId)
+                upsertAnswer(seat.invitation, key, InvitationStatus.DECLINED, invitation.userId)
             } else {
                 val now = clock.millis()
-                saveInvitation(invitation.copy(status = InvitationStatus.DECLINED, respondedAt = now, updatedAt = now, updatedBy = invitation.userId))
+                saveInvitation(seat.invitation.copy(status = InvitationStatus.DECLINED, respondedAt = now, updatedAt = now, updatedBy = invitation.userId))
             }
         }
     }

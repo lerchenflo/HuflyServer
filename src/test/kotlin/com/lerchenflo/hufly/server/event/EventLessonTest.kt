@@ -10,6 +10,7 @@ import com.lerchenflo.hufly.server.core.sync.FakeVersionCounterStore
 import com.lerchenflo.hufly.server.core.sync.VersionCounterService
 import com.lerchenflo.hufly.server.event.model.Event
 import com.lerchenflo.hufly.server.event.model.EventInvitation
+import com.lerchenflo.hufly.server.event.model.EventOccurrenceAnswer
 import com.lerchenflo.hufly.server.event.model.InvitationStatus
 import com.lerchenflo.hufly.server.event.model.LessonFields
 import com.lerchenflo.hufly.server.repository.FakeEventInvitationRepository
@@ -17,6 +18,7 @@ import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceAnswerRepositor
 import com.lerchenflo.hufly.server.repository.FakeEventOccurrenceRepository
 import com.lerchenflo.hufly.server.repository.FakeEventRepository
 import com.lerchenflo.hufly.server.repository.FakeHorseRepository
+import com.lerchenflo.hufly.server.repository.FakeLessonLockRepository
 import com.lerchenflo.hufly.server.repository.FakeLessonOfferRepository
 import com.lerchenflo.hufly.server.repository.FakeStableRepository
 import com.lerchenflo.hufly.server.repository.FakeTagRepository
@@ -34,10 +36,14 @@ import com.lerchenflo.hufly.server.user.model.User
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /** Lessons with places and a waiting list (client schema 37; supersede EVT-7). */
 class EventLessonTest {
@@ -57,7 +63,7 @@ class EventLessonTest {
     private val versionCounterService = VersionCounterService(FakeVersionCounterStore())
     private val offerRepository = FakeLessonOfferRepository()
     private val publisher = ApplicationEventPublisher { published += it }
-    private val lessons = LessonService(eventRepository, invitationRepository, occurrenceRepository, answerRepository, offerRepository, clock, publisher)
+    private val lessons = LessonService(eventRepository, invitationRepository, occurrenceRepository, answerRepository, offerRepository, LessonLocks(FakeLessonLockRepository(), clock), clock, publisher)
     private val eventService = EventService(
         eventRepository, invitationRepository, occurrenceRepository, answerRepository, userRepository, horseRepository, tagRepository,
         accessService, versionCounterService, clock, publisher, lessons,
@@ -414,6 +420,82 @@ class EventLessonTest {
         timeouts.expireOffers()
 
         assertEquals(emptyList(), offers())
+        assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
+    }
+
+    // At the same moment
+
+    /**
+     * Runs [first] on its own thread and holds it at its first save, after its checks; runs [second] meanwhile and lets
+     * [first] go once [second] is done, or after a moment if [second] waits for [first].
+     */
+    private fun race(first: () -> Any, second: () -> Any): Pair<Result<Any>, Result<Any>> {
+        val firstSaving = CountDownLatch(1)
+        val secondDone = CountDownLatch(1)
+        val hold = {
+            if (Thread.currentThread().name == "first" && firstSaving.count > 0) {
+                firstSaving.countDown()
+                secondDone.await(300, TimeUnit.MILLISECONDS)
+            }
+        }
+        invitationRepository.beforeSave = hold
+        answerRepository.beforeSave = hold
+        var firstResult: Result<Any>? = null
+        val firstThread = thread(name = "first") { firstResult = runCatching(first) }
+        assertTrue(firstSaving.await(5, TimeUnit.SECONDS))
+        val secondResult = runCatching(second)
+        secondDone.countDown()
+        firstThread.join()
+        return firstResult!! to secondResult
+    }
+
+    @Test
+    fun `two taking the last free place at the same moment, one gets it and the other is told no`() {
+        val event = lesson(maxParticipants = 1, invitees = listOf(anna, ben))
+        respond(event, anna, accepted = false)
+        respond(event, ben, accepted = false)
+
+        val (won, lost) = race({ respond(event, anna, accepted = true) }, { respond(event, ben, accepted = true) })
+
+        assertEquals(InvitationStatus.ACCEPTED, (won.getOrThrow() as EventInvitation).status)
+        assertRefused("Lesson: no free place") { lost.getOrThrow() }
+        assertEquals(InvitationStatus.DECLINED, invitationOf(event, ben).status)
+    }
+
+    @Test
+    fun `two taking the last free place on a series date at the same moment, one gets it and the other is told no`() {
+        val event = lesson(maxParticipants = 1, recurrence = weekly, invitees = listOf(anna, ben))
+        answerDate(event, anna, second, accepted = false)
+        answerDate(event, ben, second, accepted = false)
+
+        val (won, lost) = race({ answerDate(event, anna, second, accepted = true) }, { answerDate(event, ben, second, accepted = true) })
+
+        assertEquals(InvitationStatus.ACCEPTED, (won.getOrThrow() as EventOccurrenceAnswer).status)
+        assertRefused("Lesson: no free place") { lost.getOrThrow() }
+        assertEquals(InvitationStatus.DECLINED, answerRepository.findByInvitationIdAndOccurrenceStartAt(invitationOf(event, ben).id, second)!!.status)
+    }
+
+    @Test
+    fun `an offer accepted while it times out stays accepted`() {
+        val event = lesson(maxParticipants = 1, invitees = listOf(anna, ben), answerHours = 12)
+        respond(event, anna, accepted = false)
+        val offered = invitationOf(event, ben)
+        respond(event, ben, accepted = true)
+
+        eventService.declineUnanswered(event, offered, null)
+
+        assertEquals(InvitationStatus.ACCEPTED, invitationOf(event, ben).status)
+    }
+
+    @Test
+    fun `an offer whose user fell back to waiting while it times out is not declined`() {
+        val event = lesson(answerHours = 12)
+        respond(event, anna, accepted = false)
+        val offered = invitationOf(event, clara)
+        update(event, fields(maxParticipants = 1, answerHours = 12))
+
+        eventService.declineUnanswered(event, offered, null)
+
         assertEquals(InvitationStatus.PENDING, invitationOf(event, clara).status)
     }
 

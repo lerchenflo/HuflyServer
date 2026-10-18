@@ -42,9 +42,13 @@ class FakeEventOccurrenceRepository : EventOccurrenceRepository {
 class FakeEventOccurrenceAnswerRepository : EventOccurrenceAnswerRepository {
     val answers = mutableListOf<EventOccurrenceAnswer>()
 
+    /** Runs at the start of every save, so a test can hold a request there. */
+    var beforeSave: () -> Unit = {}
+
     override fun deleteByStableId(stableId: ObjectId): Long = answers.count { it.stableId == stableId }.toLong().also { answers.removeIf { it.stableId == stableId } }
 
     override fun save(answer: EventOccurrenceAnswer): EventOccurrenceAnswer {
+        beforeSave()
         if (answers.any { it.id != answer.id && it.invitationId == answer.invitationId && it.occurrenceStartAt == answer.occurrenceStartAt }) {
             throw DuplicateKeyException("invitationId_occurrenceStartAt")
         }
