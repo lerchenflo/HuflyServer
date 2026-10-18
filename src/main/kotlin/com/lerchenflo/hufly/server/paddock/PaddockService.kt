@@ -47,22 +47,24 @@ class PaddockService(
 ) {
     // Paddocks
 
-    fun createPaddock(requester: User, name: String, description: String, clientId: String? = null): Paddock {
+    fun createPaddock(requester: User, name: String, description: String, clientId: String? = null, position: Int = 0): Paddock {
         accessService.requireAdmin(requester)
         return idempotentCreate(clientId, { paddockRepository.findByStableIdAndClientId(requester.stableId, it) }) {
             paddockRepository.save(
                     Paddock(
                         stableId = requester.stableId, name = name, description = description, updatedAt = clock.millis(), updatedBy = requester.id,
-                        clientId = clientId,
+                        clientId = clientId, position = position,
                     )
                 )
         }
     }
 
-    fun updatePaddock(requester: User, paddockId: ObjectId, name: String, description: String): Paddock {
+    fun updatePaddock(requester: User, paddockId: ObjectId, name: String, description: String, position: Int = 0): Paddock {
         accessService.requireAdmin(requester)
         val paddock = ownPaddock(requester, paddockId) ?: throw notFound()
-        return paddockRepository.save(paddock.copy(name = name, description = description, updatedAt = clock.millis(), updatedBy = requester.id))
+        return paddockRepository.save(
+            paddock.copy(name = name, description = description, position = position, updatedAt = clock.millis(), updatedBy = requester.id)
+        )
     }
 
     /** Future assignments on the paddock go, running ones end now, past ones stay as history. */

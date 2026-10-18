@@ -51,6 +51,8 @@ class PaddockController(
         @field:Size(max = 2000) val description: String = "",
         /** Only read on create. */
         @field:Size(min = 1, max = MAX_CLIENT_ID_LENGTH) val clientId: String? = null,
+        /** The list and board order; missing means 0, also on update. */
+        @field:Min(0) val position: Int = 0,
     )
 
     data class GroupRequest(
@@ -86,13 +88,13 @@ class PaddockController(
     @PostMapping("/paddocks")
     fun createPaddock(@Valid @RequestBody request: PaddockRequest): PaddockResponse {
         val requester = accessService.requester(requireAuth())
-        return paddockService.createPaddock(requester, request.name, request.description, request.clientId).toPaddockResponse()
+        return paddockService.createPaddock(requester, request.name, request.description, request.clientId, request.position).toPaddockResponse()
     }
 
     @PutMapping("/paddocks/{paddockId}")
     fun updatePaddock(@PathVariable paddockId: String, @Valid @RequestBody request: PaddockRequest): PaddockResponse {
         val requester = accessService.requester(requireAuth())
-        return paddockService.updatePaddock(requester, parseObjectId(paddockId), request.name, request.description).toPaddockResponse()
+        return paddockService.updatePaddock(requester, parseObjectId(paddockId), request.name, request.description, request.position).toPaddockResponse()
     }
 
     @DeleteMapping("/paddocks/{paddockId}")

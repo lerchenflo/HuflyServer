@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.request
 import tools.jackson.databind.ObjectMapper
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /** Paddock planning: HTTP mapping, validation and sync. Business rules live in PaddockServiceTest. */
 @SpringBootTest
@@ -90,6 +91,22 @@ class PaddockControllerTest {
             jsonPath("$.updatedEntries[0].id") { value(id) }
         }
         call(HttpMethod.DELETE, "/paddocks/$id").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `the admin orders paddocks by position, a body without it means 0`() {
+        val id = idOf(HttpMethod.POST, "/paddocks", """{"name":"Große Koppel","description":"","position":2}""")
+
+        call(HttpMethod.POST, "/paddocks/sync", "[]", userId = rider.id).andExpect {
+            jsonPath("$.updatedEntries[0].position") { value(2) }
+        }
+        call(HttpMethod.PUT, "/paddocks/$id", """{"name":"Große Koppel","description":"","position":5}""").andExpect {
+            status { isOk() }
+            jsonPath("$.position") { value(5) }
+        }
+        call(HttpMethod.PUT, "/paddocks/$id", """{"name":"Große Koppel"}""").andExpect { jsonPath("$.position") { value(0) } }
+        call(HttpMethod.PUT, "/paddocks/$id", """{"name":"Große Koppel","position":-1}""").andExpect { status { isBadRequest() } }
+        assertEquals(listOf(0), paddockRepository.paddocks.map { it.position })
     }
 
     @Test

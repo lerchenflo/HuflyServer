@@ -1,7 +1,15 @@
 package com.lerchenflo.hufly.server.paddock.model
 
 /** Timestamps are epoch milliseconds. */
-data class PaddockResponse(val id: String, val stableId: String, val name: String, val description: String, val updatedAt: Long, val updatedBy: String)
+data class PaddockResponse(
+    val id: String,
+    val stableId: String,
+    val name: String,
+    val description: String,
+    val updatedAt: Long,
+    val updatedBy: String,
+    val position: Int,
+)
 
 data class HorseGroupResponse(val id: String, val stableId: String, val name: String, val horseIds: List<String>, val updatedAt: Long, val updatedBy: String)
 
@@ -31,7 +39,7 @@ data class PaddockAssignmentResponse(
 )
 
 fun Paddock.toPaddockResponse() =
-    PaddockResponse(id.toHexString(), stableId.toHexString(), name, description, updatedAt, updatedBy.toHexString())
+    PaddockResponse(id.toHexString(), stableId.toHexString(), name, description, updatedAt, updatedBy.toHexString(), position)
 
 fun HorseGroup.toHorseGroupResponse() = HorseGroupResponse(
     id.toHexString(), stableId.toHexString(), name, horseIds.map { it.toHexString() }, updatedAt, updatedBy.toHexString(),

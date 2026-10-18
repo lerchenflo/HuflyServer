@@ -20,6 +20,8 @@ data class Paddock(
     val deleted: Boolean = false,
     /** The client's local id, see [com.lerchenflo.hufly.server.core.idempotentCreate]. */
     val clientId: String? = null,
+    /** The admin's order in the paddock list and the board's columns; equal positions sort by name on the client. */
+    val position: Int = 0,
 ) : TimestampSynced
 
 /** Horses that usually go out together. */
