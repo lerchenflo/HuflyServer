@@ -14,6 +14,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.data.domain.Limit
+import org.springframework.data.mongodb.core.MongoTemplate
+import org.springframework.data.mongodb.core.query.Criteria
+import org.springframework.data.mongodb.core.query.Query
+import org.springframework.data.mongodb.core.query.Update
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mongodb.MongoDBContainer
@@ -33,6 +37,7 @@ class MongoEventRepositoryTest {
 
     @Autowired lateinit var eventRepository: EventRepository
     @Autowired lateinit var invitationRepository: EventInvitationRepository
+    @Autowired lateinit var mongoTemplate: MongoTemplate
 
     private val creator = ObjectId.get()
 
@@ -69,6 +74,16 @@ class MongoEventRepositoryTest {
 
         assertEquals(listOf(2L, 3L), eventRepository.findVersionPage(STABLE_ID, 1, 4, Limit.of(2)).map { it.version })
         assertEquals(6, eventRepository.findByCreatorUserIdAndDeletedFalse(creator).size)
+    }
+
+    @Test
+    fun `an event stored before participantsVisible shows its participants`() {
+        val hidden = eventRepository.save(event(1).copy(participantsVisible = false))
+        val older = eventRepository.save(event(2).copy(participantsVisible = false))
+        mongoTemplate.updateFirst(Query(Criteria.where("_id").`is`(older.id)), Update().unset("participantsVisible"), Event::class.java)
+
+        assertEquals(false, eventRepository.findById(hidden.id)?.participantsVisible)
+        assertEquals(true, eventRepository.findById(older.id)?.participantsVisible)
     }
 
     @Test

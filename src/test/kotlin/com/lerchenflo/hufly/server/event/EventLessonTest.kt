@@ -244,6 +244,18 @@ class EventLessonTest {
     }
 
     @Test
+    fun `moving or deleting a lesson tells only who accepted, never who waits`() {
+        val event = lesson()
+        respond(event, anna, accepted = true)
+        published.clear()
+
+        update(event.copy(startAt = start + hours(1), endAt = start + hours(2)), fields(maxParticipants = 2, order = listOf(anna, ben, clara)))
+        eventService.deleteEvent(teacher, event.id)
+
+        assertEquals(listOf(listOf(anna.id), listOf(anna.id)), published.filterIsInstance<com.lerchenflo.hufly.server.core.notification.EventChanged>().map { it.userIds })
+    }
+
+    @Test
     fun `removing an invitation offers its place`() {
         val event = lesson()
         published.clear()

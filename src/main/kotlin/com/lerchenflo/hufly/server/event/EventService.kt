@@ -77,6 +77,7 @@ class EventService(
         recurrence: Recurrence? = null,
         splitFrom: EventSplit? = null,
         lesson: LessonFields = LessonFields(),
+        participantsVisible: Boolean = true,
     ): Event {
         accessService.requirePermission(requester, Permission.EVENT_EDIT)
         return idempotentCreate(clientId, { eventRepository.findByStableIdAndClientId(requester.stableId, it) }) {
@@ -103,6 +104,7 @@ class EventService(
                     clientId = clientId,
                     splitFromEventId = splitFrom?.eventId,
                     splitFromOccurrenceStartAt = splitFrom?.occurrenceStartAt,
+                    participantsVisible = participantsVisible,
                 ).withLesson(lessonFields)
             )
             invitees.forEach { addInvitation(requester, event, it, null) }
@@ -122,6 +124,7 @@ class EventService(
         horseIds: List<ObjectId>,
         recurrence: Recurrence? = null,
         lesson: LessonFields = LessonFields(),
+        participantsVisible: Boolean = true,
     ): Event {
         val event = managedEvent(requester, eventId)
         validate(requester, startAt, endAt, horseIds)
@@ -136,6 +139,7 @@ class EventService(
                     endAt = endAt,
                     horseIds = horseIds.distinct(),
                     recurrence = recurrence,
+                    participantsVisible = participantsVisible,
                     updatedAt = clock.millis(),
                     updatedBy = requester.id,
                 ).withLesson(lessonFields)

@@ -164,6 +164,24 @@ class EventControllerTest {
         }
     }
 
+    // Who sees the participants (client 2026-10-18)
+
+    @Test
+    fun `an event stores whether invitees see who accepted, a body without it means yes`() {
+        val created = call(HttpMethod.POST, "/events", lessonJson(""""participantsVisible":false""")).andExpect {
+            status { isOk() }
+            jsonPath("$.participantsVisible") { value(false) }
+        }
+        val eventId = objectMapper.readTree(created.andReturn().response.contentAsString)["id"].asString()
+        assertEquals(false, eventRepository.events.single().participantsVisible)
+
+        call(HttpMethod.PUT, "/events/$eventId", eventJson()).andExpect {
+            status { isOk() }
+            jsonPath("$.participantsVisible") { value(true) }
+        }
+        assertEquals(true, eventRepository.events.single().participantsVisible)
+    }
+
     // Lessons (client schema 37; supersede EVT-7)
 
     private fun lessonJson(lesson: String) =

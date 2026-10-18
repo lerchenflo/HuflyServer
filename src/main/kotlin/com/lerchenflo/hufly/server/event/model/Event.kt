@@ -43,6 +43,8 @@ data class Event(
     val answerHours: Int? = null,
     /** Who gets places first; may name users without an invitation, invitees missing from it come last. */
     val participantOrder: List<ObjectId> = emptyList(),
+    /** Whether invitees see who else accepted; the client hides it, the server sends every invitation anyway. */
+    val participantsVisible: Boolean = true,
 ) : VersionSynced
 
 /** The lesson fields of an [Event], all empty for a plain event. */

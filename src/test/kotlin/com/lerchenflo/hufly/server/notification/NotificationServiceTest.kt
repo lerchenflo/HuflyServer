@@ -180,26 +180,26 @@ class NotificationServiceTest {
     }
 
     @Test
-    fun `a place offered from the waiting list names the date and the answer time`() {
+    fun `a place offered from the waiting list reads like the organiser's invitation, with the answer time`() {
         val event = eventRepository.save(event().copy(maxParticipants = 2, answerHours = 12))
 
-        service.on(LessonPlaceOffered(STABLE_ID, anna.id, event.id, listOf(ben.id), occurrenceStartAt = null))
+        service.on(LessonPlaceOffered(STABLE_ID, clara.id, event.id, listOf(ben.id), occurrenceStartAt = null))
 
-        assertEquals(listOf(PushMessage("Platz frei: Springstunde", "Fr. 09.10. 17:00 · zusagen bis Mo. 05.10. 22:00", offerData(event))), sentTo(ben))
+        assertEquals(listOf(PushMessage("Einladung: Springstunde", "Fr. 09.10. 17:00 · von anna · zusagen bis Mo. 05.10. 22:00", offerData(event))), sentTo(ben))
     }
 
     @Test
-    fun `an offer without an answer time, or one ending after the start, asks to accept now`() {
+    fun `an offer without an answer time, or one ending after the start, reads like a plain invitation`() {
         val event = eventRepository.save(event(Recurrence(RecurrenceFrequency.WEEKLY, 1, emptyList(), null, null, "Europe/Vienna")).copy(maxParticipants = 2))
         val late = eventRepository.save(event().copy(maxParticipants = 2, answerHours = 200))
 
-        service.on(LessonPlaceOffered(STABLE_ID, anna.id, event.id, listOf(ben.id), occurrenceStartAt = lesson + days(7)))
-        service.on(LessonPlaceOffered(STABLE_ID, anna.id, late.id, listOf(ben.id), occurrenceStartAt = null))
+        service.on(LessonPlaceOffered(STABLE_ID, clara.id, event.id, listOf(ben.id), occurrenceStartAt = lesson + days(7)))
+        service.on(LessonPlaceOffered(STABLE_ID, clara.id, late.id, listOf(ben.id), occurrenceStartAt = null))
 
         assertEquals(
             listOf(
-                PushMessage("Platz frei: Springstunde", "Fr. 16.10. 17:00 · jetzt zusagen", offerData(event, lesson + days(7))),
-                PushMessage("Platz frei: Springstunde", "Fr. 09.10. 17:00 · jetzt zusagen", offerData(late)),
+                PushMessage("Einladung: Springstunde", "Fr. 16.10. 17:00 · von anna", offerData(event, lesson + days(7))),
+                PushMessage("Einladung: Springstunde", "Fr. 09.10. 17:00 · von anna", offerData(late)),
             ),
             sentTo(ben),
         )

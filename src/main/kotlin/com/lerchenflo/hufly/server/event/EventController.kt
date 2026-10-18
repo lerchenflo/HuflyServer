@@ -63,6 +63,8 @@ class EventController(
         @field:Min(0) @field:Max(MAX_LESSON_HOURS) val leaveLockHours: Int? = null,
         @field:Min(0) @field:Max(MAX_LESSON_HOURS) val answerHours: Int? = null,
         @field:Size(max = 500) val participantOrder: List<String>? = null,
+        /** Whether invitees see who else accepted; missing means yes, also on update. */
+        val participantsVisible: Boolean = true,
     ) {
         fun lesson() = LessonFields(
             eventTypeId = eventTypeId?.let(::parseObjectId),
@@ -110,6 +112,7 @@ class EventController(
             request.recurrence?.toRecurrence(request.startAt),
             request.split(),
             request.lesson(),
+            request.participantsVisible,
         ).toEventResponse()
     }
 
@@ -121,6 +124,7 @@ class EventController(
             request.endAt, request.horseIds.map(::parseObjectId),
             request.recurrence?.toRecurrence(request.startAt),
             request.lesson(),
+            request.participantsVisible,
         ).toEventResponse()
     }
 

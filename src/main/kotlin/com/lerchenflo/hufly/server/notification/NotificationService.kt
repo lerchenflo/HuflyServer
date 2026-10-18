@@ -98,15 +98,19 @@ class NotificationService(
         }
     }
 
-    /** Has an answer time, so it goes out at once, also to digest users; it is an invitation for whoever mutes those. */
+    /**
+     * Reads like the organiser's invitation, since invitees never learn about the waiting list. Has an answer time, so
+     * it goes out at once, also to digest users; it is an invitation for whoever mutes those.
+     */
     private fun placeOffered(event: LessonPlaceOffered) {
         val calendarEvent = eventRepository.findById(event.eventId)?.takeIf { it.stableId == event.stableId && !it.deleted } ?: return
+        val from = userRepository.findById(calendarEvent.creatorUserId)?.displayName ?: return
         val at = event.occurrenceStartAt ?: calendarEvent.startAt
         val answerBy = calendarEvent.answerHours?.let { clock.millis() + it * MILLIS_PER_HOUR }?.takeIf { it < at }
         deliver(members(event, event.userIds), atOnce = true) { zone ->
             PushMessage(
-                "Platz frei: ${calendarEvent.title}",
-                "${format(at, zone)} · " + (answerBy?.let { "zusagen bis ${format(it, zone)}" } ?: "jetzt zusagen"),
+                "Einladung: ${calendarEvent.title}",
+                "${format(at, zone)} · von $from" + (answerBy?.let { " · zusagen bis ${format(it, zone)}" } ?: ""),
                 data("event_invitation", "eventId" to calendarEvent.id, event.occurrenceStartAt),
             )
         }

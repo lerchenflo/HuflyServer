@@ -25,6 +25,7 @@ data class EventResponse(
     val leaveLockHours: Int?,
     val answerHours: Int?,
     val participantOrder: List<String>,
+    val participantsVisible: Boolean,
 )
 
 data class EventInvitationResponse(
@@ -62,6 +63,7 @@ fun Event.toEventResponse() = EventResponse(
     leaveLockHours = leaveLockHours,
     answerHours = answerHours,
     participantOrder = participantOrder.map { it.toHexString() },
+    participantsVisible = participantsVisible,
 )
 
 fun EventInvitation.toEventInvitationResponse() = EventInvitationResponse(
