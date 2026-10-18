@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.core.logging.LogUser
 import com.lerchenflo.hufly.server.core.security.MutableClock
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
@@ -123,9 +124,9 @@ class PushServiceTest {
 
         assertEquals(
             setOf(
-                "INFO Push note to account $anna sent (ANDROID, session ${phone.id})",
-                "INFO Push note to account $anna sent (IOS, session ${tablet.id})",
-                "WARN Push note to account $anna: token rejected (IOS, session ${stale.id}), removed",
+                "INFO Push note to ${LogUser(anna)} sent (ANDROID, session ${phone.id})",
+                "INFO Push note to ${LogUser(anna)} sent (IOS, session ${tablet.id})",
+                "WARN Push note to ${LogUser(anna)}: token rejected (IOS, session ${stale.id}), removed",
             ),
             logs.lines.toSet(),
         )
@@ -143,8 +144,8 @@ class PushServiceTest {
 
         assertEquals(
             listOf(
-                "INFO Push note to account $ben: no device",
-                "WARN Push note to account $anna failed (IOS, session ${phone.id})",
+                "INFO Push note to ${LogUser(ben)}: no device",
+                "WARN Push note to ${LogUser(anna)} failed (IOS, session ${phone.id})",
             ),
             logs.lines,
         )

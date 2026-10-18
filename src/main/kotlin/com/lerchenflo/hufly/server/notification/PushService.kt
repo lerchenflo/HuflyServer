@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.core.Clock
+import com.lerchenflo.hufly.server.core.logging.LogUser
 import com.lerchenflo.hufly.server.notification.model.PushMessage
 import com.lerchenflo.hufly.server.notification.model.PushPlatform
 import com.lerchenflo.hufly.server.notification.sender.PlatformPushSender
@@ -41,7 +42,7 @@ class PushService(
         val now = clock.millis()
         val targets = sessionRepository.findByUserIdAndPushTokenNotNull(userId).filter { it.expiresAt > now }
         // Never log the push's text, it holds names.
-        val push = "Push ${message.data["type"]} to account $userId"
+        val push = "Push ${message.data["type"]} to ${LogUser(userId)}"
         if (targets.isEmpty()) log.info("{}: no device", push)
         targets.forEach { session ->
             val token = session.pushToken ?: return@forEach

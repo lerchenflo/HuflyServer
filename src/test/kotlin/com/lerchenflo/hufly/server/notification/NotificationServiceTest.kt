@@ -1,6 +1,7 @@
 package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.authentication.model.RefreshToken
+import com.lerchenflo.hufly.server.core.logging.LogUser
 import com.lerchenflo.hufly.server.core.notification.EventChange
 import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
@@ -439,8 +440,8 @@ class NotificationServiceTest {
 
         assertEquals(
             listOf(
-                "INFO Notification event_invitation for account ${ben.id}: muted",
-                "INFO Notification event_invitation for account ${clara.id}: held for the digest",
+                "INFO Notification event_invitation for ${LogUser(ben.id)}: muted",
+                "INFO Notification event_invitation for ${LogUser(clara.id)}: held for the digest",
             ),
             logs.lines,
         )

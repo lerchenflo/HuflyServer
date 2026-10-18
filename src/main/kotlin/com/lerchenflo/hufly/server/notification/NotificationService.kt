@@ -2,6 +2,7 @@ package com.lerchenflo.hufly.server.notification
 
 import com.lerchenflo.hufly.server.core.Clock
 import com.lerchenflo.hufly.server.core.MILLIS_PER_HOUR
+import com.lerchenflo.hufly.server.core.logging.LogUser
 import com.lerchenflo.hufly.server.core.notification.EventChange
 import com.lerchenflo.hufly.server.core.notification.EventChanged
 import com.lerchenflo.hufly.server.core.notification.EventInvited
@@ -232,11 +233,11 @@ class NotificationService(
             }
             val type = push.data["type"]
             if (!preferences.enabled || preferences.mutes(type)) {
-                log.info("Notification {} for account {}: muted", type, user.accountId)
+                log.info("Notification {} for {}: muted", type, LogUser(user.accountId))
                 return@forEach
             }
             if (preferences.digest && !atOnce) {
-                log.info("Notification {} for account {}: held for the digest", type, user.accountId)
+                log.info("Notification {} for {}: held for the digest", type, LogUser(user.accountId))
                 digestRepository.save(DigestItem(userId = user.accountId, stableId = user.stableId, title = push.title, body = push.body, createdAt = clock.millis()))
             } else {
                 pushService.send(user.accountId, push)

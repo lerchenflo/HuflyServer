@@ -18,9 +18,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
 
 /**
  * Logs every failed app request (status 400 and up, except 401 for missing or expired logins) with its method, path,
- * cause, the allowed methods of a 405, the account and the app, so a failure seen in the log can be traced. Never logs
- * bodies, query strings or rejected values; they may hold passwords or names. Runs after [JwtAuthFilter]. Wrong paths,
- * methods or types without a login go to DEBUG: those are bots probing the public website.
+ * cause, the allowed methods of a 405 and the app (the account is in the line's user column), so a failure seen in the
+ * log can be traced. Never logs bodies, query strings or rejected values; they may hold passwords or names. Runs after
+ * [JwtAuthFilter]. Wrong paths, methods or types without a login go to DEBUG: those are bots probing the public website.
  */
 class FailedRequestLog(private val errorAttributes: ErrorAttributes) : OncePerRequestFilter() {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -39,7 +39,6 @@ class FailedRequestLog(private val errorAttributes: ErrorAttributes) : OncePerRe
         val accountId = (SecurityContextHolder.getContext().authentication?.principal as? String)?.takeIf(ObjectId::isValid)
         val details = listOfNotNull(
             response.getHeader("Allow")?.let { allow -> "allowed " + allow.split(",").map(String::trim).sorted().joinToString(",") },
-            accountId?.let { "account $it" } ?: "no account",
             "agent ${request.getHeader("User-Agent")?.let { clean(it, 100) } ?: "none"}",
         ).joinToString("; ")
         val message = "$status ${request.method} ${clean(request.requestURI, 200)}${cause?.let { ": $it" }.orEmpty()} ($details)"

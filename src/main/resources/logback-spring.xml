@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Console layout like SchneaggchatV3server's AppLogger: date, level, the requesting account by name, message. Lines go
+through a queue; one worker thread looks the names up and prints, so a request never waits for it.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <conversionRule conversionWord="user" class="com.lerchenflo.hufly.server.core.logging.UserConverter"/>
+    <conversionRule conversionWord="userMsg" class="com.lerchenflo.hufly.server.core.logging.MentionConverter"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%clr(%d{dd.MM.yyyy HH:mm:ss.SSS}){faint} %clr(%-7p) %-25user | %clr(%logger{0}){cyan}: %userMsg%n%wEx</pattern>
+            <charset>${CONSOLE_LOG_CHARSET}</charset>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>10000</queueSize>
+        <!-- Keep every level; when the queue is full, drop instead of blocking the request -->
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CONSOLE"/>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC"/>
+    </root>
+</configuration>

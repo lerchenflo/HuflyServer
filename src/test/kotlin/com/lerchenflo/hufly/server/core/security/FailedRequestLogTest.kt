@@ -58,13 +58,13 @@ class FailedRequestLogTest {
         }
 
     @Test
-    fun `a method the route does not take is logged with path, cause, allowed methods, account and app`() {
+    fun `a method the route does not take is logged with path, cause, allowed methods and app`() {
         call(HttpMethod.POST, "/events/sync", as_ = rider.id).andExpect { status { isMethodNotAllowed() } }
 
         assertEquals(
             listOf(
                 // Also matches PUT/DELETE /events/{eventId}.
-                "INFO 405 POST /events/sync: Request method 'POST' is not supported (allowed DELETE,GET,PUT; account ${rider.id}; agent Ktor client)",
+                "INFO 405 POST /events/sync: Request method 'POST' is not supported (allowed DELETE,GET,PUT; agent Ktor client)",
             ),
             logs.lines,
         )
@@ -78,9 +78,9 @@ class FailedRequestLogTest {
 
         assertEquals(
             listOf(
-                "DEBUG 405 POST /: Request method 'POST' is not supported (allowed GET,HEAD; no account; agent Ktor client)",
-                "DEBUG 404 GET /assets/.env: No static resource assets/.env for request '/assets/.env'. (no account; agent Ktor client)",
-                "DEBUG 406 GET / (no account; agent none)",
+                "DEBUG 405 POST /: Request method 'POST' is not supported (allowed GET,HEAD; agent Ktor client)",
+                "DEBUG 404 GET /assets/.env: No static resource assets/.env for request '/assets/.env'. (agent Ktor client)",
+                "DEBUG 406 GET / (agent none)",
             ),
             logs.lines,
         )
@@ -93,8 +93,8 @@ class FailedRequestLogTest {
 
         assertEquals(
             listOf(
-                "INFO 403 PUT /stables/me: Not allowed (account ${rider.id}; agent Ktor client)",
-                "INFO 404 GET /nope: No static resource nope for request '/nope'. (account ${rider.id}; agent Ktor client)",
+                "INFO 403 PUT /stables/me: Not allowed (agent Ktor client)",
+                "INFO 404 GET /nope: No static resource nope for request '/nope'. (agent Ktor client)",
             ),
             logs.lines,
         )
@@ -105,7 +105,16 @@ class FailedRequestLogTest {
         call(HttpMethod.POST, "/auth/register", """{"email":"neu@hufly.test","password":"geheim","displayName":"Neu"}""")
             .andExpect { status { isBadRequest() } }
 
-        assertEquals(listOf("INFO 400 POST /auth/register: invalid password (no account; agent Ktor client)"), logs.lines)
+        assertEquals(listOf("INFO 400 POST /auth/register: invalid password (agent Ktor client)"), logs.lines)
+    }
+
+    @Test
+    fun `the account goes into the line's user column, not into the message`() {
+        call(HttpMethod.PUT, "/stables/me", """{"name":"X"}""", as_ = rider.id).andExpect { status { isForbidden() } }
+        call(HttpMethod.POST, "/auth/register", """{"email":"neu@hufly.test","password":"geheim","displayName":"Neu"}""")
+            .andExpect { status { isBadRequest() } }
+
+        assertEquals(listOf(rider.id.toHexString(), null), logs.users)
     }
 
     @Test
