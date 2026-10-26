@@ -23,6 +23,10 @@ through a queue; one worker thread looks the names up and prints, so a request n
         <appender-ref ref="CONSOLE"/>
     </appender>
 
+    <!-- FailedRequestLog writes failed requests with their path; Spring's "Resolved [...]" lines repeat them without it,
+         and for invalid bodies they hold the rejected values (passwords, names) -->
+    <logger name="org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver" level="ERROR"/>
+
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
     </root>

@@ -15,16 +15,32 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
+import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertTrue
 
 /** Failed requests are logged with what is needed to find their cause, never with request bodies or rejected values. */
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "operator.path=/office-t3st", "operator.username=operator", "operator.password=operator-secret-123",
+        "ratelimit.operator.max-failures-per-ip=2",
+    ],
+)
 @AutoConfigureMockMvc
-@Import(FakeRepositoryConfig::class)
+@Import(FakeRepositoryConfig::class, FailedRequestLogTest.CrashController::class)
 class FailedRequestLogTest {
+
+    @RestController
+    class CrashController {
+        @GetMapping("/test/crash")
+        fun crash(): String = error("details that stay out of the log")
+    }
 
     @Autowired lateinit var mockMvc: MockMvc
     @Autowired lateinit var jwtService: JwtService
@@ -34,6 +50,7 @@ class FailedRequestLogTest {
     private val admin = testUser()
     private val rider = testUser()
     private lateinit var logs: LogCapture
+    private lateinit var springLogs: LogCapture
 
     @BeforeTest
     fun setUp() {
@@ -42,15 +59,28 @@ class FailedRequestLogTest {
         listOf(admin, rider).forEach { userRepository.save(it) }
         stableRepository.save(testStable(adminUserId = admin.id))
         logs = LogCapture(FailedRequestLog::class.java, Level.DEBUG)
+        springLogs = LogCapture("org.springframework")
     }
 
     @AfterTest
-    fun tearDown() = logs.close()
+    fun tearDown() {
+        logs.close()
+        springLogs.close()
+    }
 
-    private fun call(method: HttpMethod, path: String, body: String? = null, as_: org.bson.types.ObjectId? = null) =
+    private fun call(
+        method: HttpMethod,
+        path: String,
+        body: String? = null,
+        as_: org.bson.types.ObjectId? = null,
+        basic: String? = null,
+        ip: String = "127.0.0.1",
+    ) =
         mockMvc.request(method, path) {
+            with { it.remoteAddr = ip; it }
             header("User-Agent", "Ktor client")
             if (as_ != null) header("Authorization", "Bearer ${jwtService.generateAccessToken(as_)}")
+            if (basic != null) header("Authorization", "Basic " + Base64.getEncoder().encodeToString(basic.toByteArray()))
             if (body != null) {
                 contentType = MediaType.APPLICATION_JSON
                 content = body
@@ -118,9 +148,53 @@ class FailedRequestLogTest {
     }
 
     @Test
-    fun `missing or expired logins are not logged`() {
+    fun `missing or expired logins are logged at DEBUG only`() {
         call(HttpMethod.GET, "/events/sync").andExpect { status { isUnauthorized() } }
 
-        assertEquals(emptyList(), logs.lines)
+        assertEquals(listOf("DEBUG 401 GET /events/sync (agent Ktor client)"), logs.lines)
+    }
+
+    @Test
+    fun `exceptions no handler answers are logged as 500 with their class, never their message`() {
+        assertFails { call(HttpMethod.GET, "/test/crash", as_ = rider.id) }
+
+        assertEquals(listOf("WARN 500 GET /test/crash: IllegalStateException (agent Ktor client)"), logs.lines)
+    }
+
+    @Test
+    fun `Spring writes no lines of its own for failed requests, they would repeat the line without the path`() {
+        call(HttpMethod.POST, "/events/sync", as_ = rider.id).andExpect { status { isMethodNotAllowed() } }
+        call(HttpMethod.GET, "/nope", as_ = rider.id).andExpect { status { isNotFound() } }
+        call(HttpMethod.POST, "/auth/register", """{"email":"neu@hufly.test","password":"geheim","displayName":"Neu"}""")
+            .andExpect { status { isBadRequest() } }
+        mockMvc.request(HttpMethod.POST, "/auth/login") { contentType = MediaType.TEXT_PLAIN; content = "x" }
+            .andExpect { status { isUnsupportedMediaType() } }
+
+        assertEquals(emptyList(), springLogs.lines)
+    }
+
+    @Test
+    fun `the operator area logs wrong logins and blocks at WARN, never its secret path`() {
+        call(HttpMethod.GET, "/office-t3st", ip = "203.0.113.20").andExpect { status { isUnauthorized() } }
+        repeat(2) {
+            call(HttpMethod.GET, "/office-t3st/api/stables", basic = "operator:wrong-password", ip = "203.0.113.20")
+                .andExpect { status { isUnauthorized() } }
+        }
+        call(HttpMethod.GET, "/office-t3st/api/stables", basic = "operator:operator-secret-123", ip = "203.0.113.20")
+            .andExpect { status { isTooManyRequests() } }
+        call(HttpMethod.GET, "/office-t3st/nope", basic = "operator:operator-secret-123", ip = "203.0.113.21")
+            .andExpect { status { isNotFound() } }
+
+        assertEquals(
+            listOf(
+                // The browser's first try without credentials is no failure.
+                "WARN 401 GET <operator path> (agent Ktor client)",
+                "WARN 401 GET <operator path> (agent Ktor client)",
+                "WARN 429 GET <operator path> (agent Ktor client)",
+                "INFO 404 GET <operator path>: NoResourceFoundException (agent Ktor client)",
+            ),
+            logs.lines,
+        )
+        assertTrue((logs.lines + springLogs.lines).none { "office-t3st" in it })
     }
 }

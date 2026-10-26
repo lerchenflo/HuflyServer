@@ -54,6 +54,7 @@ class SecurityConfig(
         http: HttpSecurity,
         @Value("\${operator.path}") operatorPath: String,
         loginGuard: LoginGuard,
+        errorAttributes: ErrorAttributes,
     ): SecurityFilterChain {
         val basicEntryPoint = BasicAuthenticationEntryPoint().apply { setRealmName("Hufly"); afterPropertiesSet() }
         // Wrong Basic credentials end here; a request without credentials is only the browser's first try.
@@ -77,6 +78,8 @@ class SecurityConfig(
             .authorizeHttpRequests { it.anyRequest().hasRole(OPERATOR_ROLE) }
             .httpBasic { it.authenticationEntryPoint(countingEntryPoint) }
             .exceptionHandling { it.authenticationEntryPoint(countingEntryPoint) }
+            // Added first, so it also sees the IP block's 429.
+            .addFilterBefore(FailedRequestLog(errorAttributes, secretPath = true), BasicAuthenticationFilter::class.java)
             .addFilterBefore(blockedIps, BasicAuthenticationFilter::class.java)
             .build()
     }

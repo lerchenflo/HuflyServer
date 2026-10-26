@@ -8,8 +8,12 @@ import com.lerchenflo.hufly.server.core.logging.LOG_USER
 import org.slf4j.LoggerFactory
 
 /** Collects what [type] logs from [level] up, as "LEVEL message" lines. */
-class LogCapture(type: Class<*>, level: Level = Level.INFO) {
-    private val logger = LoggerFactory.getLogger(type) as Logger
+class LogCapture private constructor(private val logger: Logger, level: Level?) {
+    constructor(type: Class<*>, level: Level = Level.INFO) : this(LoggerFactory.getLogger(type) as Logger, level)
+
+    /** What the loggers under [name] log at their configured levels. */
+    constructor(name: String) : this(LoggerFactory.getLogger(name) as Logger, null)
+
     private val appender = object : ListAppender<ILoggingEvent>() {
         // Keeps the MDC of the logging thread; read later, it would be the test thread's.
         override fun append(event: ILoggingEvent) {
@@ -20,7 +24,7 @@ class LogCapture(type: Class<*>, level: Level = Level.INFO) {
     private val levelBefore = logger.level
 
     init {
-        logger.level = level
+        if (level != null) logger.level = level
         logger.addAppender(appender)
     }
 
